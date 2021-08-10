@@ -11,7 +11,7 @@ import (
 type DHCPServer struct {
 	opts         *DHCPServerOpts
 	issuedLeases leaseDB
-	requestChan  chan dhcpLeaseRequest
+	requestChan  chan Message
 	responseChan chan Message
 }
 
@@ -44,13 +44,8 @@ func (l *leaseDB) set(id string, ls *lease) {
 	l.leases[id] = ls
 }
 
-type dhcpLeaseRequest struct {
-	Message
-	addr net.Addr
-}
-
 var defaultOpts = &DHCPServerOpts{
-	ListenAddress: "127.0.0.1:67",
+	ListenAddress: "0.0.0.0:67",
 	StartFrom:     net.ParseIP("10.0.0.1"),
 	NumLeases:     254,
 }
@@ -66,12 +61,15 @@ func NewDHCPServerWithOpts(opts *DHCPServerOpts) *DHCPServer {
 			leases: make(map[string]*lease),
 			lock:   new(sync.Mutex),
 		},
-		requestChan:  make(chan dhcpLeaseRequest, 100),
+		requestChan:  make(chan Message, 100),
 		responseChan: make(chan Message, 100),
 	}
 }
 
 func (z *DHCPServer) Start() error {
+	for i := 0; i < 10; i++ {
+		go requestWorker(z.requestChan, z.responseChan, z.issuedLeases)
+	}
 	return z.listen()
 }
 
@@ -80,10 +78,12 @@ func (z *DHCPServer) listen() error {
 	if err != nil {
 		return err
 	}
+	log.Debug("Listen on ", z.opts.ListenAddress)
 	go func() {
 		buff := make([]byte, 1500)
 		for {
-			n, addr, err := packetConn.ReadFrom(buff)
+			log.Debug("waiting on packet")
+			n, _, err := packetConn.ReadFrom(buff)
 			if err != nil {
 				log.Fatal("unable to read datastream: ", err.Error())
 			}
@@ -91,26 +91,20 @@ func (z *DHCPServer) listen() error {
 			if n < 240 {
 				continue
 			}
+			log.Debug("read packet of ", n, " bytes")
 
-			req := dhcpLeaseRequest{
-				Message: Message(buff[:n]),
-				addr:    addr,
-			}
-			if req.HLen() < 16 {
-				continue
-			}
-
-			z.requestChan <- req
+			z.requestChan <- Message(buff[:n])
 		}
 	}()
 	return nil
 }
 
-func requestWorker(reqChan chan dhcpLeaseRequest, respChan chan Message, leases leaseDB) {
+func requestWorker(reqChan <-chan Message, respChan chan<- Message, leases leaseDB) {
 	for req := range reqChan {
-		log.Debug("request from ", req.addr.String())
+		opts := ParseOptions(req)
+		log.Debugf("Transaction: %x %d from %s", req.XId(), opts[OptionDHCPMessageType], req.CHAddr().String())
 
-		resp := Message([]byte{0})
+		resp := Message(make([]byte, 0))
 		respChan <- resp
 	}
 }

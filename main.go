@@ -3,10 +3,14 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.com/thatjames-go/gatekeeper-go/config"
+	"gitlab.com/thatjames-go/gatekeeper-go/dhcp"
 )
 
 //Flags
@@ -21,7 +25,18 @@ func main() {
 		panic(err)
 	}
 	log.SetFormatter(logFormatFunc(formatLogEntry))
-	log.Info("Hello World")
+	log.SetLevel(log.DebugLevel)
+	log.Info("Starting gatekeeper")
+	log.Info("Starting DHCP server")
+	dhcpServer := dhcp.NewDHCPServer()
+	if err := dhcpServer.Start(); err != nil {
+		log.Fatal(err)
+	}
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	sig := <-sigChan
+	log.Infof("caught signal %v", sig)
 }
 
 type logFormatFunc func(*log.Entry) ([]byte, error)
@@ -31,5 +46,5 @@ func (fn logFormatFunc) Format(e *log.Entry) ([]byte, error) {
 }
 
 func formatLogEntry(e *log.Entry) ([]byte, error) {
-	return []byte(fmt.Sprintf("%s %s - %s", e.Time.Format("2006-01-02 15:04:05"), strings.ToUpper(e.Level.String()), e.Message)), nil
+	return []byte(fmt.Sprintf("%s %s - %s\n", e.Time.Format("2006-01-02 15:04:05"), strings.ToUpper(e.Level.String()), e.Message)), nil
 }
