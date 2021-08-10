@@ -1,13 +1,25 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	"gitlab.com/thatjames-go/gatekeeper-go/config"
+)
+
+//Flags
+var (
+	configFile string
 )
 
 func main() {
+	flag.StringVar(&configFile, "c", "config.yml", "config file")
+	flag.Parse()
+	if err := config.LoadConfig(configFile); err != nil {
+		panic(err)
+	}
 	log.SetFormatter(logFormatFunc(formatLogEntry))
 	log.Info("Hello World")
 }

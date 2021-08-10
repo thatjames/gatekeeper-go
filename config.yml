@@ -1,2 +1,2 @@
 DNS:
-  ListenAddr: ":53"
+  ListenAddr: ":67"
