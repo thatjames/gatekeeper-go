@@ -85,15 +85,13 @@ func (z *DHCPServer) listen() error {
 			log.Debug("waiting on packet")
 			n, _, err := packetConn.ReadFrom(buff)
 			if err != nil {
-				log.Fatal("unable to read datastream: ", err.Error())
-			}
-
-			if n < 240 {
+				log.Error("unable to read datastream: ", err.Error())
 				continue
 			}
-			log.Debug("read packet of ", n, " bytes")
 
-			z.requestChan <- Message(buff[:n])
+			if msg := Message(buff[:n]); n >= 240 && msg.OpCode() == OpRequest {
+				z.requestChan <- Message(buff[:n])
+			}
 		}
 	}()
 	return nil
@@ -105,6 +103,21 @@ func requestWorker(reqChan <-chan Message, respChan chan<- Message, leases lease
 		log.Debugf("Transaction: %x %d from %s", req.XId(), opts[OptionDHCPMessageType], req.CHAddr().String())
 
 		resp := Message(make([]byte, 0))
+		switch int(opts[OptionDHCPMessageType][0]) {
+		case DHCPDiscover:
+			log.Debug("discovery packet, responding with offer")
+
+			//respond(offer)
+
+		case DHCPRequest:
+			log.Debug("client requests address ", net.IP(opts[OptionRequestedIPAddress]))
+
+			//check and respond with ack/nack
+
+		case DHCPRelease:
+			log.Debug("client releasing lease")
+		}
+
 		respChan <- resp
 	}
 }

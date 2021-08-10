@@ -2,7 +2,10 @@ package dhcp
 
 import (
 	"bytes"
+	"fmt"
 	"net"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type OpCode byte
@@ -37,6 +40,7 @@ func ParseOptions(m Message) Options {
 	opts := make(map[OptionTag][]byte)
 	b := m.Options()
 	buff := bytes.NewBuffer(b)
+	fmt.Println(b)
 	for optTag := OptionTag(buff.Next(1)[0]); buff.Len() > 0; {
 		switch optTag {
 		case OptionPad: //Do nothing
@@ -47,6 +51,7 @@ func ParseOptions(m Message) Options {
 		default:
 			size := int(buff.Next(1)[0])
 			opts[optTag] = buff.Next(size)
+			log.Debug("set opt tag ", optTag)
 		}
 		if buff.Len() > 0 {
 			optTag = OptionTag(buff.Next(1)[0])
@@ -99,6 +104,17 @@ const (
 	OptionRebindingTimeValue                         //59
 	OptionClassIdentifier                            //60
 	OptionClientIdentifier                           //61
+)
+
+//DHCP Message Type
+const (
+	DHCPDiscover = iota + 1
+	DHCPOffer
+	DHCPRequest
+	DHCPDecline
+	DHCPAck
+	DHCPNack
+	DHCPRelease
 )
 
 func (o OptionTag) String() string {
