@@ -3,7 +3,7 @@ package dhcp
 import (
 	"net"
 	"strconv"
-	"sync"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -16,7 +16,7 @@ type DHCPPacket struct {
 
 type DHCPServer struct {
 	opts         *DHCPServerOpts
-	issuedLeases leaseDB
+	issuedLeases *LeaseDB
 	packetConn   net.PacketConn
 	requestChan  chan *DHCPPacket
 	responseChan chan *DHCPPacket
@@ -26,28 +26,6 @@ type DHCPServerOpts struct {
 	ListenAddress string
 	StartFrom     net.IP
 	NumLeases     int
-}
-
-type lease struct {
-	ClientId string
-	Expiry   time.Time
-}
-type leaseDB struct {
-	leases map[string]*lease
-	lock   *sync.Mutex
-}
-
-func (l *leaseDB) get(id string) (*lease, bool) {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-	ls, ok := l.leases[id]
-	return ls, ok
-}
-
-func (l *leaseDB) set(id string, ls *lease) {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-	l.leases[id] = ls
 }
 
 var defaultOpts = &DHCPServerOpts{
@@ -62,11 +40,8 @@ func NewDHCPServer() *DHCPServer {
 
 func NewDHCPServerWithOpts(opts *DHCPServerOpts) *DHCPServer {
 	return &DHCPServer{
-		opts: opts,
-		issuedLeases: leaseDB{
-			leases: make(map[string]*lease),
-			lock:   new(sync.Mutex),
-		},
+		opts:         opts,
+		issuedLeases: NewLeaseDB(),
 		responseChan: make(chan *DHCPPacket, 100),
 		requestChan:  make(chan *DHCPPacket, 100),
 	}
@@ -121,18 +96,35 @@ func (z *DHCPServer) receivePacketWorker() {
 		case DHCPDiscover:
 			log.Debug("discovery packet, responding with offer")
 
-			opts[OptionDHCPMessageType] = []byte{byte(DHCPOffer)}
-			resp = DHCPReply(req.Message, []byte{10, 0, 0, 1}, []byte{10, 0, 0, 100}, time.Second*86400, opts)
+			var offeredIp net.IP
+			if existingLease, ok := z.issuedLeases.GetLease(req.Message.CHAddr().String()); ok {
+				offeredIp = existingLease.IP
+			} else {
+				if offeredIp = z.issuedLeases.NextIP(); offeredIp == nil {
+					continue
+				}
+			}
+			resp = MakeReply(req.Message, DHCPOffer, []byte{10, 0, 0, 40}, offeredIp, time.Second*86400, opts)
 			log.Debugf("offering address %s", resp.CIAddr().String())
 
 		case DHCPRequest:
-			log.Debug("client requests address ", net.IP(opts[OptionRequestedIPAddress]))
+			requestedAddr := net.IP(opts[OptionRequestedIPAddress])
+			log.Debug("client requests address ", requestedAddr)
+			var msgType DHCPMessageType
+			var setIP net.IP
+			if lease, ok := z.issuedLeases.GetLeaseForIP(requestedAddr); ok {
+				if strings.EqualFold(lease.ClientId, net.IP(req.Message.CHAddr()).String()) {
+					msgType = DHCPAck
+					setIP = requestedAddr
+				}
+			} else {
+				msgType = DHCPNack
+			}
 			opts = make(Options)
-			opts[OptionDHCPMessageType] = []byte{byte(DHCPAck)}
 			opts[OptionDomainNameServer] = []byte{8, 8, 8, 8, 1, 1, 1, 1, 9, 9, 9, 9}
 			opts[OptionDomainName] = []byte("international-space-station")
 			// opts[OptionNetbiosNameServer] = []byte{10, 0, 0, 1}
-			resp = DHCPReply(req.Message, []byte{10, 0, 0, 1}, []byte{10, 0, 0, 100}, time.Second*86400, opts)
+			resp = MakeReply(req.Message, msgType, []byte{10, 0, 0, 1}, setIP, time.Second*86400, opts)
 			log.Debugf("acking address %s", net.IP(opts[OptionRequestedIPAddress]).String())
 
 			//check and respond with ack/nack

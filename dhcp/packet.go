@@ -324,7 +324,7 @@ func (m Message) Options() []byte {
 	return m[240:]
 }
 
-func (m Message) SetOptions(options Options) {
+func MarshalOptions(options Options) []byte {
 	b := make([]byte, 0)
 	for tag, val := range options {
 		b = append(b, byte(tag))
@@ -332,6 +332,7 @@ func (m Message) SetOptions(options Options) {
 		b = append(b, val...)
 	}
 	b = append(b, byte(OptionEndField))
+	return b
 }
 
 func (m *Message) FillPadding() {
@@ -340,7 +341,7 @@ func (m *Message) FillPadding() {
 	}
 }
 
-func DHCPReply(request Message, serverAddr, yiaddr net.IP, leaseDuration time.Duration, options Options) Message {
+func MakeReply(request Message, msgType DHCPMessageType, serverAddr, yiaddr net.IP, leaseDuration time.Duration, options Options) Message {
 	m := NewMessage(OpResponse)
 	m.SetXId(request.XId())
 	m.SetFlags(request.Flags())
@@ -351,15 +352,7 @@ func DHCPReply(request Message, serverAddr, yiaddr net.IP, leaseDuration time.Du
 		options[OptionIPLeaseTime] = make([]byte, 4)
 		binary.BigEndian.PutUint32(options[OptionIPLeaseTime], uint32(leaseDuration/time.Second))
 	}
-	m.SetOptions(options)
-	b := make([]byte, 0)
-	for tag, val := range options {
-		b = append(b, byte(tag))
-		b = append(b, byte(len(val)))
-		b = append(b, val...)
-	}
-	b = append(b, byte(OptionEndField))
-
-	copy(m[240:], b)
+	options[OptionDHCPMessageType] = []byte{byte(msgType)}
+	copy(m[240:], MarshalOptions(options))
 	return m
 }
