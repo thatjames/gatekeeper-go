@@ -101,6 +101,7 @@ func (z *DHCPServer) receivePacketWorker() {
 				offeredIp = existingLease.IP
 			} else {
 				if offeredIp = z.issuedLeases.NextIP(); offeredIp == nil {
+					log.Warn("unable to issue lease: no more remaining in pool")
 					continue
 				}
 			}
@@ -116,16 +117,24 @@ func (z *DHCPServer) receivePacketWorker() {
 				if strings.EqualFold(lease.ClientId, net.IP(req.Message.CHAddr()).String()) {
 					msgType = DHCPAck
 					setIP = requestedAddr
+				} else {
+					msgType = DHCPNack
 				}
 			} else {
-				msgType = DHCPNack
+				msgType = DHCPAck
+				z.issuedLeases.AddLease(req.Message.CHAddr().String(), &Lease{
+					ClientId: req.Message.CHAddr().String(),
+					IP:       requestedAddr,
+					Expiry:   time.Now().Add(time.Second * 86400),
+				})
+				setIP = requestedAddr
 			}
 			opts = make(Options)
 			opts[OptionDomainNameServer] = []byte{8, 8, 8, 8, 1, 1, 1, 1, 9, 9, 9, 9}
 			opts[OptionDomainName] = []byte("international-space-station")
 			// opts[OptionNetbiosNameServer] = []byte{10, 0, 0, 1}
 			resp = MakeReply(req.Message, msgType, []byte{10, 0, 0, 1}, setIP, time.Second*86400, opts)
-			log.Debugf("acking address %s", net.IP(opts[OptionRequestedIPAddress]).String())
+			log.Debugf("acking address %s", setIP.String())
 
 			//check and respond with ack/nack
 

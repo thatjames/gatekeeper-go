@@ -5,6 +5,8 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type Lease struct {
@@ -27,6 +29,7 @@ func NewLeaseDB() *LeaseDB {
 		issuedLeases: make(map[string]*Lease),
 		lock:         new(sync.Mutex),
 		start:        net.IP{10, 0, 0, 2},
+		leaseRange:   253,
 	}
 }
 
@@ -54,6 +57,7 @@ func (l *LeaseDB) NextIP() net.IP {
 	startByte := binary.BigEndian.Uint32(l.start)
 	for i := startByte; i < startByte+uint32(l.leaseRange); i++ {
 		binary.BigEndian.PutUint32(result, i)
+		log.Debug("Check address ", result.String())
 		if _, ok := l.GetLeaseForIP(result); !ok {
 			return result
 		}
