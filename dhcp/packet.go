@@ -2,8 +2,9 @@ package dhcp
 
 import (
 	"bytes"
-	"fmt"
+	"encoding/binary"
 	"net"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -40,7 +41,6 @@ func ParseOptions(m Message) Options {
 	opts := make(map[OptionTag][]byte)
 	b := m.Options()
 	buff := bytes.NewBuffer(b)
-	fmt.Println(b)
 	for optTag := OptionTag(buff.Next(1)[0]); buff.Len() > 0; {
 		switch optTag {
 		case OptionPad: //Do nothing
@@ -87,7 +87,8 @@ const (
 	OptionMaxDatagramReassemblySize                  //22
 	OptionIPTTL                                      //23
 
-	OptionEndField OptionTag = 255
+	OptionNetbiosNameServer           = 44
+	OptionEndField          OptionTag = 255
 )
 
 //DHCP Extensions
@@ -107,8 +108,11 @@ const (
 )
 
 //DHCP Message Type
+
+type DHCPMessageType int
+
 const (
-	DHCPDiscover = iota + 1
+	DHCPDiscover DHCPMessageType = iota + 1
 	DHCPOffer
 	DHCPRequest
 	DHCPDecline
@@ -196,15 +200,36 @@ func (o OptionTag) String() string {
 	}
 }
 
+var DHCPCookie = []byte{99, 130, 83, 99}
+
+// The entire packet needs to be 300 bytes when sent over UDP
+var zeroes [300]byte
+
 //DHCP Message
 type Message []byte
+
+func NewMessage(opCode OpCode) Message {
+	m := make(Message, 300)
+	m.SetOpCode(opCode)
+	m.SetHType(1) //ethernet
+	m.SetCookie(DHCPCookie)
+	return m
+}
 
 func (m Message) OpCode() OpCode {
 	return OpCode(m[0])
 }
 
+func (m Message) SetOpCode(opCode OpCode) {
+	m[0] = byte(opCode)
+}
+
 func (m Message) HType() byte {
 	return m[1]
+}
+
+func (m Message) SetHType(htype byte) {
+	m[1] = htype
 }
 
 func (m Message) HLen() byte {
@@ -212,6 +237,13 @@ func (m Message) HLen() byte {
 		return 16
 	}
 	return m[2]
+}
+
+func (m Message) SetHLen(size int) {
+	if size > 16 {
+		size = 16
+	}
+	m[2] = byte(size)
 }
 
 func (m Message) Hops() byte {
@@ -222,12 +254,20 @@ func (m Message) XId() []byte {
 	return m[4:8]
 }
 
+func (m Message) SetXId(b []byte) {
+	copy(m[4:8], b)
+}
+
 func (m Message) Secs() []byte {
 	return m[8:10]
 }
 
 func (m Message) Flags() []byte {
 	return m[10:12]
+}
+
+func (m Message) SetFlags(b []byte) {
+	copy(m[8:10], b)
 }
 
 func (m Message) CIAddr() net.IP {
@@ -238,6 +278,10 @@ func (m Message) YIAddr() net.IP {
 	return net.IP(m[16:20])
 }
 
+func (m Message) SetYIAddr(a net.IP) {
+	copy(m[16:20], a)
+}
+
 func (m Message) SIAddr() net.IP {
 	return net.IP(m[20:24])
 }
@@ -246,9 +290,18 @@ func (m Message) GIAddr() net.IP {
 	return net.IP(m[24:28])
 }
 
+func (m Message) SetGIAddr(a net.IP) {
+	copy(m[24:28], a)
+}
+
 func (m Message) CHAddr() net.HardwareAddr {
 	hlen := m.HLen()
 	return net.HardwareAddr(m[28 : 28+hlen])
+}
+
+func (m Message) SetCHAddr(a net.HardwareAddr) {
+	copy(m[28:28+len(a)], a)
+	m.SetHLen(len([]byte(a)))
 }
 
 func (m Message) Sname() string {
@@ -259,6 +312,55 @@ func (m Message) File() []byte {
 	return m[108:236]
 }
 
+func (m Message) Cookie() []byte {
+	return m[236:240]
+}
+
+func (m Message) SetCookie(cookie []byte) {
+	copy(m[236:240], cookie)
+}
+
 func (m Message) Options() []byte {
 	return m[240:]
+}
+
+func (m Message) SetOptions(options Options) {
+	b := make([]byte, 0)
+	for tag, val := range options {
+		b = append(b, byte(tag))
+		b = append(b, byte(len(val)))
+		b = append(b, val...)
+	}
+	b = append(b, byte(OptionEndField))
+}
+
+func (m *Message) FillPadding() {
+	if l := len(*m); l < 272 {
+		*m = append(*m, zeroes[:272-l]...)
+	}
+}
+
+func DHCPReply(request Message, serverAddr, yiaddr net.IP, leaseDuration time.Duration, options Options) Message {
+	m := NewMessage(OpResponse)
+	m.SetXId(request.XId())
+	m.SetFlags(request.Flags())
+	m.SetYIAddr(yiaddr)
+	m.SetGIAddr(request.GIAddr())
+	m.SetCHAddr(request.CHAddr())
+	if leaseDuration > 0 {
+		options[OptionIPLeaseTime] = make([]byte, 4)
+		binary.BigEndian.PutUint32(options[OptionIPLeaseTime], uint32(leaseDuration/time.Second))
+	}
+	m.SetOptions(options)
+	b := make([]byte, 0)
+	for tag, val := range options {
+		b = append(b, byte(tag))
+		b = append(b, byte(len(val)))
+		b = append(b, val...)
+	}
+	b = append(b, byte(OptionEndField))
+
+	copy(m[240:], b)
+	log.Debug("REPLY: %v", m)
+	return m
 }
