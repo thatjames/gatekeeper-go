@@ -361,6 +361,5 @@ func DHCPReply(request Message, serverAddr, yiaddr net.IP, leaseDuration time.Du
 	b = append(b, byte(OptionEndField))
 
 	copy(m[240:], b)
-	log.Debug("REPLY: %v", m)
 	return m
 }
