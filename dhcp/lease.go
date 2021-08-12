@@ -87,7 +87,6 @@ func (l *LeaseDB) AcceptLease(ls *Lease) {
 
 func (l *LeaseDB) NextAvailableLease(clientId string) *Lease {
 	start := binary.BigEndian.Uint32(l.start)
-	var nextLease *Lease
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	for i, lease := range l.leases {
@@ -98,7 +97,8 @@ func (l *LeaseDB) NextAvailableLease(clientId string) *Lease {
 				IP:       make(net.IP, 4),
 			}
 			binary.BigEndian.PutUint32(l.leases[i].IP, start+uint32(i))
+			return l.leases[i]
 		}
 	}
-	return nextLease
+	return nil
 }

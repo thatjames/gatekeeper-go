@@ -5,8 +5,6 @@ import (
 	"encoding/binary"
 	"net"
 	"time"
-
-	log "github.com/sirupsen/logrus"
 )
 
 type OpCode byte
@@ -51,7 +49,6 @@ func ParseOptions(m Message) Options {
 		default:
 			size := int(buff.Next(1)[0])
 			opts[optTag] = buff.Next(size)
-			log.Debug("set opt tag ", optTag)
 		}
 		if buff.Len() > 0 {
 			optTag = OptionTag(buff.Next(1)[0])

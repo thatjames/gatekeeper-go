@@ -1,2 +1,10 @@
-DNS:
-  ListenAddr: ":67"
+DHCP:
+  DomainName: international-space-station
+  Interface: enp34s0
+  StartAddr: 10.0.0.2
+  EndAddr: 10.0.0.99
+  LeaseTTL: 86400
+  NameServers:
+    - 8.8.8.8
+    - 1.1.1.1
+    - 9.9.9.9

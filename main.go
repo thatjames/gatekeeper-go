@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"strings"
@@ -16,19 +17,35 @@ import (
 //Flags
 var (
 	configFile string
+	debug      bool
 )
 
 func main() {
 	flag.StringVar(&configFile, "c", "config.yml", "config file")
+	flag.BoolVar(&debug, "v", false, "verbose printout")
 	flag.Parse()
 	if err := config.LoadConfig(configFile); err != nil {
 		panic(err)
 	}
 	log.SetFormatter(logFormatFunc(formatLogEntry))
-	log.SetLevel(log.DebugLevel)
+	if debug {
+		log.SetLevel(log.DebugLevel)
+	}
 	log.Info("Starting gatekeeper")
 	log.Info("Starting DHCP server")
-	dhcpServer := dhcp.NewDHCPServer()
+	log.Debugf("%+v", config.Config)
+	nameServers := make([]net.IP, 0, len(config.Config.DHCP.NameServers))
+	for _, nameServer := range config.Config.DHCP.NameServers {
+		nameServers = append(nameServers, net.ParseIP(nameServer).To4())
+	}
+	options := &dhcp.DHCPServerOpts{
+		Interface:   config.Config.DHCP.Interface,
+		StartFrom:   net.ParseIP(config.Config.DHCP.StartAddr).To4(),
+		EndAt:       net.ParseIP(config.Config.DHCP.EndAddr).To4(),
+		NameServers: nameServers,
+		LeaseTTL:    config.Config.DHCP.LeaseTTL,
+	}
+	dhcpServer := dhcp.NewDHCPServerWithOpts(options)
 	if err := dhcpServer.Start(); err != nil {
 		log.Fatal(err)
 	}

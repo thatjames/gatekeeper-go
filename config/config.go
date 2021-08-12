@@ -6,14 +6,19 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var Config *ConfigInstance
+var Config ConfigInstance
 
 type ConfigInstance struct {
-	DNS *DNS `yaml:"dns"`
+	DHCP DHCP `yaml:"DHCP"`
 }
 
-type DNS struct {
-	ListenAddr string `yaml:""`
+type DHCP struct {
+	Interface   string   `yaml:"Interface"`
+	StartAddr   string   `yaml:"StartAddr"`
+	EndAddr     string   `yaml:"EndAddr"`
+	DomainName  string   `yaml:"DomainName"`
+	NameServers []string `yaml:"NameServers"`
+	LeaseTTL    int      `yaml:"LeaseTTL"`
 }
 
 func LoadConfig(filePath string) error {
@@ -23,6 +28,5 @@ func LoadConfig(filePath string) error {
 	}
 
 	defer f.Close()
-	Config = new(ConfigInstance)
-	return yaml.NewDecoder(f).Decode(Config)
+	return yaml.NewDecoder(f).Decode(&Config)
 }
