@@ -44,6 +44,8 @@ func main() {
 		EndAt:       net.ParseIP(config.Config.DHCP.EndAddr).To4(),
 		NameServers: nameServers,
 		LeaseTTL:    config.Config.DHCP.LeaseTTL,
+		Router:      net.ParseIP(config.Config.DHCP.Router).To4(),
+		SubnetMask:  net.ParseIP(config.Config.DHCP.SubnetMask).To4(),
 	}
 	dhcpServer := dhcp.NewDHCPServerWithOpts(options)
 	if err := dhcpServer.Start(); err != nil {

@@ -19,6 +19,8 @@ type DHCP struct {
 	DomainName  string   `yaml:"DomainName"`
 	NameServers []string `yaml:"NameServers"`
 	LeaseTTL    int      `yaml:"LeaseTTL"`
+	SubnetMask  string   `yaml:"SubnetMask"`
+	Router      string   `yaml:"Router"`
 }
 
 func LoadConfig(filePath string) error {

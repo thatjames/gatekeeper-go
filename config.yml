@@ -4,6 +4,8 @@ DHCP:
   StartAddr: 10.0.0.2
   EndAddr: 10.0.0.99
   LeaseTTL: 86400
+  SubnetMask: 255.255.255.0
+  Router: 10.0.0.1
   NameServers:
     - 8.8.8.8
     - 1.1.1.1
