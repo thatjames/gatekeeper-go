@@ -46,6 +46,7 @@ func main() {
 		LeaseTTL:    config.Config.DHCP.LeaseTTL,
 		Router:      net.ParseIP(config.Config.DHCP.Router).To4(),
 		SubnetMask:  net.ParseIP(config.Config.DHCP.SubnetMask).To4(),
+		DomainName:  config.Config.DHCP.DomainName,
 	}
 	dhcpServer := dhcp.NewDHCPServerWithOpts(options)
 	if err := dhcpServer.Start(); err != nil {

@@ -350,6 +350,7 @@ func MakeReply(request Message, msgType DHCPMessageType, serverAddr, yiaddr net.
 		binary.BigEndian.PutUint32(options[OptionIPLeaseTime], uint32(leaseDuration/time.Second))
 	}
 	options[OptionDHCPMessageType] = []byte{byte(msgType)}
-	copy(m[240:], MarshalOptions(options))
-	return m
+	buff := bytes.NewBuffer(m)
+	buff.Write(MarshalOptions(options))
+	return buff.Bytes()
 }

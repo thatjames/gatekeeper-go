@@ -36,6 +36,7 @@ type DHCPServerOpts struct {
 	LeaseTTL    int
 	Router      net.IP
 	SubnetMask  net.IP
+	DomainName  string
 }
 
 var defaultOpts = &DHCPServerOpts{
@@ -94,26 +95,23 @@ func (z *DHCPServer) Start() error {
 	return nil
 }
 
-func (z *DHCPServer) listen() error {
-	go func() {
-		buff := make([]byte, 1500)
-		for {
-			n, addr, err := z.packetConn.ReadFrom(buff)
-			if err != nil {
-				log.Error("unable to read datastream: ", err.Error())
-				continue
-			}
-
-			if msg := Message(buff[:n]); n >= 240 && msg.OpCode() == OpRequest {
-				z.requestChan <- &DHCPPacket{
-					Message:      msg,
-					ResponseAddr: addr,
-				}
-
-			}
+func (z *DHCPServer) listen() {
+	buff := make([]byte, 1500)
+	for {
+		n, addr, err := z.packetConn.ReadFrom(buff)
+		if err != nil {
+			log.Error("unable to read datastream: ", err.Error())
+			continue
 		}
-	}()
-	return nil
+
+		if msg := Message(buff[:n]); n >= 240 && msg.OpCode() == OpRequest {
+			z.requestChan <- &DHCPPacket{
+				Message:      msg,
+				ResponseAddr: addr,
+			}
+
+		}
+	}
 }
 
 func (z *DHCPServer) receivePacketWorker() {
@@ -150,20 +148,30 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 			}
 		}
 		responseOptions := make(Options)
+		responseOptions[OptionDHCPMessageType] = []byte{(byte(DHCPOffer))}
 		responseOptions[OptionServerIdentifier] = z.interfaceAddr.To4()
 		responseOptions[OptionIPLeaseTime] = make([]byte, 4)
 		binary.BigEndian.PutUint32(responseOptions[OptionIPLeaseTime], 86400)
 		responseOptions[OptionRouter] = z.opts.Router.To4()
 		responseOptions[OptionSubnetMask] = z.opts.SubnetMask.To4()
+		nameServers := make([]byte, 4*len(z.opts.NameServers))
+		for i, nameServer := range z.opts.NameServers {
+			copy(nameServers[i*4:(i+1)*4], nameServer)
+		}
+		responseOptions[OptionDomainNameServer] = nameServers
+		responseOptions[OptionDomainName] = []byte(z.opts.DomainName)
 		resp = MakeReply(req.Message, DHCPOffer, z.interfaceAddr, offeredIp, time.Second*86400, responseOptions)
 		log.Infof("offering address %s to %s", resp.YIAddr().String(), req.Message.CHAddr().String())
 
 	case DHCPRequest:
-		if !net.IP.Equal(z.interfaceAddr, opts[OptionServerIdentifier]) {
+		if val, ok := opts[OptionServerIdentifier]; ok && !net.IP.Equal(z.interfaceAddr, net.IP(val)) {
 			log.Debug("client requesting address from another server")
 			return nil
 		}
-		requestedAddr := net.IP(opts[OptionRequestedIPAddress])
+		var requestedAddr net.IP
+		if requestedAddr = opts[OptionRequestedIPAddress]; requestedAddr == nil {
+			requestedAddr = req.Message.CIAddr()
+		}
 		log.Debug("client requests address ", requestedAddr)
 		var msgType DHCPMessageType
 		var setIP net.IP
@@ -177,22 +185,23 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 				msgType = DHCPNack
 			}
 		} else {
-			msgType = DHCPAck
-			if nextLease := z.issuedLeases.NextAvailableLease(req.Message.CHAddr().String()); nextLease != nil {
-				setIP = nextLease.IP
-			} else {
-				log.Warn("no available leases")
-				return nil
-			}
+			//The client needs to ask for a new address
+			msgType = DHCPNack
 		}
-		opts = make(Options)
-		nameServers := make([]byte, 0, 4*len(z.opts.NameServers))
+		responseOptions := make(Options)
+		responseOptions[OptionDHCPMessageType] = []byte{(byte(DHCPAck))}
+		responseOptions[OptionServerIdentifier] = z.interfaceAddr.To4()
+		responseOptions[OptionIPLeaseTime] = make([]byte, 4)
+		binary.BigEndian.PutUint32(responseOptions[OptionIPLeaseTime], 86400)
+		responseOptions[OptionRouter] = z.opts.Router.To4()
+		responseOptions[OptionSubnetMask] = z.opts.SubnetMask.To4()
+		nameServers := make([]byte, 4*len(z.opts.NameServers))
 		for i, nameServer := range z.opts.NameServers {
 			copy(nameServers[i*4:(i+1)*4], nameServer)
 		}
-		opts[OptionDomainNameServer] = nameServers
-		opts[OptionDomainName] = []byte("international-space-station")
-		resp = MakeReply(req.Message, msgType, z.interfaceAddr, setIP, time.Second*time.Duration(z.opts.LeaseTTL), opts)
+		responseOptions[OptionDomainNameServer] = nameServers
+		responseOptions[OptionDomainName] = []byte(z.opts.DomainName)
+		resp = MakeReply(req.Message, msgType, z.interfaceAddr, setIP, time.Second*time.Duration(z.opts.LeaseTTL), responseOptions)
 		log.Infof("send ack for address %s", setIP.String())
 
 		//check and respond with ack/nack
