@@ -2,65 +2,103 @@ package dhcp
 
 import (
 	"encoding/binary"
+	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
+)
 
-	log "github.com/sirupsen/logrus"
+type LeaseState int
+
+func (ls LeaseState) String() string {
+	switch ls {
+	case LeaseAvailable:
+		return "Available"
+	case LeaseOffered:
+		return "Offered"
+	case LeaseReserved:
+		return "Reserved"
+	case LeaseActive:
+		return "Active"
+	case LeaseExpired:
+		return "Expired"
+	default:
+		return "unknown"
+	}
+}
+
+const (
+	LeaseAvailable LeaseState = iota + 1
+	LeaseOffered
+	LeaseReserved
+	LeaseActive
+	LeaseExpired
 )
 
 type Lease struct {
 	ClientId string
 	IP       net.IP
 	Expiry   time.Time
+	State    LeaseState
+}
+
+func (l *Lease) String() string {
+	return fmt.Sprintf("%s - %s: %s expiring at %s", l.IP.String(), l.ClientId, l.State, l.Expiry.Format("15:04:05"))
 }
 
 type LeaseDB struct {
-	start        net.IP
-	leaseRange   int
-	leases       map[string]*Lease
-	issuedLeases map[string]*Lease
-	lock         *sync.Mutex
+	start  net.IP
+	end    net.IP
+	leases []*Lease
+	lock   *sync.Mutex
 }
 
-func NewLeaseDB() *LeaseDB {
+func NewLeaseDB(startAddr, endAddr net.IP) *LeaseDB {
+	leaseRange := int(binary.BigEndian.Uint32(endAddr) - binary.BigEndian.Uint32(startAddr))
 	return &LeaseDB{
-		leases:       make(map[string]*Lease),
-		issuedLeases: make(map[string]*Lease),
-		lock:         new(sync.Mutex),
-		start:        net.IP{10, 0, 0, 2},
-		leaseRange:   253,
+		start:  startAddr,
+		end:    endAddr,
+		lock:   new(sync.Mutex),
+		leases: make([]*Lease, leaseRange),
 	}
 }
 
-func (l *LeaseDB) GetLease(id string) (*Lease, bool) {
+func (l *LeaseDB) GetLease(clientId string) *Lease {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	ls, ok := l.leases[id]
-	return ls, ok
-}
-
-func (l *LeaseDB) AddLease(id string, ls *Lease) {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-	l.leases[id] = ls
-	l.issuedLeases[ls.IP.String()] = nil
-}
-
-func (l *LeaseDB) GetLeaseForIP(ip net.IP) (*Lease, bool) {
-	lease, ok := l.issuedLeases[ip.String()]
-	return lease, ok
-}
-
-func (l *LeaseDB) NextIP() net.IP {
-	result := make(net.IP, 4)
-	startByte := binary.BigEndian.Uint32(l.start)
-	for i := startByte; i < startByte+uint32(l.leaseRange); i++ {
-		binary.BigEndian.PutUint32(result, i)
-		log.Debug("Check address ", result.String())
-		if _, ok := l.GetLeaseForIP(result); !ok {
-			return result
+	for _, lease := range l.leases {
+		if lease != nil && strings.EqualFold(clientId, lease.ClientId) {
+			return lease
 		}
 	}
 	return nil
+}
+
+func (l *LeaseDB) AcceptLease(ls *Lease) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	for i, lease := range l.leases {
+		if lease.ClientId == ls.ClientId {
+			l.leases[i].State = LeaseActive
+		}
+	}
+}
+
+func (l *LeaseDB) NextAvailableLease(clientId string) *Lease {
+	start := binary.BigEndian.Uint32(l.start)
+	var nextLease *Lease
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	for i, lease := range l.leases {
+		if lease == nil { //empty slot
+			l.leases[i] = &Lease{
+				ClientId: clientId,
+				State:    LeaseOffered,
+				IP:       make(net.IP, 4),
+			}
+			binary.BigEndian.PutUint32(l.leases[i].IP, start+uint32(i))
+		}
+	}
+	return nextLease
 }
