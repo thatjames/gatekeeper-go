@@ -1,12 +1,17 @@
 package dhcp
 
 import (
+	"bytes"
+	"fmt"
 	"net"
 	"strconv"
-	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
+)
+
+const (
+	dhcpServerPort = 67
 )
 
 type DHCPPacket struct {
@@ -15,23 +20,24 @@ type DHCPPacket struct {
 }
 
 type DHCPServer struct {
-	opts         *DHCPServerOpts
-	issuedLeases *LeaseDB
-	packetConn   net.PacketConn
-	requestChan  chan *DHCPPacket
-	responseChan chan *DHCPPacket
+	opts          *DHCPServerOpts
+	issuedLeases  *LeaseDB
+	packetConn    net.PacketConn
+	interfaceAddr net.IP
+	requestChan   chan *DHCPPacket
+	responseChan  chan *DHCPPacket
 }
 
 type DHCPServerOpts struct {
-	ListenAddress string
-	StartFrom     net.IP
-	NumLeases     int
+	Interface string
+	StartFrom net.IP
+	EndAt     net.IP
 }
 
 var defaultOpts = &DHCPServerOpts{
-	ListenAddress: "0.0.0.0:67",
-	StartFrom:     net.ParseIP("10.0.0.1"),
-	NumLeases:     254,
+	Interface: "enp34s0",
+	StartFrom: net.ParseIP("10.0.0.2").To4(),
+	EndAt:     net.ParseIP("10.0.0.99").To4(),
 }
 
 func NewDHCPServer() *DHCPServer {
@@ -41,19 +47,41 @@ func NewDHCPServer() *DHCPServer {
 func NewDHCPServerWithOpts(opts *DHCPServerOpts) *DHCPServer {
 	return &DHCPServer{
 		opts:         opts,
-		issuedLeases: NewLeaseDB(),
+		issuedLeases: NewLeaseDB(opts.StartFrom, opts.EndAt),
 		responseChan: make(chan *DHCPPacket, 100),
 		requestChan:  make(chan *DHCPPacket, 100),
 	}
 }
 
 func (z *DHCPServer) Start() error {
-	packetConn, err := net.ListenPacket("udp4", z.opts.ListenAddress)
+	log.Debug("looking for interface ", z.opts.Interface)
+	iface, err := net.InterfaceByName(z.opts.Interface)
+	if err != nil {
+		return err
+	}
+
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return err
+	}
+
+	for _, addr := range addrs {
+		if a, ok := addr.(*net.IPNet); ok {
+			z.interfaceAddr = a.IP
+			break
+		}
+	}
+
+	if z.interfaceAddr == nil {
+		return fmt.Errorf("could not find IP network address for interface %s", z.opts.Interface)
+	}
+
+	packetConn, err := net.ListenPacket("udp4", fmt.Sprintf("%s:%d", z.interfaceAddr.String(), dhcpServerPort))
 	if err != nil {
 		return err
 	}
 	z.packetConn = packetConn
-	log.Debug("Listen on ", z.opts.ListenAddress)
+	log.Debug("Listen on ", z.interfaceAddr.String())
 	go z.listen()
 	for i := 0; i < 10; i++ {
 		go z.receivePacketWorker()
@@ -97,24 +125,27 @@ func (z *DHCPServer) receivePacketWorker() {
 			log.Debug("discovery packet, responding with offer")
 
 			var offeredIp net.IP
-			if existingLease, ok := z.issuedLeases.GetLease(req.Message.CHAddr().String()); ok {
+			if existingLease := z.issuedLeases.GetLease(req.Message.CHAddr().String()); existingLease != nil {
 				offeredIp = existingLease.IP
 			} else {
-				if offeredIp = z.issuedLeases.NextIP(); offeredIp == nil {
+				if nextLease := z.issuedLeases.NextAvailableLease(req.Message.CHAddr().String()); offeredIp == nil {
 					log.Warn("unable to issue lease: no more remaining in pool")
 					continue
+				} else {
+					offeredIp = nextLease.IP
 				}
 			}
 			resp = MakeReply(req.Message, DHCPOffer, []byte{10, 0, 0, 40}, offeredIp, time.Second*86400, opts)
 			log.Debugf("offering address %s", resp.CIAddr().String())
 
 		case DHCPRequest:
+			log.Debug("Request made to ", net.IP(opts[OptionServerIdentifier]).String())
 			requestedAddr := net.IP(opts[OptionRequestedIPAddress])
 			log.Debug("client requests address ", requestedAddr)
 			var msgType DHCPMessageType
 			var setIP net.IP
-			if lease, ok := z.issuedLeases.GetLeaseForIP(requestedAddr); ok {
-				if strings.EqualFold(lease.ClientId, net.IP(req.Message.CHAddr()).String()) {
+			if lease := z.issuedLeases.GetLease(req.Message.CHAddr().String()); lease != nil {
+				if bytes.Equal(lease.IP, requestedAddr) {
 					msgType = DHCPAck
 					setIP = requestedAddr
 				} else {
@@ -122,12 +153,12 @@ func (z *DHCPServer) receivePacketWorker() {
 				}
 			} else {
 				msgType = DHCPAck
-				z.issuedLeases.AddLease(req.Message.CHAddr().String(), &Lease{
-					ClientId: req.Message.CHAddr().String(),
-					IP:       requestedAddr,
-					Expiry:   time.Now().Add(time.Second * 86400),
-				})
-				setIP = requestedAddr
+				if nextLease := z.issuedLeases.NextAvailableLease(req.Message.CHAddr().String()); nextLease != nil {
+					setIP = nextLease.IP
+				} else {
+					log.Warn("no available leases")
+					continue
+				}
 			}
 			opts = make(Options)
 			opts[OptionDomainNameServer] = []byte{8, 8, 8, 8, 1, 1, 1, 1, 9, 9, 9, 9}
@@ -168,8 +199,8 @@ func (z *DHCPServer) responsePacketWorker() {
 				Port: p,
 			}
 		}
-		if _, err := z.packetConn.WriteTo(resp.Message, addr); err != nil {
-			log.Error("Unable to respond to client: ", err.Error())
-		}
+		// if _, err := z.packetConn.WriteTo(resp.Message, addr); err != nil {
+		// 	log.Error("Unable to respond to client: ", err.Error())
+		// }
 	}
 }
