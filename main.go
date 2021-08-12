@@ -39,14 +39,15 @@ func main() {
 		nameServers = append(nameServers, net.ParseIP(nameServer).To4())
 	}
 	options := &dhcp.DHCPServerOpts{
-		Interface:   config.Config.DHCP.Interface,
-		StartFrom:   net.ParseIP(config.Config.DHCP.StartAddr).To4(),
-		EndAt:       net.ParseIP(config.Config.DHCP.EndAddr).To4(),
-		NameServers: nameServers,
-		LeaseTTL:    config.Config.DHCP.LeaseTTL,
-		Router:      net.ParseIP(config.Config.DHCP.Router).To4(),
-		SubnetMask:  net.ParseIP(config.Config.DHCP.SubnetMask).To4(),
-		DomainName:  config.Config.DHCP.DomainName,
+		Interface:      config.Config.DHCP.Interface,
+		StartFrom:      net.ParseIP(config.Config.DHCP.StartAddr).To4(),
+		EndAt:          net.ParseIP(config.Config.DHCP.EndAddr).To4(),
+		NameServers:    nameServers,
+		LeaseTTL:       config.Config.DHCP.LeaseTTL,
+		Router:         net.ParseIP(config.Config.DHCP.Router).To4(),
+		SubnetMask:     net.ParseIP(config.Config.DHCP.SubnetMask).To4(),
+		DomainName:     config.Config.DHCP.DomainName,
+		ReservedLeases: config.Config.DHCP.ReservedAddresses,
 	}
 	dhcpServer := dhcp.NewDHCPServerWithOpts(options)
 	if err := dhcpServer.Start(); err != nil {

@@ -9,3 +9,7 @@ DHCP:
   NameServers:
     - 8.8.8.8
     - 1.1.1.1
+  ReservedAddresses:
+    bc:5f:f4:ac:ea:c4: 10.0.0.100
+    00:d8:61:39:b5:6a: 10.0.0.101
+

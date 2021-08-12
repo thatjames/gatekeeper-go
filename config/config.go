@@ -13,14 +13,15 @@ type ConfigInstance struct {
 }
 
 type DHCP struct {
-	Interface   string   `yaml:"Interface"`
-	StartAddr   string   `yaml:"StartAddr"`
-	EndAddr     string   `yaml:"EndAddr"`
-	DomainName  string   `yaml:"DomainName"`
-	NameServers []string `yaml:"NameServers"`
-	LeaseTTL    int      `yaml:"LeaseTTL"`
-	SubnetMask  string   `yaml:"SubnetMask"`
-	Router      string   `yaml:"Router"`
+	Interface         string            `yaml:"Interface"`
+	StartAddr         string            `yaml:"StartAddr"`
+	EndAddr           string            `yaml:"EndAddr"`
+	DomainName        string            `yaml:"DomainName"`
+	NameServers       []string          `yaml:"NameServers"`
+	LeaseTTL          int               `yaml:"LeaseTTL"`
+	SubnetMask        string            `yaml:"SubnetMask"`
+	Router            string            `yaml:"Router"`
+	ReservedAddresses map[string]string `yaml:"ReservedAddresses"`
 }
 
 func LoadConfig(filePath string) error {

@@ -29,14 +29,15 @@ type DHCPServer struct {
 }
 
 type DHCPServerOpts struct {
-	Interface   string
-	StartFrom   net.IP
-	EndAt       net.IP
-	NameServers []net.IP
-	LeaseTTL    int
-	Router      net.IP
-	SubnetMask  net.IP
-	DomainName  string
+	Interface      string
+	StartFrom      net.IP
+	EndAt          net.IP
+	NameServers    []net.IP
+	LeaseTTL       int
+	Router         net.IP
+	SubnetMask     net.IP
+	DomainName     string
+	ReservedLeases map[string]string
 }
 
 var defaultOpts = &DHCPServerOpts{
@@ -79,6 +80,11 @@ func (z *DHCPServer) Start() error {
 
 	if z.interfaceAddr == nil {
 		return fmt.Errorf("could not find IP network address for interface %s", z.opts.Interface)
+	}
+
+	for clientID, lease := range z.opts.ReservedLeases {
+		z.issuedLeases.ReserveLease(clientID, net.ParseIP(lease).To4())
+		log.Debugf("reserving %s for %s", lease, clientID)
 	}
 
 	packetConn, err := net.ListenPacket("udp4", fmt.Sprintf(":%d", dhcpServerPort))

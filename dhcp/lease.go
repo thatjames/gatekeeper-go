@@ -102,3 +102,12 @@ func (l *LeaseDB) NextAvailableLease(clientId string) *Lease {
 	}
 	return nil
 }
+
+func (l *LeaseDB) ReserveLease(clientID string, reservedIP net.IP) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	//Reserved leases go to the top
+	leases := make([]*Lease, 0, len(l.leases)+1)
+	leases = append(leases, &Lease{ClientId: clientID, IP: reservedIP, State: LeaseReserved})
+	l.leases = append(leases, l.leases...)
+}
