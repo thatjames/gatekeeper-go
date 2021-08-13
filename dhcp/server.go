@@ -2,6 +2,7 @@ package dhcp
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -24,6 +25,7 @@ type DHCPServer struct {
 	issuedLeases  *LeaseDB
 	packetConn    net.PacketConn
 	interfaceAddr net.IP
+	broadcastAddr net.IP
 	requestChan   chan *DHCPPacket
 	responseChan  chan *DHCPPacket
 }
@@ -66,6 +68,10 @@ func (z *DHCPServer) Start() error {
 		return err
 	}
 
+	if iface.Flags&net.FlagBroadcast == 0 {
+		return errors.New("interface does not support broadcast")
+	}
+
 	addrs, err := iface.Addrs()
 	if err != nil {
 		return err
@@ -74,6 +80,14 @@ func (z *DHCPServer) Start() error {
 	for _, addr := range addrs {
 		if a, ok := addr.(*net.IPNet); ok {
 			z.interfaceAddr = a.IP
+			z.broadcastAddr = make(net.IP, 4)
+
+			//calculate broadcast for the given network mask by OR'ing the complement of the mask with the current address
+			//example: given address 10.0.0.1 and mask 255.255.255.0:
+			// 1. take complement of the mask: ^mask = [00 00 00 ff]
+			// 2. ^mask | addr: [10 00 00 ff] (10.0.0.255)
+			binary.BigEndian.PutUint32(z.broadcastAddr, binary.BigEndian.Uint32(a.IP.To4())|^binary.BigEndian.Uint32(net.IP(a.Mask).To4()))
+			log.Debug("set broadcast address ", z.broadcastAddr, " from mask ", net.IP(a.Mask).String())
 			break
 		}
 	}
@@ -183,7 +197,7 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 		var setIP net.IP
 		if lease := z.issuedLeases.GetLease(req.Message.CHAddr().String()); lease != nil {
 			if net.IP.Equal(lease.IP, requestedAddr) {
-				log.Infof("confirming address %s for %s", requestedAddr, req.Message.CHAddr().String())
+				log.Infof("send ack for %s", requestedAddr)
 				msgType = DHCPAck
 				setIP = requestedAddr
 			} else {
@@ -195,7 +209,7 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 			msgType = DHCPNack
 		}
 		responseOptions := make(Options)
-		responseOptions[OptionDHCPMessageType] = []byte{(byte(DHCPAck))}
+		responseOptions[OptionDHCPMessageType] = []byte{(byte(msgType))}
 		responseOptions[OptionServerIdentifier] = z.interfaceAddr.To4()
 		responseOptions[OptionIPLeaseTime] = make([]byte, 4)
 		binary.BigEndian.PutUint32(responseOptions[OptionIPLeaseTime], 86400)
@@ -208,7 +222,6 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 		responseOptions[OptionDomainNameServer] = nameServers
 		responseOptions[OptionDomainName] = []byte(z.opts.DomainName)
 		resp = MakeReply(req.Message, msgType, z.interfaceAddr, setIP, time.Second*time.Duration(z.opts.LeaseTTL), responseOptions)
-		log.Infof("send ack for address %s", setIP.String())
 
 		//check and respond with ack/nack
 
@@ -220,7 +233,6 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 
 func (z *DHCPServer) responsePacketWorker() {
 	for resp := range z.responseChan {
-		log.Debugf("responding to transaction %x", resp.Message.XId())
 		addr := resp.ResponseAddr
 		ip, port, err := net.SplitHostPort(addr.String())
 		if err != nil {
@@ -231,12 +243,14 @@ func (z *DHCPServer) responsePacketWorker() {
 		if net.ParseIP(ip).Equal(net.IPv4zero) {
 			p, _ := strconv.Atoi(port)
 			addr = &net.UDPAddr{
-				IP:   net.IPv4bcast,
+				IP:   z.broadcastAddr,
 				Port: p,
 			}
 		}
+
+		log.Debugf("responding to transaction %x at %s", resp.Message.XId(), addr.String())
 		if _, err := z.packetConn.WriteTo(resp.Message, addr); err != nil {
-			log.Error("Unable to respond to client: ", err.Error())
+			log.Error("unable to respond to client: ", err.Error())
 		}
 	}
 }
