@@ -47,10 +47,11 @@ func (l *Lease) String() string {
 }
 
 type LeaseDB struct {
-	start  net.IP
-	end    net.IP
-	leases []*Lease
-	lock   *sync.Mutex
+	start             net.IP
+	end               net.IP
+	leases            []*Lease
+	lock              *sync.Mutex
+	reservedAddresses map[string]*Lease
 }
 
 func NewLeaseDB(startAddr, endAddr net.IP) *LeaseDB {
@@ -64,16 +65,20 @@ func NewLeaseDB(startAddr, endAddr net.IP) *LeaseDB {
 		binary.BigEndian.PutUint32(leases[i].IP, start+uint32(i))
 	}
 	return &LeaseDB{
-		start:  startAddr,
-		end:    endAddr,
-		lock:   new(sync.Mutex),
-		leases: leases,
+		start:             startAddr,
+		end:               endAddr,
+		lock:              new(sync.Mutex),
+		leases:            leases,
+		reservedAddresses: make(map[string]*Lease),
 	}
 }
 
 func (l *LeaseDB) GetLease(clientId string) *Lease {
 	l.lock.Lock()
 	defer l.lock.Unlock()
+	if reservedLease, ok := l.reservedAddresses[clientId]; ok {
+		return reservedLease
+	}
 	for i, lease := range l.leases {
 		if strings.EqualFold(clientId, lease.ClientId) {
 			if lease.State == LeaseReserved {
@@ -140,10 +145,7 @@ func (l *LeaseDB) NextAvailableLease(clientId string) *Lease {
 func (l *LeaseDB) ReserveLease(clientID string, reservedIP net.IP) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	//Reserved leases go to the top
-	leases := make([]*Lease, 0, len(l.leases)+1)
-	leases = append(leases, &Lease{ClientId: clientID, IP: reservedIP, State: LeaseReserved})
-	l.leases = append(leases, l.leases...)
+	l.reservedAddresses[clientID] = &Lease{ClientId: clientID, IP: reservedIP, State: LeaseReserved}
 }
 
 func (l *LeaseDB) PeristLeases(file string) error {
