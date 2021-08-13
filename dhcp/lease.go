@@ -75,7 +75,10 @@ func (l *LeaseDB) GetLease(clientId string) *Lease {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	for i, lease := range l.leases {
-		if lease != nil && strings.EqualFold(clientId, lease.ClientId) {
+		if strings.EqualFold(clientId, lease.ClientId) {
+			if lease.State == LeaseReserved {
+				return l.leases[i]
+			}
 			if time.Now().After(lease.Expiry) {
 				l.leases[i].ClientId = ""
 				l.leases[i].State = LeaseAvailable
@@ -88,12 +91,12 @@ func (l *LeaseDB) GetLease(clientId string) *Lease {
 }
 
 func (l *LeaseDB) AcceptLease(ls *Lease, ttl time.Duration) {
+	if ls.State == LeaseReserved {
+		return
+	}
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	for i, lease := range l.leases {
-		if lease == nil {
-			break
-		}
 		if lease.ClientId == ls.ClientId {
 			l.leases[i].State = LeaseActive
 			l.leases[i].Expiry = time.Now().Add(ttl)
