@@ -23,19 +23,16 @@ func (ls LeaseState) String() string {
 		return "Reserved"
 	case LeaseActive:
 		return "Active"
-	case LeaseExpired:
-		return "Expired"
 	default:
 		return "unknown"
 	}
 }
 
 const (
-	LeaseAvailable LeaseState = iota + 1
+	LeaseAvailable LeaseState = iota
 	LeaseOffered
 	LeaseReserved
 	LeaseActive
-	LeaseExpired
 )
 
 type Lease struct {
@@ -58,26 +55,39 @@ type LeaseDB struct {
 
 func NewLeaseDB(startAddr, endAddr net.IP) *LeaseDB {
 	leaseRange := int(binary.BigEndian.Uint32(endAddr) - binary.BigEndian.Uint32(startAddr))
+	start := binary.BigEndian.Uint32(startAddr)
+	leases := make([]*Lease, leaseRange)
+	for i := range leases {
+		leases[i] = &Lease{
+			IP: make(net.IP, 4),
+		}
+		binary.BigEndian.PutUint32(leases[i].IP, start+uint32(i))
+	}
 	return &LeaseDB{
 		start:  startAddr,
 		end:    endAddr,
 		lock:   new(sync.Mutex),
-		leases: make([]*Lease, leaseRange),
+		leases: leases,
 	}
 }
 
 func (l *LeaseDB) GetLease(clientId string) *Lease {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	for _, lease := range l.leases {
+	for i, lease := range l.leases {
 		if lease != nil && strings.EqualFold(clientId, lease.ClientId) {
+			if time.Now().After(lease.Expiry) {
+				l.leases[i].ClientId = ""
+				l.leases[i].State = LeaseAvailable
+				return nil
+			}
 			return lease
 		}
 	}
 	return nil
 }
 
-func (l *LeaseDB) AcceptLease(ls *Lease) {
+func (l *LeaseDB) AcceptLease(ls *Lease, ttl time.Duration) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	for i, lease := range l.leases {
@@ -86,7 +96,7 @@ func (l *LeaseDB) AcceptLease(ls *Lease) {
 		}
 		if lease.ClientId == ls.ClientId {
 			l.leases[i].State = LeaseActive
-			l.leases[i].Expiry = time.Now().Add(time.Second * 86400)
+			l.leases[i].Expiry = time.Now().Add(ttl)
 			return
 		}
 	}
@@ -97,14 +107,28 @@ func (l *LeaseDB) NextAvailableLease(clientId string) *Lease {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	for i, lease := range l.leases {
-		if lease == nil { //empty slot
+		if lease.State == LeaseAvailable {
 			l.leases[i] = &Lease{
 				ClientId: clientId,
 				State:    LeaseOffered,
+				Expiry:   time.Now().Add(time.Second * 60),
 				IP:       make(net.IP, 4),
 			}
 			binary.BigEndian.PutUint32(l.leases[i].IP, start+uint32(i))
 			return l.leases[i]
+		} else if lease.State == LeaseOffered {
+			if strings.EqualFold(clientId, lease.ClientId) {
+				l.leases[i].Expiry = time.Now().Add(time.Second * 60)
+				return l.leases[i]
+			} else if time.Now().After(lease.Expiry) {
+				l.leases[i] = &Lease{
+					ClientId: clientId,
+					Expiry:   time.Now().Add(time.Second * 60),
+					IP:       make(net.IP, 4),
+				}
+				binary.BigEndian.PutUint32(l.leases[i].IP, start+uint32(i))
+				return l.leases[i]
+			}
 		}
 	}
 	return nil
@@ -152,7 +176,7 @@ func (l *LeaseDB) PeristLeases(file string) error {
 	return nil
 }
 
-func (l *LeaseDB) LoadLeases(file string) error {
+func (l *LeaseDB) LoadLeases(file string, ttl time.Duration) error {
 	f, err := os.OpenFile(file, os.O_RDONLY, 0600)
 	if err == nil {
 		defer f.Close()
@@ -167,6 +191,9 @@ func (l *LeaseDB) LoadLeases(file string) error {
 		return err
 	}
 
+	if len(data) == 0 {
+		return nil
+	}
 	leaseCount := int(data[0])
 	data = data[1:]
 	for i := 0; i < leaseCount; i++ {
@@ -177,6 +204,7 @@ func (l *LeaseDB) LoadLeases(file string) error {
 		lease.IP = data[:4]
 		data = data[4:]
 		lease.State = LeaseState(data[0])
+		lease.Expiry = time.Now().Add(ttl)
 		data = data[1:]
 		l.leases = append(l.leases, lease)
 	}

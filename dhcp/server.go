@@ -104,7 +104,7 @@ func (z *DHCPServer) Start() error {
 	if leaseFile == "" {
 		leaseFile = "/var/lib/gatekeeper/leases"
 	}
-	if err := z.issuedLeases.LoadLeases(leaseFile); err != nil {
+	if err := z.issuedLeases.LoadLeases(leaseFile, time.Second*time.Duration(z.opts.LeaseTTL)); err != nil {
 		log.Warn("unable to load leases: ", err.Error())
 	} else {
 		counter := 0
@@ -204,7 +204,7 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 		responseOptions[OptionDHCPMessageType] = []byte{(byte(DHCPOffer))}
 		responseOptions[OptionServerIdentifier] = z.interfaceAddr.To4()
 		responseOptions[OptionIPLeaseTime] = make([]byte, 4)
-		binary.BigEndian.PutUint32(responseOptions[OptionIPLeaseTime], 86400)
+		binary.BigEndian.PutUint32(responseOptions[OptionIPLeaseTime], uint32(z.opts.LeaseTTL))
 		responseOptions[OptionRouter] = z.opts.Router.To4()
 		responseOptions[OptionSubnetMask] = z.opts.SubnetMask.To4()
 		nameServers := make([]byte, 4*len(z.opts.NameServers))
@@ -213,7 +213,7 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 		}
 		responseOptions[OptionDomainNameServer] = nameServers
 		responseOptions[OptionDomainName] = []byte(z.opts.DomainName)
-		resp = MakeReply(req.Message, DHCPOffer, z.interfaceAddr, offeredIp, time.Second*86400, responseOptions)
+		resp = MakeReply(req.Message, DHCPOffer, z.interfaceAddr, offeredIp, time.Second*time.Duration(z.opts.LeaseTTL), responseOptions)
 		log.Infof("offering address %s to %s", resp.YIAddr().String(), req.Message.CHAddr().String())
 
 	case DHCPRequest:
@@ -229,12 +229,12 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 		var msgType DHCPMessageType
 		var setIP net.IP
 		if lease := z.issuedLeases.GetLease(req.Message.CHAddr().String()); lease != nil {
-			if net.IP.Equal(lease.IP, requestedAddr) {
+			if lease.IP.Equal(requestedAddr) {
 				log.Infof("send ack for %s", requestedAddr)
 				msgType = DHCPAck
 				setIP = requestedAddr
-				if lease.State != LeaseActive && lease.State != LeaseReserved {
-					z.issuedLeases.AcceptLease(lease)
+				if lease.State == LeaseOffered {
+					z.issuedLeases.AcceptLease(lease, time.Second*time.Duration(z.opts.LeaseTTL))
 				}
 			} else {
 				log.Infof("reject requested address from %s", req.Message.CHAddr().String())
@@ -248,7 +248,7 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 		responseOptions[OptionDHCPMessageType] = []byte{(byte(msgType))}
 		responseOptions[OptionServerIdentifier] = z.interfaceAddr.To4()
 		responseOptions[OptionIPLeaseTime] = make([]byte, 4)
-		binary.BigEndian.PutUint32(responseOptions[OptionIPLeaseTime], 86400)
+		binary.BigEndian.PutUint32(responseOptions[OptionIPLeaseTime], uint32(z.opts.LeaseTTL))
 		responseOptions[OptionRouter] = z.opts.Router.To4()
 		responseOptions[OptionSubnetMask] = z.opts.SubnetMask.To4()
 		nameServers := make([]byte, 4*len(z.opts.NameServers))
