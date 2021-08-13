@@ -33,7 +33,7 @@ func main() {
 		log.SetLevel(log.DebugLevel)
 	}
 	log.Info("Starting gatekeeper")
-	log.Info("Version", version)
+	log.Info("Version ", version)
 	log.Info("Starting DHCP server")
 	log.Debugf("%+v", config.Config)
 	nameServers := make([]net.IP, 0, len(config.Config.DHCP.NameServers))
