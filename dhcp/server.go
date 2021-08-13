@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"path"
 	"strconv"
 	"time"
 
@@ -40,6 +42,7 @@ type DHCPServerOpts struct {
 	SubnetMask     net.IP
 	DomainName     string
 	ReservedLeases map[string]string
+	LeaseFile      string
 }
 
 var defaultOpts = &DHCPServerOpts{
@@ -96,6 +99,23 @@ func (z *DHCPServer) Start() error {
 		return fmt.Errorf("could not find IP network address for interface %s", z.opts.Interface)
 	}
 
+	log.Debug("load any existing leases")
+	leaseFile := z.opts.LeaseFile
+	if leaseFile == "" {
+		leaseFile = "/var/lib/gatekeeper/leases"
+	}
+	if err := z.issuedLeases.LoadLeases(leaseFile); err != nil {
+		log.Warn("unable to load leases: ", err.Error())
+	} else {
+		counter := 0
+		for _, lease := range z.issuedLeases.leases {
+			if lease != nil && lease.State == LeaseActive {
+				counter++
+			}
+		}
+		log.Debug("loaded ", counter, " leases")
+	}
+
 	for clientID, lease := range z.opts.ReservedLeases {
 		z.issuedLeases.ReserveLease(clientID, net.ParseIP(lease).To4())
 		log.Debugf("reserving %s for %s", lease, clientID)
@@ -113,6 +133,19 @@ func (z *DHCPServer) Start() error {
 		go z.responsePacketWorker()
 	}
 	return nil
+}
+
+func (z *DHCPServer) Stop() error {
+	leaseFile := z.opts.LeaseFile
+	if leaseFile == "" {
+		leaseFile = "/var/lib/gatekeeper/leases"
+	}
+
+	if err := os.MkdirAll(path.Dir(leaseFile), os.ModePerm); err != nil && !os.IsExist(err) {
+		return err
+	}
+
+	return z.issuedLeases.PeristLeases(leaseFile)
 }
 
 func (z *DHCPServer) listen() {
@@ -200,6 +233,9 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 				log.Infof("send ack for %s", requestedAddr)
 				msgType = DHCPAck
 				setIP = requestedAddr
+				if lease.State != LeaseActive && lease.State != LeaseReserved {
+					z.issuedLeases.AcceptLease(lease)
+				}
 			} else {
 				log.Infof("reject requested address from %s", req.Message.CHAddr().String())
 				msgType = DHCPNack

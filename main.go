@@ -60,6 +60,9 @@ func main() {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	sig := <-sigChan
 	log.Infof("caught signal %v", sig)
+	if err := dhcpServer.Stop(); err != nil {
+		log.Warning("unclean dhcp exit: ", err.Error())
+	}
 }
 
 type logFormatFunc func(*log.Entry) ([]byte, error)

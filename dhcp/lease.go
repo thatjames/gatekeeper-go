@@ -3,7 +3,9 @@ package dhcp
 import (
 	"encoding/binary"
 	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -79,8 +81,13 @@ func (l *LeaseDB) AcceptLease(ls *Lease) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	for i, lease := range l.leases {
+		if lease == nil {
+			break
+		}
 		if lease.ClientId == ls.ClientId {
 			l.leases[i].State = LeaseActive
+			l.leases[i].Expiry = time.Now().Add(time.Second * 86400)
+			return
 		}
 	}
 }
@@ -110,4 +117,68 @@ func (l *LeaseDB) ReserveLease(clientID string, reservedIP net.IP) {
 	leases := make([]*Lease, 0, len(l.leases)+1)
 	leases = append(leases, &Lease{ClientId: clientID, IP: reservedIP, State: LeaseReserved})
 	l.leases = append(leases, l.leases...)
+}
+
+func (l *LeaseDB) PeristLeases(file string) error {
+	f, err := os.OpenFile(file, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	buff := make([]byte, 1)
+	var counter byte = 0
+	for _, lease := range l.leases {
+		if lease == nil {
+			break
+		}
+		if lease.State == LeaseActive {
+			counter++
+			leaseBuff := make([]byte, 0)
+			leaseBuff = append(leaseBuff, byte(len(lease.ClientId)))
+			leaseBuff = append(leaseBuff, []byte(lease.ClientId)...)
+			leaseBuff = append(leaseBuff, lease.IP...)
+			leaseBuff = append(leaseBuff, byte(lease.State))
+			buff = append(buff, leaseBuff...)
+		}
+	}
+
+	if counter > 0 {
+		buff[0] = counter
+		_, err := f.Write(buff)
+		return err
+	}
+
+	return nil
+}
+
+func (l *LeaseDB) LoadLeases(file string) error {
+	f, err := os.OpenFile(file, os.O_RDONLY, 0600)
+	if err == nil {
+		defer f.Close()
+	} else if os.IsNotExist(err) {
+		return nil
+	} else {
+		return err
+	}
+
+	data, err := ioutil.ReadAll(f)
+	if err != nil {
+		return err
+	}
+
+	leaseCount := int(data[0])
+	data = data[1:]
+	for i := 0; i < leaseCount; i++ {
+		var lease = new(Lease)
+		cidLen := data[0]
+		lease.ClientId = string(data[1 : 1+cidLen])
+		data = data[1+cidLen:]
+		lease.IP = data[:4]
+		data = data[4:]
+		lease.State = LeaseState(data[0])
+		data = data[1:]
+		l.leases = append(l.leases, lease)
+	}
+	return nil
 }
