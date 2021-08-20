@@ -23,7 +23,7 @@ test:
 build_x86_linux:
   stage: build
   variables:
-    GOARCH: x86
+    GOARCH: 386
     GOOS: linux
     BIN_NAME: $BASE_NAME-$GOARCH
   script:
@@ -38,7 +38,7 @@ build_x86_linux:
 build_x86_win:
   stage: build
   variables:
-    GOARCH: x86
+    GOARCH: 386
     GOOS: windows
     BIN_NAME: $BASE_NAME-$GOARCH.exe
   script:
