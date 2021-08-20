@@ -1,0 +1,57 @@
+body {
+    font-family: Algerian;
+    size: 100%;
+}
+
+#root {
+    height: 100%;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 80%;
+    width: 80%;
+}
+
+.container#login {
+    top: 10%;
+    position: relative;
+    min-height: 40%;
+}
+
+.form-group {
+    padding: 10px;    
+}
+
+.btn-primary {
+    background-color: #007bff;
+    border: 1px solid #007bff;
+    color: white;
+    border-radius: .25rem;
+    height: 30px;
+}
+
+.btn-block {
+    width: 100%;
+}
+
+.content-panel {
+    border: black 1px solid;
+    height: 100%;
+    width: 100%;
+}
+
+label, input {
+    display: block;
+    width: 100%;
+}
+
+form {
+    padding: 20px;
+}
+
+.form-group {
+    width: 100%;
+}
