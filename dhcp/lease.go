@@ -116,13 +116,9 @@ func (l *LeaseDB) NextAvailableLease(clientId string) *Lease {
 	defer l.lock.Unlock()
 	for i, lease := range l.leases {
 		if lease.State == LeaseAvailable {
-			l.leases[i] = &Lease{
-				ClientId: clientId,
-				State:    LeaseOffered,
-				Expiry:   time.Now().Add(time.Second * 60),
-				IP:       make(net.IP, 4),
-			}
-			binary.BigEndian.PutUint32(l.leases[i].IP, start+uint32(i))
+			l.leases[i].ClientId = clientId
+			l.leases[i].State = LeaseOffered
+			l.leases[i].Expiry = time.Now().Add(time.Second * 60)
 			return l.leases[i]
 		} else if lease.State == LeaseOffered {
 			if strings.EqualFold(clientId, lease.ClientId) {
