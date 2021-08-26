@@ -54,11 +54,11 @@ func main() {
 		ReservedLeases: config.Config.DHCP.ReservedAddresses,
 	}
 	dhcpServer := dhcp.NewDHCPServerWithOpts(options)
-	// if err := dhcpServer.Start(); err != nil {
-	// 	log.Fatal(err)
-	// }
+	if err := dhcpServer.Start(); err != nil {
+		log.Fatal(err)
+	}
 
-	if err := web.Init(); err != nil {
+	if err := web.Init(dhcpServer.LeaseDB()); err != nil {
 		log.Fatal(err)
 	}
 

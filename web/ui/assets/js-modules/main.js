@@ -7,7 +7,6 @@ export function Login(e) {
     var data = GetFormData(new FormData(form));
     Request("POST", "api/login", JSON.stringify(data)).then((res) =>{
         location.href = "/main";
-        console.log("done");
     }).catch((err) => {
         console.log("Failed: " + err);
     });

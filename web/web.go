@@ -1,28 +1,55 @@
 package web
 
 import (
+	"crypto/rand"
 	"embed"
 	"encoding/json"
+	"fmt"
+	"html/template"
 	"io/fs"
 	"net/http"
 	"strings"
+	"time"
 
+	"gitlab.com/thatjames-go/gatekeeper-go/config"
+	"gitlab.com/thatjames-go/gatekeeper-go/dhcp"
 	"gitlab.com/thatjames-go/gatekeeper-go/web/domain"
+	"golang.org/x/crypto/nacl/box"
 )
 
 //go:embed ui
 var efs embed.FS
 
-func Init() error {
+//go:embed templates/main.tmpl
+var mainTempl string
+
+var (
+	mainTemplate    = template.Must(template.New("main").Funcs(template.FuncMap{"Format": format}).Parse(mainTempl))
+	pubKey, privKey *[32]byte
+	nonce           *[24]byte
+	leaseDB         *dhcp.LeaseDB
+)
+
+func Init(db *dhcp.LeaseDB) error {
+	var err error
+	if pubKey, privKey, err = box.GenerateKey(rand.Reader); err != nil {
+		return err
+	}
+	leaseDB = db
+	nonce = new([24]byte)
+	if _, err := rand.Reader.Read(nonce[:]); err != nil {
+		return err
+	}
 	fsys, err := fs.Sub(efs, "ui")
 	if err != nil {
 		return err
 	}
 
 	fs := http.FileServer(http.FS(fsys))
-	http.HandleFunc("/api/login", makeEndpoint(http.MethodPost, login, LoggingMiddleware))
 	http.Handle("/", fs)
-	if err := http.ListenAndServe(":5000", nil); err != nil {
+	http.HandleFunc("/main", templateHandler)
+	http.HandleFunc("/api/login", makeEndpoint(http.MethodPost, login, LoggingMiddleware))
+	if err := http.ListenAndServe(config.Config.Web.Address, nil); err != nil {
 		return err
 	}
 	return nil
@@ -54,4 +81,17 @@ func login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "forbidden", http.StatusUnauthorized)
 		return
 	}
+
+}
+
+func templateHandler(w http.ResponseWriter, r *http.Request) {
+	if err := mainTemplate.Execute(w, leaseDB.ActiveLeases()); err != nil {
+		http.Error(w, "failed", http.StatusInternalServerError)
+		fmt.Println(err.Error())
+		return
+	}
+}
+
+func format(t time.Time) string {
+	return t.Format("2006-01-02 15:04:05")
 }

@@ -121,17 +121,17 @@ func (z *DHCPServer) Start() error {
 		log.Debugf("reserving %s for %s", lease, clientID)
 	}
 
-	packetConn, err := net.ListenPacket("udp4", fmt.Sprintf(":%d", dhcpServerPort))
-	if err != nil {
-		return err
-	}
-	z.packetConn = packetConn
-	log.Debug("listen on ", z.interfaceAddr.String())
-	go z.listen()
-	for i := 0; i < 10; i++ {
-		go z.receivePacketWorker()
-		go z.responsePacketWorker()
-	}
+	// packetConn, err := net.ListenPacket("udp4", fmt.Sprintf(":%d", dhcpServerPort))
+	// if err != nil {
+	// 	return err
+	// }
+	// z.packetConn = packetConn
+	// log.Debug("listen on ", z.interfaceAddr.String())
+	// go z.listen()
+	// for i := 0; i < 10; i++ {
+	// 	go z.receivePacketWorker()
+	// 	go z.responsePacketWorker()
+	// }
 	return nil
 }
 
@@ -289,4 +289,8 @@ func (z *DHCPServer) responsePacketWorker() {
 			log.Error("unable to respond to client: ", err.Error())
 		}
 	}
+}
+
+func (z *DHCPServer) LeaseDB() *LeaseDB {
+	return z.issuedLeases
 }

@@ -10,6 +10,7 @@ var Config ConfigInstance
 
 type ConfigInstance struct {
 	DHCP DHCP `yaml:"DHCP"`
+	Web  Web  `yaml:"Web"`
 }
 
 type DHCP struct {
@@ -22,6 +23,10 @@ type DHCP struct {
 	SubnetMask        string            `yaml:"SubnetMask"`
 	Router            string            `yaml:"Router"`
 	ReservedAddresses map[string]string `yaml:"ReservedAddresses"`
+}
+
+type Web struct {
+	Address string `yaml:"Address"`
 }
 
 func LoadConfig(filePath string) error {

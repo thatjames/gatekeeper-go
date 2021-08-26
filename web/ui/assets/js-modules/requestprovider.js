@@ -4,7 +4,7 @@ export default Request = (method, url, data) => {
         req.onreadystatechange = function () {
             if (this.readyState == 4) {
                 if (this.status == 200) {
-                    resolve(this);
+                    resolve(this.response);
                     return;
                 } else {
                     reject(this.statusText);

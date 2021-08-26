@@ -211,3 +211,15 @@ func (l *LeaseDB) LoadLeases(file string, ttl time.Duration) error {
 	}
 	return nil
 }
+
+func (l *LeaseDB) ActiveLeases() []Lease {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	var leases []Lease
+	for i := range l.leases {
+		if l.leases[i].State == LeaseActive {
+			leases = append(leases, *l.leases[i])
+		}
+	}
+	return leases
+}
