@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"net"
@@ -12,6 +13,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gitlab.com/thatjames-go/gatekeeper-go/config"
 	"gitlab.com/thatjames-go/gatekeeper-go/dhcp"
+	"gitlab.com/thatjames-go/gatekeeper-go/web"
 )
 
 //Flags
@@ -52,7 +54,11 @@ func main() {
 		ReservedLeases: config.Config.DHCP.ReservedAddresses,
 	}
 	dhcpServer := dhcp.NewDHCPServerWithOpts(options)
-	if err := dhcpServer.Start(); err != nil {
+	// if err := dhcpServer.Start(); err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	if err := web.Init(); err != nil {
 		log.Fatal(err)
 	}
 
@@ -72,5 +78,10 @@ func (fn logFormatFunc) Format(e *log.Entry) ([]byte, error) {
 }
 
 func formatLogEntry(e *log.Entry) ([]byte, error) {
-	return []byte(fmt.Sprintf("%s %s - %s\n", e.Time.Format("2006-01-02 15:04:05"), strings.ToUpper(e.Level.String()), e.Message)), nil
+	msg := bytes.NewBuffer([]byte(fmt.Sprintf("%s %s - %s", e.Time.Format("2006-01-02 15:04:05"), strings.ToUpper(e.Level.String()), e.Message)))
+	for key, dataField := range e.Data {
+		msg.WriteString(fmt.Sprintf(" %s: %v", key, dataField))
+	}
+	msg.WriteString("\n")
+	return msg.Bytes(), nil
 }
