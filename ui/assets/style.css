@@ -52,6 +52,11 @@ body {
     color: white;
     border-radius: .25rem;
     height: 30px;
+    cursor: pointer;
+}
+
+.btn-primary:hover {
+    background-color:  #88a3f2;
 }
 
 .btn-block {
