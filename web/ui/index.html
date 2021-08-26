@@ -4,7 +4,6 @@
     <title>GateKeeper</title>
     <link rel="icon" href="assets/favicon.ico">
     <link href="assets/style.css" rel="stylesheet" />
-    <script type="module" src="./assets/js-modules/main.js"></script>
 </head>
 
 <body>
@@ -14,7 +13,7 @@
                 <h1>GateKeeper</h1>
             </div>
             <div class="content-panel" id="login-panel">
-                <form id="login-form" method="POST" action="/api/login">
+                <form id="login-form">
                     <div class="form-group">
                         <label for="username">Username</label>
                         <input type="username" class="form-control" id="username" name="username"
@@ -34,4 +33,10 @@
     </div>
 </body>
 
+<footer>
+    <script type="module">
+        import { Login } from "./assets/js-modules/main.js";
+        document.getElementById("login-form").onsubmit = Login;
+    </script>
+</footer>
 </html>

@@ -2,11 +2,12 @@ package web
 
 import (
 	"embed"
+	"encoding/json"
 	"io/fs"
 	"net/http"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
+	"gitlab.com/thatjames-go/gatekeeper-go/web/domain"
 )
 
 //go:embed ui
@@ -43,15 +44,14 @@ func makeEndpoint(method string, handler http.HandlerFunc, decorators ...Middlew
 //start of handlers
 
 func login(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		log.Error(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	var req domain.UserLoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "malformed request", http.StatusBadRequest)
 		return
 	}
 
-	if r.FormValue("username") != "admin" || r.FormValue("password") != "admin" {
-		http.Error(w, "unauthorised", http.StatusUnauthorized)
+	if req.Username != "admin" || req.Password != "admin" {
+		http.Error(w, "forbidden", http.StatusUnauthorized)
+		return
 	}
-
-	http.Redirect(w, r, "/main.html", http.StatusTemporaryRedirect)
 }
