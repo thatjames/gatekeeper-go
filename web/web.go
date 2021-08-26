@@ -2,12 +2,11 @@ package web
 
 import (
 	"embed"
-	"encoding/json"
 	"io/fs"
 	"net/http"
 	"strings"
 
-	"gitlab.com/thatjames-go/gatekeeper-go/web/domain"
+	log "github.com/sirupsen/logrus"
 )
 
 //go:embed ui
@@ -22,7 +21,7 @@ func Init() error {
 	fs := http.FileServer(http.FS(fsys))
 	http.HandleFunc("/api/login", makeEndpoint(http.MethodPost, login, LoggingMiddleware))
 	http.Handle("/", fs)
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	if err := http.ListenAndServe(":5000", nil); err != nil {
 		return err
 	}
 	return nil
@@ -44,14 +43,15 @@ func makeEndpoint(method string, handler http.HandlerFunc, decorators ...Middlew
 //start of handlers
 
 func login(w http.ResponseWriter, r *http.Request) {
-	var loginRequest domain.UserLoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&loginRequest); err != nil {
-		http.Error(w, "malformed request", http.StatusBadRequest)
+	if err := r.ParseForm(); err != nil {
+		log.Error(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if loginRequest.Username != "admin" && loginRequest.Password != "admin" {
-		http.Error(w, "access denied", http.StatusUnauthorized)
-		return
+	if r.FormValue("username") != "admin" || r.FormValue("password") != "admin" {
+		http.Error(w, "unauthorised", http.StatusUnauthorized)
 	}
+
+	http.Redirect(w, r, "/main.html", http.StatusTemporaryRedirect)
 }
