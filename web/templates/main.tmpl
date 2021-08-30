@@ -1,0 +1,36 @@
+<html lang="en">
+
+<head>
+    <title>GateKeeper</title>
+    <link rel="icon" href="assets/favicon.ico">
+    <link href="assets/style.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="root">
+        <div class="container" id="dhcp-leases">
+            <div>
+                <h1>GateKeeper</h1>
+            </div>
+            <div>
+                <h3>Active Leases</h3>
+            </div>
+            <div>
+                <table>
+                    <tr>
+                        <th>MAC Address</th>
+                        <th>Assigned IP</th>
+                        <th>Expires At</th>
+                    </tr>
+                    {{range .}}<tr>
+                        <th>{{.ClientId}}</th>
+                        <th>{{.IP}}</th>
+                        <th>{{Format .Expiry}}</th>
+                    </tr>{{end}}
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,7 +1,6 @@
 package web
 
 import (
-	"crypto/rand"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -14,7 +13,6 @@ import (
 	"gitlab.com/thatjames-go/gatekeeper-go/config"
 	"gitlab.com/thatjames-go/gatekeeper-go/dhcp"
 	"gitlab.com/thatjames-go/gatekeeper-go/web/domain"
-	"golang.org/x/crypto/nacl/box"
 )
 
 //go:embed ui
@@ -24,22 +22,13 @@ var efs embed.FS
 var mainTempl string
 
 var (
-	mainTemplate    = template.Must(template.New("main").Funcs(template.FuncMap{"Format": format}).Parse(mainTempl))
-	pubKey, privKey *[32]byte
-	nonce           *[24]byte
-	leaseDB         *dhcp.LeaseDB
+	mainTemplate = template.Must(template.New("main").Funcs(template.FuncMap{"Format": format}).Parse(mainTempl))
+	leaseDB      *dhcp.LeaseDB
 )
 
 func Init(db *dhcp.LeaseDB) error {
 	var err error
-	if pubKey, privKey, err = box.GenerateKey(rand.Reader); err != nil {
-		return err
-	}
 	leaseDB = db
-	nonce = new([24]byte)
-	if _, err := rand.Reader.Read(nonce[:]); err != nil {
-		return err
-	}
 	fsys, err := fs.Sub(efs, "ui")
 	if err != nil {
 		return err
