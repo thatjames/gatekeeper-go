@@ -222,3 +222,14 @@ func (l *LeaseDB) ActiveLeases() []Lease {
 	}
 	return leases
 }
+
+func (l *LeaseDB) ReservedLeases() []Lease {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	var leases []Lease
+	for _, lease := range l.reservedAddresses {
+		leases = append(leases, *lease)
+	}
+
+	return leases
+}

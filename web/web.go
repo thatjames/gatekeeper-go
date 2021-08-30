@@ -74,7 +74,15 @@ func login(w http.ResponseWriter, r *http.Request) {
 }
 
 func templateHandler(w http.ResponseWriter, r *http.Request) {
-	if err := mainTemplate.Execute(w, leaseDB.ActiveLeases()); err != nil {
+	pageData := LeasePage{
+		ReservedLeases: leaseDB.ReservedLeases(),
+		ActiveLeases:   leaseDB.ActiveLeases(),
+		Start:          config.Config.DHCP.StartAddr,
+		End:            config.Config.DHCP.EndAddr,
+		Nameservers:    config.Config.DHCP.NameServers,
+		DomainName:     config.Config.DHCP.DomainName,
+	}
+	if err := mainTemplate.Execute(w, pageData); err != nil {
 		http.Error(w, "failed", http.StatusInternalServerError)
 		fmt.Println(err.Error())
 		return

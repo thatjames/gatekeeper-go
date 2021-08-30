@@ -13,20 +13,54 @@
                 <h1>GateKeeper</h1>
             </div>
             <div>
-                <h3>Active Leases</h3>
+                <h2>DHCP Status</h3>
             </div>
             <div>
+                <div>
+                    <h2>Leases</h3>
+                    <h3>Active</h3>
+                    <table>
+                        <tr>
+                            <th>MAC Address</th>
+                            <th>Assigned IP</th>
+                            <th>Expires At</th>
+                        </tr>
+                        {{range .ActiveLeases}}<tr>
+                            <td>{{.ClientId}}</td>
+                            <td>{{.IP}}</td>
+                            <td>{{Format .Expiry}}</td>
+                        </tr>{{end}}
+                    </table>
+                </div>
+                <div>
+                    <h3>Reserved</h3>
+                    <table>
+                        <tr>
+                            <th>MAC Address</th>
+                            <th>Assigned IP</th>
+                        </tr>
+                        {{range .ReservedLeases}}<tr>
+                            <td>{{.ClientId}}</td>
+                            <td>{{.IP}}</td>
+                        </tr>{{end}}
+                    </table>
+                </div>
+                <div>
+                    <h2>Options</h2>
+                </div>
                 <table>
                     <tr>
-                        <th>MAC Address</th>
-                        <th>Assigned IP</th>
-                        <th>Expires At</th>
+                        <td>DomainName</td>
+                        <td>{{.DomainName}}</td>
                     </tr>
-                    {{range .}}<tr>
-                        <th>{{.ClientId}}</th>
-                        <th>{{.IP}}</th>
-                        <th>{{Format .Expiry}}</th>
-                    </tr>{{end}}
+                    <tr>
+                        <td>Assignable Range</td>
+                        <td>{{.Start}} - {{.End}}</td>
+                    </tr>
+                    <tr>
+                        <td>Nameservers</td> 
+                        <td>{{range .Nameservers}}{{.}} {{end}}</td>
+                    </tr>
                 </table>
             </div>
         </div>
