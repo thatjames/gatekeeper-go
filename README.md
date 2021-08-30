@@ -1,6 +1,6 @@
 # GateKeeper
 
-GateKeeper is a configurable DHCP and DNS server written in Go
+GateKeeper is a configurable DHCP server written in Go
 
 ## Installation
 
@@ -29,4 +29,6 @@ DHCP:
     - 1.1.1.1
   ReservedAddresses:
     bc:5f:f4:ac:ea:c4: 10.0.0.100
+Web:
+  Address: localhost:8080
 ```
