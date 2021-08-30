@@ -81,12 +81,8 @@ func (l *LeaseDB) GetLease(clientId string) *Lease {
 	}
 	for i, lease := range l.leases {
 		if strings.EqualFold(clientId, lease.ClientId) {
-			if lease.State == LeaseReserved {
-				return l.leases[i]
-			}
 			if time.Now().After(lease.Expiry) {
-				l.leases[i].ClientId = ""
-				l.leases[i].State = LeaseAvailable
+				l.leases[i] = new(Lease)
 				return nil
 			}
 			return lease
@@ -127,6 +123,7 @@ func (l *LeaseDB) NextAvailableLease(clientId string) *Lease {
 			} else if time.Now().After(lease.Expiry) {
 				l.leases[i] = &Lease{
 					ClientId: clientId,
+					State:    LeaseOffered,
 					Expiry:   time.Now().Add(time.Second * 60),
 					IP:       make(net.IP, 4),
 				}
@@ -179,11 +176,12 @@ func (l *LeaseDB) PeristLeases(file string) error {
 
 func (l *LeaseDB) LoadLeases(file string, ttl time.Duration) error {
 	f, err := os.OpenFile(file, os.O_RDONLY, 0600)
-	if err == nil {
+	switch {
+	case err == nil:
 		defer f.Close()
-	} else if os.IsNotExist(err) {
+	case os.IsNotExist(err):
 		return nil
-	} else {
+	default:
 		return err
 	}
 
@@ -197,6 +195,7 @@ func (l *LeaseDB) LoadLeases(file string, ttl time.Duration) error {
 	}
 	leaseCount := int(data[0])
 	data = data[1:]
+	l.leases = make([]*Lease, 0)
 	for i := 0; i < leaseCount; i++ {
 		var lease = new(Lease)
 		cidLen := data[0]
