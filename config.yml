@@ -3,7 +3,7 @@ DHCP:
   Interface: enp34s0
   StartAddr: 10.0.0.2
   EndAddr: 10.0.0.99
-  LeaseTTL: 86400
+  LeaseTTL: 300
   SubnetMask: 255.255.255.0
   Router: 10.0.0.1
   NameServers:
