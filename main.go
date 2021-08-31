@@ -13,6 +13,7 @@ import (
 	"gitlab.com/thatjames-go/gatekeeper-go/config"
 	"gitlab.com/thatjames-go/gatekeeper-go/dhcp"
 	"gitlab.com/thatjames-go/gatekeeper-go/netlink"
+	"gitlab.com/thatjames-go/gatekeeper-go/service"
 	"gitlab.com/thatjames-go/gatekeeper-go/web"
 )
 
@@ -45,15 +46,16 @@ func main() {
 			log.Fatal(err)
 		}
 
-	}
+		service.Register(dhcpServer)
 
-	if config.Config.Web != nil {
-		log.Debug("Starting web server")
-		if err := web.Init(config.Config.Web); err != nil {
-			panic(err)
+		if config.Config.Web != nil {
+			log.Debug("Starting web server")
+			if err := web.Init(config.Config.Web, dhcpServer.LeaseDB()); err != nil {
+				panic(err)
+			}
 		}
-	}
 
+	}
 	routeNotifyChan := make(chan netlink.Message, 100)
 	_, err := netlink.New(routeNotifyChan)
 	if err != nil {
