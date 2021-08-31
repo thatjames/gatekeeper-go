@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
 	"strings"
@@ -12,7 +11,9 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.com/thatjames-go/gatekeeper-go/config"
+	"gitlab.com/thatjames-go/gatekeeper-go/dhcp"
 	"gitlab.com/thatjames-go/gatekeeper-go/netlink"
+	"gitlab.com/thatjames-go/gatekeeper-go/web"
 )
 
 //Flags
@@ -36,30 +37,22 @@ func main() {
 	log.Info("Starting gatekeeper")
 	log.Info("Version ", version)
 	log.Debugf("Config: %v", config.Config)
-	nameServers := make([]net.IP, 0, len(config.Config.DHCP.NameServers))
-	for _, nameServer := range config.Config.DHCP.NameServers {
-		nameServers = append(nameServers, net.ParseIP(nameServer).To4())
-	}
-	// options := &dhcp.DHCPServerOpts{
-	// 	Interface:      config.Config.DHCP.Interface,
-	// 	StartFrom:      net.ParseIP(config.Config.DHCP.StartAddr).To4(),
-	// 	EndAt:          net.ParseIP(config.Config.DHCP.EndAddr).To4(),
-	// 	NameServers:    nameServers,
-	// 	LeaseTTL:       config.Config.DHCP.LeaseTTL,
-	// 	Router:         net.ParseIP(config.Config.DHCP.Router).To4(),
-	// 	SubnetMask:     net.ParseIP(config.Config.DHCP.SubnetMask).To4(),
-	// 	DomainName:     config.Config.DHCP.DomainName,
-	// 	ReservedLeases: config.Config.DHCP.ReservedAddresses,
-	// }
-	// dhcpServer := dhcp.NewDHCPServerWithOpts(options)
-	// log.Info("Starting DHCP server")
-	// if err := dhcpServer.Start(); err != nil {
-	// 	log.Fatal(err)
-	// }
 
-	// if err := web.Init(dhcpServer.LeaseDB()); err != nil {
-	// 	log.Fatal(err)
-	// }
+	if config.Config.DHCP != nil {
+		log.Info("Starting DHCP server")
+		dhcpServer := dhcp.NewDHCPServerFromConfig(config.Config.DHCP)
+		if err := dhcpServer.Start(); err != nil {
+			log.Fatal(err)
+		}
+
+	}
+
+	if config.Config.Web != nil {
+		log.Debug("Starting web server")
+		if err := web.Init(config.Config.Web); err != nil {
+			panic(err)
+		}
+	}
 
 	routeNotifyChan := make(chan netlink.Message, 100)
 	_, err := netlink.New(routeNotifyChan)

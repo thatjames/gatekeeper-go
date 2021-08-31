@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"gitlab.com/thatjames-go/gatekeeper-go/config"
-	"gitlab.com/thatjames-go/gatekeeper-go/dhcp"
 	"gitlab.com/thatjames-go/gatekeeper-go/web/domain"
 )
 
@@ -23,12 +22,10 @@ var mainTempl string
 
 var (
 	mainTemplate = template.Must(template.New("main").Funcs(template.FuncMap{"Format": format}).Parse(mainTempl))
-	leaseDB      *dhcp.LeaseDB
 )
 
-func Init(db *dhcp.LeaseDB) error {
+func Init(config *config.Web) error {
 	var err error
-	leaseDB = db
 	fsys, err := fs.Sub(efs, "ui")
 	if err != nil {
 		return err
@@ -38,7 +35,7 @@ func Init(db *dhcp.LeaseDB) error {
 	http.Handle("/", fs)
 	http.HandleFunc("/main", templateHandler)
 	http.HandleFunc("/api/login", makeEndpoint(http.MethodPost, login, LoggingMiddleware))
-	if err := http.ListenAndServe(config.Config.Web.Address, nil); err != nil {
+	if err := http.ListenAndServe(config.Address, nil); err != nil {
 		return err
 	}
 	return nil
@@ -75,12 +72,12 @@ func login(w http.ResponseWriter, r *http.Request) {
 
 func templateHandler(w http.ResponseWriter, r *http.Request) {
 	pageData := LeasePage{
-		ReservedLeases: leaseDB.ReservedLeases(),
-		ActiveLeases:   leaseDB.ActiveLeases(),
-		Start:          config.Config.DHCP.StartAddr,
-		End:            config.Config.DHCP.EndAddr,
-		Nameservers:    config.Config.DHCP.NameServers,
-		DomainName:     config.Config.DHCP.DomainName,
+		// ReservedLeases: leaseDB.ReservedLeases(),
+		// ActiveLeases:   leaseDB.ActiveLeases(),
+		Start:       config.Config.DHCP.StartAddr,
+		End:         config.Config.DHCP.EndAddr,
+		Nameservers: config.Config.DHCP.NameServers,
+		DomainName:  config.Config.DHCP.DomainName,
 	}
 	if err := mainTemplate.Execute(w, pageData); err != nil {
 		http.Error(w, "failed", http.StatusInternalServerError)

@@ -27,6 +27,9 @@ func printStruct(prefix string, iface interface{}) string {
 	for i := 0; i < refType.NumField(); i++ {
 		switch refVal.Field(i).Kind() {
 		case reflect.Ptr, reflect.Interface, reflect.Struct:
+			if refVal.Field(i).IsNil() {
+				continue
+			}
 			fmt.Fprintln(buff, refType.Field(i).Name)
 			val := reflect.Indirect(refVal.Field(i))
 			fmt.Fprintln(buff, printStruct(prefix+" ", val.Interface()))
