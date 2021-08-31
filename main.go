@@ -35,8 +35,7 @@ func main() {
 	}
 	log.Info("Starting gatekeeper")
 	log.Info("Version ", version)
-	log.Info("Starting DHCP server")
-	log.Debugf("%+v", config.Config)
+	log.Debugf("Config: %v", config.Config)
 	nameServers := make([]net.IP, 0, len(config.Config.DHCP.NameServers))
 	for _, nameServer := range config.Config.DHCP.NameServers {
 		nameServers = append(nameServers, net.ParseIP(nameServer).To4())
@@ -53,6 +52,7 @@ func main() {
 	// 	ReservedLeases: config.Config.DHCP.ReservedAddresses,
 	// }
 	// dhcpServer := dhcp.NewDHCPServerWithOpts(options)
+	// log.Info("Starting DHCP server")
 	// if err := dhcpServer.Start(); err != nil {
 	// 	log.Fatal(err)
 	// }
