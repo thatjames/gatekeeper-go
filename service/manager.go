@@ -12,13 +12,12 @@ type serviceManager map[ServiceKey]Service
 var instance = make(serviceManager)
 
 type Service interface {
-	Type() ServiceKey
 	Start() error
 	Stop() error
 }
 
-func Register(s Service) {
-	instance[s.Type()] = s
+func Register(s Service, stype ServiceKey) {
+	instance[stype] = s
 }
 
 func Start() error {

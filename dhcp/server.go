@@ -12,7 +12,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.com/thatjames-go/gatekeeper-go/config"
-	"gitlab.com/thatjames-go/gatekeeper-go/service"
 )
 
 const (
@@ -84,10 +83,6 @@ func NewDHCPServerWithOpts(opts *DHCPServerOpts) *DHCPServer {
 		responseChan: make(chan *DHCPPacket, 100),
 		requestChan:  make(chan *DHCPPacket, 100),
 	}
-}
-
-func (z *DHCPServer) Type() service.ServiceKey {
-	return service.DHCP
 }
 
 func (z *DHCPServer) Start() error {
