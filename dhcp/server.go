@@ -11,6 +11,8 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"gitlab.com/thatjames-go/gatekeeper-go/config"
+	"gitlab.com/thatjames-go/gatekeeper-go/service"
 )
 
 const (
@@ -55,6 +57,26 @@ func NewDHCPServer() *DHCPServer {
 	return NewDHCPServerWithOpts(defaultOpts)
 }
 
+func NewDHCPServerFromConfig(config *config.DHCP) *DHCPServer {
+	nameServers := make([]net.IP, len(config.NameServers))
+	for i := range nameServers {
+		nameServers[i] = net.ParseIP(config.NameServers[i])
+	}
+	options := &DHCPServerOpts{
+		Interface:      config.Interface,
+		StartFrom:      net.ParseIP(config.StartAddr).To4(),
+		EndAt:          net.ParseIP(config.EndAddr).To4(),
+		NameServers:    nameServers,
+		LeaseTTL:       config.LeaseTTL,
+		Router:         net.ParseIP(config.Router).To4(),
+		SubnetMask:     net.ParseIP(config.SubnetMask).To4(),
+		DomainName:     config.DomainName,
+		ReservedLeases: config.ReservedAddresses,
+	}
+
+	return NewDHCPServerWithOpts(options)
+}
+
 func NewDHCPServerWithOpts(opts *DHCPServerOpts) *DHCPServer {
 	return &DHCPServer{
 		opts:         opts,
@@ -62,6 +84,10 @@ func NewDHCPServerWithOpts(opts *DHCPServerOpts) *DHCPServer {
 		responseChan: make(chan *DHCPPacket, 100),
 		requestChan:  make(chan *DHCPPacket, 100),
 	}
+}
+
+func (z *DHCPServer) Type() service.ServiceKey {
+	return service.DHCP
 }
 
 func (z *DHCPServer) Start() error {

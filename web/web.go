@@ -26,19 +26,19 @@ var (
 	leaseDB      *dhcp.LeaseDB
 )
 
-func Init(db *dhcp.LeaseDB) error {
+func Init(config *config.Web, leases *dhcp.LeaseDB) error {
 	var err error
-	leaseDB = db
 	fsys, err := fs.Sub(efs, "ui")
 	if err != nil {
 		return err
 	}
 
+	leaseDB = leases
 	fs := http.FileServer(http.FS(fsys))
 	http.Handle("/", fs)
 	http.HandleFunc("/main", templateHandler)
 	http.HandleFunc("/api/login", makeEndpoint(http.MethodPost, login, LoggingMiddleware))
-	if err := http.ListenAndServe(config.Config.Web.Address, nil); err != nil {
+	if err := http.ListenAndServe(config.Address, nil); err != nil {
 		return err
 	}
 	return nil

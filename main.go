@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
 	"strings"
@@ -13,7 +12,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gitlab.com/thatjames-go/gatekeeper-go/config"
 	"gitlab.com/thatjames-go/gatekeeper-go/dhcp"
+	"gitlab.com/thatjames-go/gatekeeper-go/service"
 	"gitlab.com/thatjames-go/gatekeeper-go/web"
+	"gitlab.com/thatjames-go/netlink-go"
 )
 
 //Flags
@@ -36,38 +37,39 @@ func main() {
 	}
 	log.Info("Starting gatekeeper")
 	log.Info("Version ", version)
-	log.Info("Starting DHCP server")
-	log.Debugf("%+v", config.Config)
-	nameServers := make([]net.IP, 0, len(config.Config.DHCP.NameServers))
-	for _, nameServer := range config.Config.DHCP.NameServers {
-		nameServers = append(nameServers, net.ParseIP(nameServer).To4())
+	log.Debugf("Config: %v", config.Config)
+
+	if config.Config.DHCP != nil {
+		log.Info("Starting DHCP server")
+		dhcpServer := dhcp.NewDHCPServerFromConfig(config.Config.DHCP)
+		service.Register(dhcpServer)
+
+		if config.Config.Web != nil {
+			log.Debug("Starting web server")
+			if err := web.Init(config.Config.Web, dhcpServer.LeaseDB()); err != nil {
+				panic(err)
+			}
+		}
+
 	}
-	options := &dhcp.DHCPServerOpts{
-		Interface:      config.Config.DHCP.Interface,
-		StartFrom:      net.ParseIP(config.Config.DHCP.StartAddr).To4(),
-		EndAt:          net.ParseIP(config.Config.DHCP.EndAddr).To4(),
-		NameServers:    nameServers,
-		LeaseTTL:       config.Config.DHCP.LeaseTTL,
-		Router:         net.ParseIP(config.Config.DHCP.Router).To4(),
-		SubnetMask:     net.ParseIP(config.Config.DHCP.SubnetMask).To4(),
-		DomainName:     config.Config.DHCP.DomainName,
-		ReservedLeases: config.Config.DHCP.ReservedAddresses,
-	}
-	dhcpServer := dhcp.NewDHCPServerWithOpts(options)
-	if err := dhcpServer.Start(); err != nil {
-		log.Fatal(err)
+	routeNotifyChan := make(chan netlink.Message, 100)
+	_, err := netlink.New(routeNotifyChan)
+	if err != nil {
+		log.Warn("unable to start netlink module:", err.Error())
 	}
 
-	if err := web.Init(dhcpServer.LeaseDB()); err != nil {
-		log.Fatal(err)
-	}
+	go func() {
+		for msg := range routeNotifyChan {
+			log.Debugf("%+v\n", msg)
+		}
+	}()
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	sig := <-sigChan
 	log.Infof("caught signal %v", sig)
-	if err := dhcpServer.Stop(); err != nil {
-		log.Warning("unclean dhcp exit: ", err.Error())
+	if err := service.Stop(); err != nil {
+		log.Warning("unclean service exit: ", err.Error())
 	}
 }
 
