@@ -42,10 +42,6 @@ func main() {
 	if config.Config.DHCP != nil {
 		log.Info("Starting DHCP server")
 		dhcpServer := dhcp.NewDHCPServerFromConfig(config.Config.DHCP)
-		if err := dhcpServer.Start(); err != nil {
-			log.Fatal(err)
-		}
-
 		service.Register(dhcpServer)
 
 		if config.Config.Web != nil {
@@ -72,9 +68,9 @@ func main() {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	sig := <-sigChan
 	log.Infof("caught signal %v", sig)
-	// if err := dhcpServer.Stop(); err != nil {
-	// 	log.Warning("unclean dhcp exit: ", err.Error())
-	// }
+	if err := service.Stop(); err != nil {
+		log.Warning("unclean service exit: ", err.Error())
+	}
 }
 
 type logFormatFunc func(*log.Entry) ([]byte, error)
