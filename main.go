@@ -12,9 +12,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gitlab.com/thatjames-go/gatekeeper-go/config"
 	"gitlab.com/thatjames-go/gatekeeper-go/dhcp"
-	"gitlab.com/thatjames-go/gatekeeper-go/netlink"
 	"gitlab.com/thatjames-go/gatekeeper-go/service"
 	"gitlab.com/thatjames-go/gatekeeper-go/web"
+	"gitlab.com/thatjames-go/netlink-go"
 )
 
 //Flags
