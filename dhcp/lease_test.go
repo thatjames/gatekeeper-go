@@ -14,7 +14,7 @@ import (
 
 var (
 	start = net.IP{10, 0, 0, 1}
-	end   = net.IP{10, 0, 0, 10}
+	end   = net.IP{10, 0, 0, 95}
 )
 
 func Test_ReservedLease_Pass(t *testing.T) {
@@ -44,6 +44,16 @@ func Test_InitSuccess(t *testing.T) {
 		case !lease.Expiry.IsZero():
 			t.Fatalf("lease %v should not have expiry date", lease)
 		}
+	}
+
+	for i := 0; i < len(db.leases); i++ {
+		lease := db.NextAvailableLease(fmt.Sprintf("%d", i))
+		assert.NotNil(t, lease)
+		assert.Equal(t, LeaseOffered, lease.State)
+		targetIP := binary.BigEndian.Uint32(start) + uint32(i)
+		assert.Equal(t, targetIP, binary.BigEndian.Uint32(lease.IP))
+		db.AcceptLease(lease, time.Minute*5)
+		assert.Equal(t, LeaseActive, db.leases[i].State)
 	}
 }
 

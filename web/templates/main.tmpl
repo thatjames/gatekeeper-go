@@ -22,11 +22,13 @@
                     <table>
                         <tr>
                             <th>MAC Address</th>
+                            <th>Hostname</th>
                             <th>Assigned IP</th>
                             <th>Expires At</th>
                         </tr>
                         {{range .ActiveLeases}}<tr>
                             <td>{{.ClientId}}</td>
+                            <td>{{.Hostname}}</td>
                             <td>{{.IP}}</td>
                             <td>{{Format .Expiry}}</td>
                         </tr>{{end}}
@@ -37,10 +39,12 @@
                     <table>
                         <tr>
                             <th>MAC Address</th>
+                            <th>Hostname</th>
                             <th>Assigned IP</th>
                         </tr>
                         {{range .ReservedLeases}}<tr>
                             <td>{{.ClientId}}</td>
+                            <td>{{.Hostname}}</td>
                             <td>{{.IP}}</td>
                         </tr>{{end}}
                     </table>

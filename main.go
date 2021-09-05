@@ -14,7 +14,6 @@ import (
 	"gitlab.com/thatjames-go/gatekeeper-go/dhcp"
 	"gitlab.com/thatjames-go/gatekeeper-go/service"
 	"gitlab.com/thatjames-go/gatekeeper-go/web"
-	"gitlab.com/thatjames-go/netlink-go"
 )
 
 //Flags
@@ -40,29 +39,30 @@ func main() {
 	log.Debugf("Config: %v", config.Config)
 
 	if config.Config.DHCP != nil {
-		log.Info("Starting DHCP server")
+		log.Info("Registering DHCP server")
 		dhcpServer := dhcp.NewDHCPServerFromConfig(config.Config.DHCP)
-		service.Register(dhcpServer)
+		service.Register(dhcpServer, service.DHCP)
 
 		if config.Config.Web != nil {
-			log.Debug("Starting web server")
-			if err := web.Init(config.Config.Web, dhcpServer.LeaseDB()); err != nil {
-				panic(err)
-			}
+			log.Debug("Registering web server")
+			go func() {
+				if err := web.Init(config.Config.Web, dhcpServer.LeaseDB()); err != nil {
+					log.Error("unable to start web server:", err)
+				}
+			}()
 		}
 
 	}
-	routeNotifyChan := make(chan netlink.Message, 100)
-	_, err := netlink.New(routeNotifyChan)
-	if err != nil {
-		log.Warn("unable to start netlink module:", err.Error())
-	}
+	// routingMan, err := routing.New()
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// service.Register(routingMan)
 
-	go func() {
-		for msg := range routeNotifyChan {
-			log.Debugf("%+v\n", msg)
-		}
-	}()
+	log.Debug("Starting registered services")
+	if err := service.Start(); err != nil {
+		log.Fatal(err)
+	}
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)

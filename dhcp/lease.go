@@ -37,13 +37,14 @@ const (
 
 type Lease struct {
 	ClientId string
+	Hostname string
 	IP       net.IP
 	Expiry   time.Time
 	State    LeaseState
 }
 
 func (l *Lease) String() string {
-	return fmt.Sprintf("%s - %s: %s expiring at %s", l.IP.String(), l.ClientId, l.State, l.Expiry.Format("15:04:05"))
+	return fmt.Sprintf("%s: %s - %s: %s expiring at %s", l.Hostname, l.IP.String(), l.ClientId, l.State, l.Expiry.Format("15:04:05"))
 }
 
 type LeaseDB struct {

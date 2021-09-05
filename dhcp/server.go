@@ -218,6 +218,7 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 				log.Warn("unable to issue lease: no more remaining in pool")
 				return nil
 			} else {
+				log.Debugf("found next available lease: %s", nextLease.String())
 				offeredIp = nextLease.IP
 			}
 		}
@@ -230,7 +231,7 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 		responseOptions[OptionSubnetMask] = z.opts.SubnetMask.To4()
 		nameServers := make([]byte, 4*len(z.opts.NameServers))
 		for i, nameServer := range z.opts.NameServers {
-			copy(nameServers[i*4:(i+1)*4], nameServer)
+			copy(nameServers[i*4:(i+1)*4], []byte(nameServer.To4()))
 		}
 		responseOptions[OptionDomainNameServer] = nameServers
 		responseOptions[OptionDomainName] = []byte(z.opts.DomainName)
@@ -246,10 +247,17 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 		if requestedAddr = opts[OptionRequestedIPAddress]; requestedAddr == nil {
 			requestedAddr = req.Message.CIAddr()
 		}
-		log.Debug("client requests address ", requestedAddr)
+		if hostname, ok := opts[OptionHostname]; ok {
+			log.Debugf("%s requests address %s", hostname, requestedAddr.To4().String())
+		} else {
+			log.Debug("client requests address ", requestedAddr)
+		}
 		var msgType DHCPMessageType
 		var setIP net.IP
 		if lease := z.issuedLeases.GetLease(req.Message.CHAddr().String()); lease != nil {
+			if hostname, ok := opts[OptionHostname]; ok {
+				lease.Hostname = string(hostname)
+			}
 			if lease.IP.Equal(requestedAddr) {
 				log.Infof("send ack for %s", requestedAddr)
 				msgType = DHCPAck
@@ -274,13 +282,11 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 		responseOptions[OptionSubnetMask] = z.opts.SubnetMask.To4()
 		nameServers := make([]byte, 4*len(z.opts.NameServers))
 		for i, nameServer := range z.opts.NameServers {
-			copy(nameServers[i*4:(i+1)*4], nameServer)
+			copy(nameServers[i*4:(i+1)*4], []byte(nameServer.To4()))
 		}
 		responseOptions[OptionDomainNameServer] = nameServers
 		responseOptions[OptionDomainName] = []byte(z.opts.DomainName)
 		resp = MakeReply(req.Message, msgType, z.interfaceAddr, setIP, time.Second*time.Duration(z.opts.LeaseTTL), responseOptions)
-
-		//check and respond with ack/nack
 
 	case DHCPRelease:
 		log.Debug("client releasing lease")
