@@ -1,0 +1,58 @@
+<div id="reserved-content" class="row">
+    <h2>DHCP Information</h2>
+    <h3>Reserved Leases</h3>
+    <table class="table text-center">
+        <thead>
+            <tr>
+                <th scope="col">Hostname</th>
+                <th scope="col">IP Address</th>
+                <th scope="col">Expires At</th>
+                <th scope="col">Mac Address</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .ReservedLeases}}<tr>
+                <td>{{.Hostname}}</td>
+                <td>{{.IP}}</td>
+                <td>{{Format .Expiry}}</td>
+                <td>{{.ClientId}}</td>
+            </tr>{{end}}
+    </table>
+</div>
+{{ $length := len .ActiveLeases }}{{if gt $length 0 }}<div id="active-content" class="container">
+    <h3>Active Leases</h3>
+    <table class="table text-center">
+        <thead>
+            <tr>
+                <th scope="col">Hostname</th>
+                <th scope="col">IP Address</th>
+                <th scope="col">Expires At</th>
+                <th scope="col">Mac Address</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .ActiveLeases}}<tr>
+                <td>{{.Hostname}}</td>
+                <td>{{.IP}}</td>
+                <td>{{Format .Expiry}}</td>
+                <td>{{.ClientId}}</td>
+            </tr>{{end}}
+    </table>
+</div>{{end}}
+<div id="options" class="container">
+    <h2>Options</h2>
+    <table class="table text-center">
+        <tr>
+            <td>DomainName</td>
+            <td>{{.DomainName}}</td>
+        </tr>
+        <tr>
+            <td>Assignable Range</td>
+            <td>{{.Start}} - {{.End}}</td>
+        </tr>
+        <tr>
+            <td>Nameservers</td>
+            <td>{{range .Nameservers}}{{.}} {{end}}</td>
+        </tr>
+    </table>
+</div>

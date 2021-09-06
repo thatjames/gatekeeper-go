@@ -12,3 +12,12 @@ export function Login(e) {
         console.log("Failed: " + err);
     });
 }
+
+export function GetPage(e) {
+    e.preventDefault();
+    Request("GET", "page/"+e.target.id).then((res)=>{
+        document.getElementById("content").innerHTML = res;
+    }).catch((err) => {
+        console.log("error: " + err);
+    });
+}

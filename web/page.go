@@ -10,3 +10,10 @@ type LeasePage struct {
 	ReservedLeases []dhcp.Lease
 	DomainName     string
 }
+
+type HomePage struct {
+	Uptime   string
+	Hostname string
+	Freeram  string
+	Totalram string
+}

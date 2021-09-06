@@ -4,27 +4,44 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"io/fs"
 	"net/http"
+	"os"
+	"path"
 	"strings"
+	"text/template"
 	"time"
 
 	"gitlab.com/thatjames-go/gatekeeper-go/config"
 	"gitlab.com/thatjames-go/gatekeeper-go/dhcp"
+	"gitlab.com/thatjames-go/gatekeeper-go/util"
 	"gitlab.com/thatjames-go/gatekeeper-go/web/domain"
+	"golang.org/x/sys/unix"
 )
 
 //go:embed ui
 var efs embed.FS
 
-//go:embed ui/main.tmpl
-var mainTempl string
+//go:embed ui/pages/dhcp.html
+var dhcpTempl string
+
+//go:embed ui/pages/home.html
+var homeTempl string
 
 var (
-	mainTemplate = template.Must(template.New("main").Funcs(template.FuncMap{"Format": format}).Parse(mainTempl))
-	leaseDB      *dhcp.LeaseDB
+	leaseDB *dhcp.LeaseDB
 )
+
+type PageFs struct {
+	fsys fs.FS
+}
+
+func (p PageFs) Open(name string) (fs.File, error) {
+	if name == "main" {
+		name += ".html"
+	}
+	return p.fsys.Open(name)
+}
 
 func Init(config *config.Web, leases *dhcp.LeaseDB) error {
 	var err error
@@ -34,9 +51,9 @@ func Init(config *config.Web, leases *dhcp.LeaseDB) error {
 	}
 
 	leaseDB = leases
-	fs := http.FileServer(http.FS(fsys))
+	fs := http.FileServer(http.FS(PageFs{fsys}))
 	http.Handle("/", fs)
-	http.HandleFunc("/main", templateHandler)
+	http.HandleFunc("/page/", templateHandler)
 	http.HandleFunc("/api/login", makeEndpoint(http.MethodPost, login, LoggingMiddleware))
 	if err := http.ListenAndServe(config.Address, nil); err != nil {
 		return err
@@ -74,15 +91,49 @@ func login(w http.ResponseWriter, r *http.Request) {
 }
 
 func templateHandler(w http.ResponseWriter, r *http.Request) {
-	pageData := LeasePage{
-		ReservedLeases: leaseDB.ReservedLeases(),
-		ActiveLeases:   leaseDB.ActiveLeases(),
-		Start:          config.Config.DHCP.StartAddr,
-		End:            config.Config.DHCP.EndAddr,
-		Nameservers:    config.Config.DHCP.NameServers,
-		DomainName:     config.Config.DHCP.DomainName,
+	page := template.New("main").Funcs(template.FuncMap{"Format": format})
+	var (
+		pageData interface{}
+		err      error
+	)
+	switch strings.ToLower(path.Base(r.URL.Path)) {
+	case "dhcp":
+		pageData = LeasePage{
+			ReservedLeases: leaseDB.ReservedLeases(),
+			ActiveLeases:   leaseDB.ActiveLeases(),
+			Start:          config.Config.DHCP.StartAddr,
+			End:            config.Config.DHCP.EndAddr,
+			Nameservers:    config.Config.DHCP.NameServers,
+			DomainName:     config.Config.DHCP.DomainName,
+		}
+		if page, err = page.Parse(dhcpTempl); err != nil {
+			http.Error(w, "failed", http.StatusInternalServerError)
+			fmt.Println(err.Error())
+			return
+		}
+
+	case "home":
+		var t unix.Sysinfo_t
+		if err := unix.Sysinfo(&t); err != nil {
+			http.Error(w, "failed", http.StatusInternalServerError)
+			fmt.Println(err.Error())
+			return
+		}
+		hostname, _ := os.Hostname()
+		pageData = HomePage{
+			Hostname: hostname,
+			Uptime:   (time.Second * time.Duration(t.Uptime)).Round(time.Second).String(),
+			Freeram:  util.ByteSize(int(t.Freeram)),
+			Totalram: util.ByteSize(int(t.Totalram)),
+		}
+		if page, err = page.Parse(homeTempl); err != nil {
+			http.Error(w, "failed", http.StatusInternalServerError)
+			fmt.Println(err.Error())
+			return
+		}
+
 	}
-	if err := mainTemplate.Execute(w, pageData); err != nil {
+	if err = page.Execute(w, pageData); err != nil {
 		http.Error(w, "failed", http.StatusInternalServerError)
 		fmt.Println(err.Error())
 		return
