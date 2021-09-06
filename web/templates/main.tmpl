@@ -4,6 +4,12 @@
     <title>GateKeeper</title>
     <link rel="icon" href="assets/favicon.ico">
     <link href="assets/style.css" rel="stylesheet" />
+    <script>
+        console.log(sessionStorage.getItem("token"));
+        if (sessionStorage.getItem("token") === null) {
+            window.location = "/";
+        }
+    </script>
 </head>
 
 <body>

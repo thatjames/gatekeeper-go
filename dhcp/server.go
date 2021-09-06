@@ -134,12 +134,11 @@ func (z *DHCPServer) Start() error {
 				counter++
 			}
 		}
-		log.Debug("loaded ", counter, " leases")
 	}
 
 	for clientID, lease := range z.opts.ReservedLeases {
 		z.issuedLeases.ReserveLease(clientID, net.ParseIP(lease).To4())
-		log.Debugf("reserving %s for %s", lease, clientID)
+		log.Infof("reserving %s for %s", lease, clientID)
 	}
 
 	packetConn, err := net.ListenPacket("udp4", fmt.Sprintf(":%d", dhcpServerPort))
@@ -202,7 +201,11 @@ func (z *DHCPServer) receivePacketWorker() {
 
 func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 	opts := ParseOptions(req.Message)
-	log.Debugf("transaction: %x %d from %s", req.Message.XId(), opts[OptionDHCPMessageType], req.Message.CHAddr().String())
+	id := req.Message.CHAddr().String()
+	if opts[OptionHostname] != nil {
+		id = string(opts[OptionHostname])
+	}
+	log.Debugf("%s starting transaction %x: %v", id, req.Message.XId(), opts[OptionDHCPMessageType])
 
 	var resp Message
 	switch DHCPMessageType(opts[OptionDHCPMessageType][0]) {
@@ -211,14 +214,14 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 
 		var offeredIp net.IP
 		if existingLease := z.issuedLeases.GetLease(req.Message.CHAddr().String()); existingLease != nil {
-			log.Debug("found existing lease for ", req.Message.CHAddr().String())
+			log.Debugf("found existing lease %s for %s", existingLease.IP.To4().String(), id)
 			offeredIp = existingLease.IP
 		} else {
 			if nextLease := z.issuedLeases.NextAvailableLease(req.Message.CHAddr().String()); nextLease == nil {
 				log.Warn("unable to issue lease: no more remaining in pool")
 				return nil
 			} else {
-				log.Debugf("found next available lease: %s", nextLease.String())
+				log.Infof("reserving available lease %s for %s", nextLease.IP.To4().String(), id)
 				offeredIp = nextLease.IP
 			}
 		}
@@ -236,7 +239,7 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 		responseOptions[OptionDomainNameServer] = nameServers
 		responseOptions[OptionDomainName] = []byte(z.opts.DomainName)
 		resp = MakeReply(req.Message, DHCPOffer, z.interfaceAddr, offeredIp, time.Second*time.Duration(z.opts.LeaseTTL), responseOptions)
-		log.Infof("offering address %s to %s", resp.YIAddr().String(), req.Message.CHAddr().String())
+		log.Infof("offering address %s to %s", resp.YIAddr().String(), id)
 
 	case DHCPRequest:
 		if val, ok := opts[OptionServerIdentifier]; ok && !net.IP.Equal(z.interfaceAddr, net.IP(val)) {
@@ -247,11 +250,7 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 		if requestedAddr = opts[OptionRequestedIPAddress]; requestedAddr == nil {
 			requestedAddr = req.Message.CIAddr()
 		}
-		if hostname, ok := opts[OptionHostname]; ok {
-			log.Debugf("%s requests address %s", hostname, requestedAddr.To4().String())
-		} else {
-			log.Debug("client requests address ", requestedAddr)
-		}
+		log.Debugf("%s requests address %s", id, requestedAddr)
 		var msgType DHCPMessageType
 		var setIP net.IP
 		if lease := z.issuedLeases.GetLease(req.Message.CHAddr().String()); lease != nil {
@@ -259,11 +258,20 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 				lease.Hostname = string(hostname)
 			}
 			if lease.IP.Equal(requestedAddr) {
-				log.Infof("send ack for %s", requestedAddr)
 				msgType = DHCPAck
 				setIP = requestedAddr
-				if lease.State == LeaseOffered {
+				switch lease.State {
+				case LeaseOffered:
+					log.Infof("send ack for %s to %s", requestedAddr, id)
 					z.issuedLeases.AcceptLease(lease, time.Second*time.Duration(z.opts.LeaseTTL))
+				case LeaseReserved:
+					log.Infof("send ack for reserved address %s to %s", requestedAddr, id)
+				case LeaseActive:
+					log.Infof("send ack for active address %s to %s", lease.IP.To4().String(), id)
+				default:
+					log.Infof("lease is invalid, resetting and nacking")
+					msgType = DHCPNack
+					z.issuedLeases.ReleaseLease(lease)
 				}
 			} else {
 				log.Infof("reject requested address from %s", req.Message.CHAddr().String())
@@ -289,7 +297,12 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 		resp = MakeReply(req.Message, msgType, z.interfaceAddr, setIP, time.Second*time.Duration(z.opts.LeaseTTL), responseOptions)
 
 	case DHCPRelease:
-		log.Debug("client releasing lease")
+		lease := z.issuedLeases.GetLease(req.Message.CHAddr().String())
+		if lease == nil {
+			return nil
+		}
+		log.Info(lease.Hostname, " releasing lease")
+		z.issuedLeases.ReleaseLease(lease)
 	}
 	return resp
 }

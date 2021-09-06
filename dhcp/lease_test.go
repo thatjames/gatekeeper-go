@@ -113,7 +113,9 @@ func Test_GetExipiredLease(t *testing.T) {
 	db.NextAvailableLease("test")
 	db.leases[0].Expiry = time.Now().Add(time.Second * -1)
 	assert.Nil(t, db.GetLease("test"), "lease has expired and a nil should be returned")
-	assert.Equal(t, new(Lease), db.leases[0], "lease should be zeroed")
+	assert.Empty(t, db.leases[1].ClientId, "client id should be zeroed")
+	assert.Empty(t, db.leases[1].Hostname, "hostname should be zeroed")
+	assert.Empty(t, db.leases[1].Expiry, "expiry should be zeroed")
 }
 
 func Test_SaveAndReadLeases(t *testing.T) {

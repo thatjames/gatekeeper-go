@@ -6,6 +6,7 @@ export function Login(e) {
     var form = document.getElementById("login-form");
     var data = GetFormData(new FormData(form));
     Request("POST", "api/login", JSON.stringify(data)).then((res) =>{
+        sessionStorage.setItem("token", "set");
         location.href = "/main";
     }).catch((err) => {
         console.log("Failed: " + err);

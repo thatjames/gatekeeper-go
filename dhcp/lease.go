@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type LeaseState int
@@ -47,6 +49,13 @@ func (l *Lease) String() string {
 	return fmt.Sprintf("%s: %s - %s: %s expiring at %s", l.Hostname, l.IP.String(), l.ClientId, l.State, l.Expiry.Format("15:04:05"))
 }
 
+func (l *Lease) Clear() {
+	l.ClientId = ""
+	l.Hostname = ""
+	l.Expiry = time.Time{}
+	l.State = LeaseAvailable
+}
+
 type LeaseDB struct {
 	start             net.IP
 	end               net.IP
@@ -83,7 +92,7 @@ func (l *LeaseDB) GetLease(clientId string) *Lease {
 	for i, lease := range l.leases {
 		if strings.EqualFold(clientId, lease.ClientId) {
 			if time.Now().After(lease.Expiry) {
-				l.leases[i] = new(Lease)
+				l.leases[i].Clear()
 				return nil
 			}
 			return lease
@@ -196,7 +205,7 @@ func (l *LeaseDB) LoadLeases(file string, ttl time.Duration) error {
 	}
 	leaseCount := int(data[0])
 	data = data[1:]
-	l.leases = make([]*Lease, 0)
+	leases := make([]*Lease, 0)
 	for i := 0; i < leaseCount; i++ {
 		var lease = new(Lease)
 		cidLen := data[0]
@@ -207,8 +216,15 @@ func (l *LeaseDB) LoadLeases(file string, ttl time.Duration) error {
 		lease.State = LeaseState(data[0])
 		lease.Expiry = time.Now().Add(ttl)
 		data = data[1:]
-		l.leases = append(l.leases, lease)
+		leases = append(leases, lease)
 	}
+
+	for i, lease := range leases {
+		if l.GetLease(lease.ClientId) == nil {
+			l.AcceptLease(leases[i], time.Until(lease.Expiry))
+		}
+	}
+	log.Debugf("loaded %d leases", len(leases))
 	return nil
 }
 
@@ -233,4 +249,14 @@ func (l *LeaseDB) ReservedLeases() []Lease {
 	}
 
 	return leases
+}
+
+func (l *LeaseDB) ReleaseLease(relLease *Lease) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	for i, lease := range l.leases {
+		if strings.EqualFold(relLease.ClientId, lease.ClientId) {
+			l.leases[i].Clear()
+		}
+	}
 }
