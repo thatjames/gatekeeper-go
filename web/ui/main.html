@@ -42,6 +42,7 @@
             <div id="content"></div>
         </div>
     </div>
+    <div id="version" class="text-center"></div>
 </body>
 
 <footer>
@@ -54,6 +55,9 @@
             document.getElementById("content").innerHTML = res;
         }).catch((err) => {
             console.log("error: " + err);
+        });
+        Request("GET", "api/version").then((res)=>{
+            document.getElementById("version").innerHTML = "version: " + res;
         });
     </script>
 </footer>

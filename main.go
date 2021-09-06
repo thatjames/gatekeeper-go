@@ -46,7 +46,7 @@ func main() {
 		if config.Config.Web != nil {
 			log.Debug("Registering web server")
 			go func() {
-				if err := web.Init(config.Config.Web, dhcpServer.LeaseDB()); err != nil {
+				if err := web.Init(version, config.Config.Web, dhcpServer.LeaseDB()); err != nil {
 					log.Error("unable to start web server:", err)
 				}
 			}()

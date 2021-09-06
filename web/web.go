@@ -28,6 +28,7 @@ var homeTempl string
 
 var (
 	leaseDB *dhcp.LeaseDB
+	version string
 )
 
 type PageFs struct {
@@ -41,7 +42,8 @@ func (p PageFs) Open(name string) (fs.File, error) {
 	return p.fsys.Open(name)
 }
 
-func Init(config *config.Web, leases *dhcp.LeaseDB) error {
+func Init(ver string, config *config.Web, leases *dhcp.LeaseDB) error {
+	version = ver
 	var err error
 	fsys, err := fs.Sub(efs, "ui")
 	if err != nil {
@@ -53,6 +55,7 @@ func Init(config *config.Web, leases *dhcp.LeaseDB) error {
 	http.Handle("/", fs)
 	http.HandleFunc("/page/", templateHandler)
 	http.HandleFunc("/api/login", makeEndpoint(http.MethodPost, login, LoggingMiddleware))
+	http.HandleFunc("/api/version", makeEndpoint(http.MethodGet, getVersion))
 	if err := http.ListenAndServe(config.Address, nil); err != nil {
 		return err
 	}
@@ -86,6 +89,10 @@ func login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+}
+
+func getVersion(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, version)
 }
 
 func templateHandler(w http.ResponseWriter, r *http.Request) {
