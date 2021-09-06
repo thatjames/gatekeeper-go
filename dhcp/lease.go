@@ -169,6 +169,8 @@ func (l *LeaseDB) PeristLeases(file string) error {
 			leaseBuff := make([]byte, 0)
 			leaseBuff = append(leaseBuff, byte(len(lease.ClientId)))
 			leaseBuff = append(leaseBuff, []byte(lease.ClientId)...)
+			leaseBuff = append(leaseBuff, byte(len(lease.Hostname)))
+			leaseBuff = append(leaseBuff, []byte(lease.Hostname)...)
 			leaseBuff = append(leaseBuff, lease.IP...)
 			leaseBuff = append(leaseBuff, byte(lease.State))
 			buff = append(buff, leaseBuff...)
@@ -211,6 +213,9 @@ func (l *LeaseDB) LoadLeases(file string, ttl time.Duration) error {
 		cidLen := data[0]
 		lease.ClientId = string(data[1 : 1+cidLen])
 		data = data[1+cidLen:]
+		hostLen := data[0]
+		lease.Hostname = string(data[1 : 1+hostLen])
+		data = data[1+hostLen:]
 		lease.IP = data[:4]
 		data = data[4:]
 		lease.State = LeaseState(data[0])
@@ -219,9 +224,12 @@ func (l *LeaseDB) LoadLeases(file string, ttl time.Duration) error {
 		leases = append(leases, lease)
 	}
 
-	for i, lease := range leases {
-		if l.GetLease(lease.ClientId) == nil {
-			l.AcceptLease(leases[i], time.Until(lease.Expiry))
+	for _, lease := range leases {
+		for j, createdLease := range l.leases {
+			if lease.IP.Equal(createdLease.IP) {
+				*l.leases[j] = *lease
+				log.Debug("restore lease ", l.leases[j])
+			}
 		}
 	}
 	log.Debugf("loaded %d leases", len(leases))

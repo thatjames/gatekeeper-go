@@ -2,17 +2,9 @@
     <h2>System Information</h2>
     <table class="table text-center">
         <tbody>
-            <tr>
-                <td>Uptime</td>
-                <td>{{.Uptime}}</td>
-            </tr>
-            <tr>
-                <td>Hostname</td>
-                <td>{{.Hostname}}</td>
-            </tr>
-            <tr>
-                <td>Memory</td>
-                <td>{{.Freeram}} / {{.Totalram}}</td>
-            </tr>
+            {{range $key, $value := . }}<tr>
+                <td>{{$key}}</td>
+                <td>{{$value}}</td>
+            </tr>{{end}}
     </table>
 </div>

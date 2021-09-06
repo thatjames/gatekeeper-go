@@ -262,11 +262,12 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 				setIP = requestedAddr
 				switch lease.State {
 				case LeaseOffered:
-					log.Infof("send ack for %s to %s", requestedAddr, id)
+					log.Infof("confirm address %s for %s", requestedAddr, id)
 					z.issuedLeases.AcceptLease(lease, time.Second*time.Duration(z.opts.LeaseTTL))
 				case LeaseReserved:
 					log.Infof("send ack for reserved address %s to %s", requestedAddr, id)
 				case LeaseActive:
+					lease.Expiry = time.Now().Add(time.Second * time.Duration(z.opts.LeaseTTL))
 					log.Infof("send ack for active address %s to %s", lease.IP.To4().String(), id)
 				default:
 					log.Infof("lease is invalid, resetting and nacking")

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
-	"os"
 	"path"
 	"strings"
 	"text/template"
@@ -14,9 +13,8 @@ import (
 
 	"gitlab.com/thatjames-go/gatekeeper-go/config"
 	"gitlab.com/thatjames-go/gatekeeper-go/dhcp"
-	"gitlab.com/thatjames-go/gatekeeper-go/util"
+	"gitlab.com/thatjames-go/gatekeeper-go/system"
 	"gitlab.com/thatjames-go/gatekeeper-go/web/domain"
-	"golang.org/x/sys/unix"
 )
 
 //go:embed ui
@@ -113,18 +111,8 @@ func templateHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case "home":
-		var t unix.Sysinfo_t
-		if err := unix.Sysinfo(&t); err != nil {
-			http.Error(w, "failed", http.StatusInternalServerError)
-			fmt.Println(err.Error())
-			return
-		}
-		hostname, _ := os.Hostname()
-		pageData = HomePage{
-			Hostname: hostname,
-			Uptime:   (time.Second * time.Duration(t.Uptime)).Round(time.Second).String(),
-			Freeram:  util.ByteSize(int(t.Freeram)),
-			Totalram: util.ByteSize(int(t.Totalram)),
+		if pageData, err = system.GetSystemInfo(); err != nil {
+			fmt.Fprintln(w, "<div>failed: "+err.Error()+"</div>")
 		}
 		if page, err = page.Parse(homeTempl); err != nil {
 			http.Error(w, "failed", http.StatusInternalServerError)
