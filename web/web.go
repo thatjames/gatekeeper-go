@@ -18,7 +18,7 @@ import (
 //go:embed ui
 var efs embed.FS
 
-//go:embed templates/main.tmpl
+//go:embed ui/main.tmpl
 var mainTempl string
 
 var (
@@ -90,5 +90,8 @@ func templateHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func format(t time.Time) string {
+	if t.IsZero() {
+		return " - "
+	}
 	return t.Format("2006-01-02 15:04:05")
 }

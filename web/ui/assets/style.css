@@ -1,84 +1,11 @@
-/* latin */
-@font-face {
-    font-family: 'Droid Sans';
-    font-style: normal;
-    font-weight: 400;
-    src: url(http://fonts.gstatic.com/s/droidsans/v12/SlGVmQWMvZQIdix7AFxXkHNSbQ.woff2) format('woff2');
-    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-  }
-
+html,
 body {
-    font-family: Droid Sans;
-    height: 90%;
-    position: relative;
-    background-color: lightslategray;
-    margin: 0;
-}
-
-#root {
     height: 100%;
-    width: 80%;
-    margin: auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
 }
 
 .container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    height: 80%;
-    width: 80%;
-    background-color: white;
-    padding: 50px;
-    margin-top: 50px;
-}
-
-.container#login {
-    position: relative;
-    height: 50%;
-    width: 30%;
-}
-
-.form-group {
-    margin: 10px;    
-}
-
-.btn-primary {
-    background-color: #007bff;
-    border: 1px solid #007bff;
-    color: white;
-    border-radius: .25rem;
-    height: 30px;
-    cursor: pointer;
-}
-
-.btn-primary:hover {
-    background-color:  #88a3f2;
-}
-
-.btn-block {
-    width: 100%;
-}
-
-.content-panel {
-    /* border: gainsboro 1px solid; */
-    border-radius: .25rem;
     height: 100%;
-    width: 100%;
-}
-
-label, input {
-    display: block;
-    width: 100%;
-}
-
-form {
-    padding: 20px;
-}
-
-.form-group {
-    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
