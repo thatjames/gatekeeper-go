@@ -87,22 +87,22 @@ func byteSize(bytes uint64) string {
 func getInterfaceStatsByName(interfaceName string) (*InterfaceStatistics, error) {
 	txdat, err := ioutil.ReadFile(fmt.Sprintf("/sys/class/net/%s/statistics/tx_bytes", interfaceName))
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	txBytes, err := strconv.ParseUint(strings.TrimRight(string(txdat), "\n"), 10, 64)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	rxdat, err := ioutil.ReadFile(fmt.Sprintf("/sys/class/net/%s/statistics/rx_bytes", interfaceName))
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	rxBytes, err := strconv.ParseUint(strings.TrimRight(string(rxdat), "\n"), 10, 64)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	return &InterfaceStatistics{

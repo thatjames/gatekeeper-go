@@ -42,6 +42,7 @@ func Secure(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claim := r.Header.Get("authorization")
 		if len(claim) == 0 {
+			fmt.Println("bad claim")
 			http.Error(w, "unauthorised", http.StatusUnauthorized)
 			return
 		}
@@ -53,7 +54,8 @@ func Secure(h http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		if token.Expires.After(time.Now()) {
+		if time.Now().After(token.Expires) {
+			fmt.Println("expired")
 			http.Error(w, "unauthorised", http.StatusUnauthorized)
 			return
 		}

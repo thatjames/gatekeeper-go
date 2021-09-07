@@ -68,7 +68,13 @@ type DHCP struct {
 }
 
 type Web struct {
-	Address string `yaml:"Address"`
+	Address string     `yaml:"Address"`
+	TLS     *TLSConfig `yaml:"TLS"`
+}
+
+type TLSConfig struct {
+	PublicKey  string `yaml:"PublicKey"`
+	PrivateKey string `yaml:"PrivateKey"`
 }
 
 func LoadConfig(filePath string) error {

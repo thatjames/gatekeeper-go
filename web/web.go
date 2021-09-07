@@ -11,6 +11,7 @@ import (
 	"text/template"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"gitlab.com/thatjames-go/gatekeeper-go/config"
 	"gitlab.com/thatjames-go/gatekeeper-go/dhcp"
 	"gitlab.com/thatjames-go/gatekeeper-go/system"
@@ -57,8 +58,16 @@ func Init(ver string, config *config.Web, leases *dhcp.LeaseDB) error {
 	http.HandleFunc("/page/", makeEndpoint(http.MethodGet, templateHandler, Secure))
 	http.HandleFunc("/api/login", makeEndpoint(http.MethodPost, login, LoggingMiddleware))
 	http.HandleFunc("/api/version", makeEndpoint(http.MethodGet, getVersion, Secure))
-	if err := http.ListenAndServe(config.Address, nil); err != nil {
-		return err
+	if config.TLS != nil {
+		log.Info("Start TLS listener on ", config.Address)
+		if err := http.ListenAndServeTLS(config.Address, config.TLS.PublicKey, config.TLS.PrivateKey, nil); err != nil {
+			return err
+		}
+	} else {
+		log.Info("Start clear-text listener on ", config.Address)
+		if err := http.ListenAndServe(config.Address, nil); err != nil {
+			return err
+		}
 	}
 	return nil
 }
