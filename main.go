@@ -41,7 +41,7 @@ func main() {
 	if config.Config.DHCP != nil {
 		log.Info("Registering DHCP server")
 		dhcpServer := dhcp.NewDHCPServerFromConfig(config.Config.DHCP)
-		service.Register(dhcpServer, service.DHCP)
+		// service.Register(dhcpServer, service.DHCP)
 
 		if config.Config.Web != nil {
 			log.Debug("Registering web server")

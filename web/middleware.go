@@ -1,10 +1,13 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
+	"gitlab.com/thatjames-go/gatekeeper-go/web/security"
 )
 
 type MiddlewareFunc func(h http.HandlerFunc) http.HandlerFunc
@@ -31,6 +34,30 @@ func CORS(h http.HandlerFunc) http.HandlerFunc {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
+		h(w, r)
+	}
+}
+
+func Secure(h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		claim := r.Header.Get("authorization")
+		if len(claim) == 0 {
+			http.Error(w, "unauthorised", http.StatusUnauthorized)
+			return
+		}
+
+		token, err := security.ParseClaim(claim)
+		if err != nil {
+			fmt.Println(err.Error())
+			http.Error(w, "unauthorised", http.StatusUnauthorized)
+			return
+		}
+
+		if token.Expires.After(time.Now()) {
+			http.Error(w, "unauthorised", http.StatusUnauthorized)
+			return
+		}
+
 		h(w, r)
 	}
 }

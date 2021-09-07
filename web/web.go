@@ -15,6 +15,7 @@ import (
 	"gitlab.com/thatjames-go/gatekeeper-go/dhcp"
 	"gitlab.com/thatjames-go/gatekeeper-go/system"
 	"gitlab.com/thatjames-go/gatekeeper-go/web/domain"
+	"gitlab.com/thatjames-go/gatekeeper-go/web/security"
 )
 
 //go:embed ui
@@ -53,9 +54,9 @@ func Init(ver string, config *config.Web, leases *dhcp.LeaseDB) error {
 	leaseDB = leases
 	fs := http.FileServer(http.FS(PageFs{fsys}))
 	http.Handle("/", fs)
-	http.HandleFunc("/page/", templateHandler)
+	http.HandleFunc("/page/", makeEndpoint(http.MethodGet, templateHandler, Secure))
 	http.HandleFunc("/api/login", makeEndpoint(http.MethodPost, login, LoggingMiddleware))
-	http.HandleFunc("/api/version", makeEndpoint(http.MethodGet, getVersion))
+	http.HandleFunc("/api/version", makeEndpoint(http.MethodGet, getVersion, Secure))
 	if err := http.ListenAndServe(config.Address, nil); err != nil {
 		return err
 	}
@@ -89,6 +90,17 @@ func login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	authToken, err := security.CreateAuthToken(req.Username)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	response := map[string]string{
+		"token": authToken,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 func getVersion(w http.ResponseWriter, r *http.Request) {
