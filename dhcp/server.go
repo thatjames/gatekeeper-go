@@ -210,8 +210,6 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 	var resp Message
 	switch DHCPMessageType(opts[OptionDHCPMessageType][0]) {
 	case DHCPDiscover:
-		log.Debug("discovery packet, responding with offer")
-
 		var offeredIp net.IP
 		if existingLease := z.issuedLeases.GetLease(req.Message.CHAddr().String()); existingLease != nil {
 			log.Debugf("found existing lease %s for %s", existingLease.IP.To4().String(), id)

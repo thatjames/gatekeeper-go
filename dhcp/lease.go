@@ -89,10 +89,10 @@ func (l *LeaseDB) GetLease(clientId string) *Lease {
 	if reservedLease, ok := l.reservedAddresses[clientId]; ok {
 		return reservedLease
 	}
-	for i, lease := range l.leases {
+	for _, lease := range l.leases {
 		if strings.EqualFold(clientId, lease.ClientId) {
 			if time.Now().After(lease.Expiry) {
-				l.leases[i].Clear()
+				lease.Clear()
 				return nil
 			}
 			return lease
@@ -107,38 +107,42 @@ func (l *LeaseDB) AcceptLease(ls *Lease, ttl time.Duration) {
 	}
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	for i, lease := range l.leases {
+	for _, lease := range l.leases {
 		if lease.ClientId == ls.ClientId {
-			l.leases[i].State = LeaseActive
-			l.leases[i].Expiry = time.Now().Add(ttl)
+			lease.State = LeaseActive
+			lease.Expiry = time.Now().Add(ttl)
 			return
 		}
 	}
 }
 
 func (l *LeaseDB) NextAvailableLease(clientId string) *Lease {
-	start := binary.BigEndian.Uint32(l.start)
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	for i, lease := range l.leases {
-		if lease.State == LeaseAvailable {
-			l.leases[i].ClientId = clientId
-			l.leases[i].State = LeaseOffered
-			l.leases[i].Expiry = time.Now().Add(time.Second * 60)
-			return l.leases[i]
-		} else if lease.State == LeaseOffered {
+	for _, lease := range l.leases {
+		switch lease.State {
+		case LeaseAvailable:
+			lease.ClientId = clientId
+			lease.State = LeaseOffered
+			lease.Expiry = time.Now().Add(time.Second * 60)
+			return lease
+
+		case LeaseOffered:
 			if strings.EqualFold(clientId, lease.ClientId) {
-				l.leases[i].Expiry = time.Now().Add(time.Second * 60)
-				return l.leases[i]
+				lease.Expiry = time.Now().Add(time.Second * 60)
+				return lease
 			} else if time.Now().After(lease.Expiry) {
-				l.leases[i] = &Lease{
-					ClientId: clientId,
-					State:    LeaseOffered,
-					Expiry:   time.Now().Add(time.Second * 60),
-					IP:       make(net.IP, 4),
-				}
-				binary.BigEndian.PutUint32(l.leases[i].IP, start+uint32(i))
-				return l.leases[i]
+				lease.ClientId = clientId
+				lease.Expiry = time.Now().Add(time.Second * 60)
+				return lease
+			}
+
+		case LeaseActive:
+			if time.Now().After(lease.Expiry) {
+				lease.ClientId = clientId
+				lease.State = LeaseOffered
+				lease.Expiry = time.Now().Add(time.Second * 60)
+				return lease
 			}
 		}
 	}
@@ -160,6 +164,7 @@ func (l *LeaseDB) PeristLeases(file string) error {
 
 	buff := make([]byte, 1)
 	var counter byte = 0
+	l.lock.Lock()
 	for _, lease := range l.leases {
 		if lease == nil {
 			break
@@ -176,6 +181,7 @@ func (l *LeaseDB) PeristLeases(file string) error {
 			buff = append(buff, leaseBuff...)
 		}
 	}
+	l.lock.Unlock()
 
 	if counter > 0 {
 		buff[0] = counter
@@ -224,6 +230,8 @@ func (l *LeaseDB) LoadLeases(file string, ttl time.Duration) error {
 		leases = append(leases, lease)
 	}
 
+	l.lock.Lock()
+	defer l.lock.Unlock()
 	for _, lease := range leases {
 		for j, createdLease := range l.leases {
 			if lease.IP.Equal(createdLease.IP) {
@@ -241,7 +249,7 @@ func (l *LeaseDB) ActiveLeases() []Lease {
 	defer l.lock.Unlock()
 	var leases []Lease
 	for i := range l.leases {
-		if l.leases[i].State == LeaseActive {
+		if l.leases[i].State == LeaseActive && time.Now().Before(l.leases[i].Expiry) {
 			leases = append(leases, *l.leases[i])
 		}
 	}
@@ -262,9 +270,9 @@ func (l *LeaseDB) ReservedLeases() []Lease {
 func (l *LeaseDB) ReleaseLease(relLease *Lease) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	for i, lease := range l.leases {
+	for _, lease := range l.leases {
 		if strings.EqualFold(relLease.ClientId, lease.ClientId) {
-			l.leases[i].Clear()
+			lease.Clear()
 		}
 	}
 }
