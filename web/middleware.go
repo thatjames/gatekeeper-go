@@ -1,7 +1,6 @@
 package web
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -42,20 +41,20 @@ func Secure(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claim := r.Header.Get("authorization")
 		if len(claim) == 0 {
-			fmt.Println("bad claim")
+			log.Debug("rejecting empty claim")
 			http.Error(w, "unauthorised", http.StatusUnauthorized)
 			return
 		}
 
 		token, err := security.ParseClaim(claim)
 		if err != nil {
-			fmt.Println(err.Error())
+			log.Error("token parse claim error: ", err.Error())
 			http.Error(w, "unauthorised", http.StatusUnauthorized)
 			return
 		}
 
 		if time.Now().After(token.Expires) {
-			fmt.Println("expired")
+			log.Debug("token expired")
 			http.Error(w, "unauthorised", http.StatusUnauthorized)
 			return
 		}
