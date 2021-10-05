@@ -15,3 +15,4 @@ DHCP:
 
 Web:
   Address: ":8080"
+  HTPasswdFile: ".htpasswd"

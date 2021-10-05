@@ -12,6 +12,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/tg123/go-htpasswd"
 	"gitlab.com/thatjames-go/gatekeeper-go/config"
 	"gitlab.com/thatjames-go/gatekeeper-go/dhcp"
 	"gitlab.com/thatjames-go/gatekeeper-go/system"
@@ -94,9 +95,18 @@ func login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Username != "admin" || req.Password != "admin" {
-		http.Error(w, "forbidden", http.StatusUnauthorized)
-		return
+	if passwd, err := htpasswd.New(config.Config.Web.HTPasswdFile, htpasswd.DefaultSystems, nil); err == nil {
+		if !passwd.Match(req.Username, req.Password) {
+			http.Error(w, "forbidden", http.StatusUnauthorized)
+			return
+		}
+	} else {
+		log.Warn("unable to read htpasswd file: ", err.Error())
+		log.Warn("defaulting to default username/password")
+		if req.Username != "admin" || req.Password != "admin" {
+			http.Error(w, "forbidden", http.StatusUnauthorized)
+			return
+		}
 	}
 
 	authToken, err := security.CreateAuthToken(req.Username)

@@ -68,8 +68,9 @@ type DHCP struct {
 }
 
 type Web struct {
-	Address string     `yaml:"Address"`
-	TLS     *TLSConfig `yaml:"TLS"`
+	Address      string     `yaml:"Address"`
+	TLS          *TLSConfig `yaml:"TLS"`
+	HTPasswdFile string     `yaml:"HTPasswdFile"`
 }
 
 type TLSConfig struct {
