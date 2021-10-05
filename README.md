@@ -11,6 +11,10 @@ Install gatekeeper from source with `go install gitlab.com/thatjames-go/gatekeep
 
 The binary will look for a `config.yml` file in the PWD, or it can be passed with the `-c <file>` flag.
 
+If the webserver is enabled, the login credentials are admin/admin. 
+
+I know, I know. I'll change that soon.
+
 ## Configuration
 
 Example config:
