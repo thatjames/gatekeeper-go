@@ -34,17 +34,6 @@ var (
 	version string
 )
 
-type PageFs struct {
-	fsys fs.FS
-}
-
-func (p PageFs) Open(name string) (fs.File, error) {
-	if name == "main" {
-		name += ".html"
-	}
-	return p.fsys.Open(name)
-}
-
 func Init(ver string, config *config.Web, leases *dhcp.LeaseDB) error {
 	version = ver
 	var err error
@@ -54,9 +43,10 @@ func Init(ver string, config *config.Web, leases *dhcp.LeaseDB) error {
 	}
 
 	leaseDB = leases
-	fs := http.FileServer(http.FS(PageFs{fsys}))
+	fs := http.FileServer(http.FS(fsys))
 	http.Handle("/", fs)
-	http.HandleFunc("/page/", makeEndpoint(http.MethodGet, templateHandler, Secure))
+	http.HandleFunc("/page/", makeEndpoint(http.MethodGet, templateHandler))
+	http.HandleFunc("/api/verify", makeEndpoint(http.MethodGet, verify, Secure))
 	http.HandleFunc("/api/login", makeEndpoint(http.MethodPost, login, LoggingMiddleware))
 	http.HandleFunc("/api/version", makeEndpoint(http.MethodGet, getVersion, Secure))
 	if config.TLS != nil {
@@ -123,11 +113,16 @@ func login(w http.ResponseWriter, r *http.Request) {
 }
 
 func getVersion(w http.ResponseWriter, r *http.Request) {
+	log.Println("returning version", version)
 	fmt.Fprintln(w, version)
 }
 
+func verify(w http.ResponseWriter, r *http.Request) {
+	//secured endpoint, middleware decides what happens here
+}
+
 func templateHandler(w http.ResponseWriter, r *http.Request) {
-	page := template.New("main").Funcs(template.FuncMap{"Format": format})
+	page := template.New("page").Funcs(template.FuncMap{"Format": format})
 	var (
 		pageData interface{}
 		err      error

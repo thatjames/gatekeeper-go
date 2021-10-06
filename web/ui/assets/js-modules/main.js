@@ -7,7 +7,7 @@ export function Login(e) {
     var data = GetFormData(new FormData(form));
     Request("POST", "api/login", JSON.stringify(data)).then((res) =>{
         sessionStorage.setItem("token", JSON.parse(res).token);
-        location.href = "/main";
+        location.href = "/pages/home";
     }).catch((err) => {
         console.log("Failed: " + err);
     });
@@ -19,5 +19,11 @@ export function GetPage(e) {
         document.getElementById("content").innerHTML = res;
     }).catch((err) => {
         console.log("error: " + err);
+    });
+}
+
+export function Authorise() {
+    Request("GET", "/api/verify").catch((err) => {
+        location.href = "/";
     });
 }
