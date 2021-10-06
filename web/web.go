@@ -4,8 +4,9 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"io/fs"
+	"io"
 	"net/http"
+	"os"
 	"path"
 	"strings"
 	"text/template"
@@ -23,12 +24,6 @@ import (
 //go:embed ui
 var efs embed.FS
 
-//go:embed ui/pages/dhcp.html
-var dhcpTempl string
-
-//go:embed ui/pages/home.html
-var homeTempl string
-
 var (
 	leaseDB *dhcp.LeaseDB
 	version string
@@ -36,16 +31,8 @@ var (
 
 func Init(ver string, config *config.Web, leases *dhcp.LeaseDB) error {
 	version = ver
-	var err error
-	fsys, err := fs.Sub(efs, "ui")
-	if err != nil {
-		return err
-	}
-
 	leaseDB = leases
-	fs := http.FileServer(http.FS(fsys))
-	http.Handle("/", fs)
-	http.HandleFunc("/page/", makeEndpoint(http.MethodGet, templateHandler))
+	http.HandleFunc("/", makeEndpoint(http.MethodGet, pageRender))
 	http.HandleFunc("/api/verify", makeEndpoint(http.MethodGet, verify, Secure))
 	http.HandleFunc("/api/login", makeEndpoint(http.MethodPost, login, LoggingMiddleware))
 	http.HandleFunc("/api/version", makeEndpoint(http.MethodGet, getVersion, Secure))
@@ -113,7 +100,6 @@ func login(w http.ResponseWriter, r *http.Request) {
 }
 
 func getVersion(w http.ResponseWriter, r *http.Request) {
-	log.Println("returning version", version)
 	fmt.Fprintln(w, version)
 }
 
@@ -121,13 +107,68 @@ func verify(w http.ResponseWriter, r *http.Request) {
 	//secured endpoint, middleware decides what happens here
 }
 
-func templateHandler(w http.ResponseWriter, r *http.Request) {
-	page := template.New("page").Funcs(template.FuncMap{"Format": format})
-	var (
-		pageData interface{}
-		err      error
-	)
-	switch strings.ToLower(path.Base(r.URL.Path)) {
+func pageRender(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Path
+	switch {
+	case name == "/", name == "", name == ".":
+		name = "index.html"
+	case !strings.HasPrefix(name, "/assets"):
+		name = fmt.Sprintf("page/%s", path.Base(name))
+	}
+	name = path.Join("ui", name)
+	switch {
+	case strings.HasPrefix(name, "ui/assets"), name == "ui/index.html":
+		if err := loadStaticFile(w, name); err != nil {
+			if os.IsNotExist(err) {
+				http.Error(w, "not found", http.StatusNotFound)
+			} else {
+				http.Error(w, "general failure", http.StatusInternalServerError)
+			}
+		}
+
+	default:
+		w.Header().Add("Content-Type", "text/html")
+		if err := renderPage(w, name); err != nil {
+			http.Error(w, "render failed: "+err.Error(), http.StatusInternalServerError)
+		}
+	}
+}
+
+func loadStaticFile(w http.ResponseWriter, name string) error {
+	f, err := efs.Open(name)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	var mimeType string
+	extension := strings.Split(path.Base(name), ".")[1]
+	switch extension {
+	case "js":
+		mimeType = "text/javascript"
+	case "ico":
+		mimeType = "image/x-icon"
+	default:
+		mimeType = "text/" + extension
+	}
+	w.Header().Add("Content-Type", mimeType)
+	io.Copy(w, f)
+	return nil
+}
+
+func renderPage(w io.Writer, name string) error {
+	rawDat, err := efs.ReadFile(fmt.Sprintf("%s.html", name))
+	if err != nil {
+		return err
+	}
+
+	page, err := template.New(path.Base(name)).Funcs(template.FuncMap{"Format": format}).Parse(string(rawDat))
+	if err != nil {
+		return err
+	}
+
+	var pageData interface{}
+
+	switch strings.ToLower(path.Base(name)) {
 	case "dhcp":
 		pageData = LeasePage{
 			ReservedLeases: leaseDB.ReservedLeases(),
@@ -137,28 +178,14 @@ func templateHandler(w http.ResponseWriter, r *http.Request) {
 			Nameservers:    config.Config.DHCP.NameServers,
 			DomainName:     config.Config.DHCP.DomainName,
 		}
-		if page, err = page.Parse(dhcpTempl); err != nil {
-			http.Error(w, "failed", http.StatusInternalServerError)
-			fmt.Println(err.Error())
-			return
-		}
 
 	case "home":
 		if pageData, err = system.GetSystemInfo(); err != nil {
 			fmt.Fprintln(w, "<div>failed: "+err.Error()+"</div>")
 		}
-		if page, err = page.Parse(homeTempl); err != nil {
-			http.Error(w, "failed", http.StatusInternalServerError)
-			fmt.Println(err.Error())
-			return
-		}
+	}
 
-	}
-	if err = page.Execute(w, pageData); err != nil {
-		http.Error(w, "failed", http.StatusInternalServerError)
-		fmt.Println(err.Error())
-		return
-	}
+	return page.Execute(w, pageData)
 }
 
 func format(t time.Time) string {
