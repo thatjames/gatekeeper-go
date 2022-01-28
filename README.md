@@ -1,6 +1,8 @@
 # GateKeeper
 
-GateKeeper is a configurable DHCP server written in Go
+GateKeeper is a configurable hobbyist DHCP server written in Go.
+
+It is **not** intended for production use, but it powers my home network just fine!
 
 ## Installation
 
@@ -32,18 +34,73 @@ Example config:
 
 ```yaml
 DHCP:
-  DomainName: GateKeeper
   Interface: eth0
+  DomainName: gatekeeper
   StartAddr: 10.0.0.2
   EndAddr: 10.0.0.99
-  LeaseTTL: 86400
+  LeaseTTL: 300
   SubnetMask: 255.255.255.0
   Router: 10.0.0.1
   NameServers:
     - 8.8.8.8
     - 1.1.1.1
   ReservedAddresses:
-    bc:5f:f4:ac:ea:c4: 10.0.0.100
+    aa:aa:aa:aa:aa:aa: 10.0.0.100
+
 Web:
-  Address: localhost:8080
+  Address: :8080
+  HTPasswdFile: .htpasswd
 ```
+
+### DHCP
+
+The DHCP configuration section.
+
+#### Interface
+
+The interface name gatekeeper will bind to
+
+#### DomainName
+
+The domain name option supplied in DHCP responses
+
+#### StartAddr
+
+The first assignable DHCP address gatekeeper will hand out
+
+#### EndAddr
+
+The last assignable DHCP address gatekeeper will hand out. This makes the effective pool equal to (StartAddr - EndAddr) + 1 (inclusive). Our example has 98 possible addresses.
+
+#### Lease TTL
+
+Time To Live for given leases
+
+#### SubnetMask
+
+The subnet mask option returned in the DHCP response
+
+#### Router
+
+The router option returned in the DHCP response
+
+#### NameServers:
+
+An array of values for the NameServer option(s) returned in the DHCP response
+
+#### ReservedAddresses
+
+A mapping of mac_address:desired_static_ip to provide static IP addresses to clients. Make sure this is outside of the assignable range of start and end addresses
+
+
+### Web
+
+The webserver configuration section
+
+#### Address
+
+Listen address the webserver should bind to
+
+#### HTPasswdFile
+
+Relative or Fully Qualified path to the htaccess file
