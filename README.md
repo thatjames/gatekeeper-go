@@ -28,6 +28,12 @@ echo username:$(echo password | openssl passwd -stdin -apr1) > .htpasswd
 
 Remember to replace `username` and `password` with your own values
 
+#### Screenshots
+
+![home page for the webview, showing various system stats such as uptime and data usage](images/web_home_page.png)
+
+![dhcp page for the webview, showing various system dhcp stats such as assigned leases and options](images/web_dhcp_view.png)
+
 ## Configuration
 
 Example config:
@@ -95,7 +101,7 @@ A mapping of mac_address:desired_static_ip to provide static IP addresses to cli
 
 ### Web
 
-The webserver configuration section
+The webserver configuration section. If this section is not defined, gatekeeper will not run a web server.
 
 #### Address
 
@@ -104,3 +110,5 @@ Listen address the webserver should bind to
 #### HTPasswdFile
 
 Relative or Fully Qualified path to the htaccess file
+
+**note:** if no `HTPasswdFile` is provided, then the default username/password is admin/admin
