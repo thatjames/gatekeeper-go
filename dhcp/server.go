@@ -10,12 +10,33 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	log "github.com/sirupsen/logrus"
 	"gitlab.com/thatjames-go/gatekeeper-go/config"
 )
 
 const (
 	dhcpServerPort = 67
+)
+
+var (
+	reqDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name: "dhcp_req_time",
+		Buckets: []float64{
+			0,
+			10,
+			100,
+			1000,
+			10000,
+			100000,
+		},
+	})
+
+	opCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "dhcp_op_counter",
+		Help: "Count by type of operations",
+	}, []string{"op"})
 )
 
 type DHCPPacket struct {
@@ -200,7 +221,13 @@ func (z *DHCPServer) receivePacketWorker() {
 }
 
 func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
+	tsStart := time.Now()
 	opts := ParseOptions(req.Message)
+	defer func() {
+		tsEnd := time.Since(tsStart).Round(time.Millisecond)
+		reqDuration.Observe(float64(tsEnd.Milliseconds()))
+		opCounter.With(prometheus.Labels{"op": DHCPMessageType(opts[OptionDHCPMessageType][0]).String()}).Inc()
+	}()
 	id := req.Message.CHAddr().String()
 	if opts[OptionHostname] != nil {
 		id = string(opts[OptionHostname])

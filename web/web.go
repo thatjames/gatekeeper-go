@@ -12,6 +12,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	"github.com/tg123/go-htpasswd"
 	"gitlab.com/thatjames-go/gatekeeper-go/config"
@@ -32,6 +33,7 @@ var (
 func Init(ver string, config *config.Web, leases *dhcp.LeaseDB) error {
 	version = ver
 	leaseDB = leases
+	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/", makeEndpoint(http.MethodGet, pageRender))
 	http.HandleFunc("/api/verify", makeEndpoint(http.MethodGet, verify, Secure))
 	http.HandleFunc("/api/login", makeEndpoint(http.MethodPost, login, LoggingMiddleware))

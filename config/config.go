@@ -71,6 +71,7 @@ type Web struct {
 	Address      string     `yaml:"Address"`
 	TLS          *TLSConfig `yaml:"TLS"`
 	HTPasswdFile string     `yaml:"HTPasswdFile"`
+	Prometheus   bool       `yaml:"Prometheus"`
 }
 
 type TLSConfig struct {

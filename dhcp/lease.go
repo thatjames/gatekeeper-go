@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -35,6 +37,13 @@ const (
 	LeaseOffered
 	LeaseReserved
 	LeaseActive
+)
+
+var (
+	activeLeaseGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "active_lease_count",
+		Help: "count of active leases",
+	})
 )
 
 type Lease struct {
@@ -111,6 +120,7 @@ func (l *LeaseDB) AcceptLease(ls *Lease, ttl time.Duration) {
 		if lease.ClientId == ls.ClientId {
 			lease.State = LeaseActive
 			lease.Expiry = time.Now().Add(ttl)
+			activeLeaseGauge.Inc()
 			return
 		}
 	}
@@ -153,6 +163,7 @@ func (l *LeaseDB) ReserveLease(clientID string, reservedIP net.IP) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	l.reservedAddresses[clientID] = &Lease{ClientId: clientID, IP: reservedIP, State: LeaseReserved}
+	activeLeaseGauge.Inc()
 }
 
 func (l *LeaseDB) PeristLeases(file string) error {
@@ -273,6 +284,7 @@ func (l *LeaseDB) ReleaseLease(relLease *Lease) {
 	for _, lease := range l.leases {
 		if strings.EqualFold(relLease.ClientId, lease.ClientId) {
 			lease.Clear()
+			activeLeaseGauge.Dec()
 		}
 	}
 }

@@ -118,6 +118,27 @@ const (
 	DHCPRelease
 )
 
+func (mtype DHCPMessageType) String() string {
+	switch mtype {
+	case DHCPDiscover:
+		return "Discover"
+	case DHCPOffer:
+		return "Offer"
+	case DHCPRequest:
+		return "Request"
+	case DHCPDecline:
+		return "Decline"
+	case DHCPAck:
+		return "Ack"
+	case DHCPNack:
+		return "Nack"
+	case DHCPRelease:
+		return "Release"
+	default:
+		return "Unknown"
+	}
+}
+
 func (o OptionTag) String() string {
 	switch o {
 	case OptionSubnetMask:
