@@ -30,7 +30,7 @@ var (
 	opCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "dhcp_op_counter",
 		Help: "Count by type of operations",
-	}, []string{"op", "client"})
+	}, []string{"op", "client", "hostname"})
 
 	activeLeaseGauge = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "active_lease_count",
@@ -158,6 +158,7 @@ func (z *DHCPServer) Start() error {
 
 	for clientID, lease := range z.opts.ReservedLeases {
 		z.issuedLeases.ReserveLease(clientID, net.ParseIP(lease).To4())
+		activeLeaseGauge.Inc()
 		log.Infof("reserving %s for %s", lease, clientID)
 	}
 
@@ -211,13 +212,18 @@ func (z *DHCPServer) receivePacketWorker() {
 	for req := range z.requestChan {
 		tsStart := time.Now()
 		resp := z.handleRequest(req)
-		opCounter.With(prometheus.Labels{"op": DHCPMessageType(ParseOptions(req.Message)[OptionDHCPMessageType][0]).String(), "client": req.Message.CHAddr().String()}).Inc()
+		opts := ParseOptions(req.Message)
+		host := req.Message.CHAddr().String()
+		if opts[OptionHostname] != nil {
+			host = string(opts[OptionHostname])
+		}
+		opCounter.With(prometheus.Labels{"op": DHCPMessageType(opts[OptionDHCPMessageType][0]).String(), "client": req.Message.CHAddr().String(), "hostname": host}).Inc()
 		if resp != nil {
 			z.responseChan <- &DHCPPacket{
 				Message:      resp,
 				ResponseAddr: req.ResponseAddr,
 			}
-			opCounter.With(prometheus.Labels{"op": DHCPMessageType(ParseOptions(resp)[OptionDHCPMessageType][0]).String(), "client": req.Message.CHAddr().String()}).Inc()
+			opCounter.With(prometheus.Labels{"op": DHCPMessageType(ParseOptions(resp)[OptionDHCPMessageType][0]).String(), "client": req.Message.CHAddr().String(), "hostname": host}).Inc()
 		}
 		tsEnd := time.Since(tsStart).Round(time.Millisecond)
 		reqDuration.Observe(float64(tsEnd.Milliseconds()))
@@ -286,14 +292,12 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 				switch lease.State {
 				case LeaseOffered:
 					log.Infof("confirm address %s for %s", requestedAddr, id)
-					activeLeaseGauge.Inc()
 					z.issuedLeases.AcceptLease(lease, time.Second*time.Duration(z.opts.LeaseTTL))
-				case LeaseReserved:
 					activeLeaseGauge.Inc()
+				case LeaseReserved:
 					z.issuedLeases.AcceptLease(lease, time.Second*time.Duration(z.opts.LeaseTTL))
 					log.Infof("send ack for reserved address %s to %s", requestedAddr, id)
 				case LeaseActive:
-					activeLeaseGauge.Inc()
 					z.issuedLeases.AcceptLease(lease, time.Second*time.Duration(z.opts.LeaseTTL))
 					lease.Expiry = time.Now().Add(time.Second * time.Duration(z.opts.LeaseTTL))
 					log.Infof("send ack for active address %s to %s", lease.IP.To4().String(), id)
