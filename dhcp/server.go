@@ -22,15 +22,9 @@ const (
 
 var (
 	reqDuration = promauto.NewHistogram(prometheus.HistogramOpts{
-		Name: "dhcp_req_time",
-		Buckets: []float64{
-			0,
-			10,
-			100,
-			1000,
-			10000,
-			100000,
-		},
+		Name:    "dhcp_req_time",
+		Help:    "dhcp request time buckets",
+		Buckets: []float64{1, 10, 100, 250, 500, 1000, 2500, 5000, 10000},
 	})
 
 	opCounter = promauto.NewCounterVec(prometheus.CounterOpts{
@@ -210,24 +204,23 @@ func (z *DHCPServer) listen() {
 
 func (z *DHCPServer) receivePacketWorker() {
 	for req := range z.requestChan {
+		tsStart := time.Now()
 		resp := z.handleRequest(req)
+		opCounter.With(prometheus.Labels{"op": DHCPMessageType(ParseOptions(req.Message)[OptionDHCPMessageType][0]).String()}).Inc()
 		if resp != nil {
 			z.responseChan <- &DHCPPacket{
 				Message:      resp,
 				ResponseAddr: req.ResponseAddr,
 			}
+			opCounter.With(prometheus.Labels{"op": DHCPMessageType(ParseOptions(resp)[OptionDHCPMessageType][0]).String()}).Inc()
 		}
+		tsEnd := time.Since(tsStart).Round(time.Millisecond)
+		reqDuration.Observe(float64(tsEnd.Milliseconds()))
 	}
 }
 
 func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
-	tsStart := time.Now()
 	opts := ParseOptions(req.Message)
-	defer func() {
-		tsEnd := time.Since(tsStart).Round(time.Millisecond)
-		reqDuration.Observe(float64(tsEnd.Milliseconds()))
-		opCounter.With(prometheus.Labels{"op": DHCPMessageType(opts[OptionDHCPMessageType][0]).String()}).Inc()
-	}()
 	id := req.Message.CHAddr().String()
 	if opts[OptionHostname] != nil {
 		id = string(opts[OptionHostname])
