@@ -6,7 +6,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"gitlab.com/thatjames-go/gatekeeper-go/web/security"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/web/security"
 )
 
 type MiddlewareFunc func(h http.HandlerFunc) http.HandlerFunc

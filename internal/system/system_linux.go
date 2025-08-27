@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/thatjames-go/gatekeeper-go/config"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
 	"golang.org/x/sys/unix"
 )
 

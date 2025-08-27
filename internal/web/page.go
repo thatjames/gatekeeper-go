@@ -1,7 +1,7 @@
 package web
 
 import (
-	"gitlab.com/thatjames-go/gatekeeper-go/dhcp"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
 )
 
 type LeasePage struct {

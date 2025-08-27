@@ -1,6 +1,6 @@
 package domain
 
-import "gitlab.com/thatjames-go/gatekeeper-go/dhcp"
+import "gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
 
 type UserLoginRequest struct {
 	Username string

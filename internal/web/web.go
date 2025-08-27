@@ -15,11 +15,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	"github.com/tg123/go-htpasswd"
-	"gitlab.com/thatjames-go/gatekeeper-go/config"
-	"gitlab.com/thatjames-go/gatekeeper-go/dhcp"
-	"gitlab.com/thatjames-go/gatekeeper-go/system"
-	"gitlab.com/thatjames-go/gatekeeper-go/web/domain"
-	"gitlab.com/thatjames-go/gatekeeper-go/web/security"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/system"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/web/domain"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/web/security"
 )
 
 //go:embed ui
