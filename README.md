@@ -8,17 +8,29 @@ It is **not** intended for production use, but it powers my home network just fi
 
 Install gatekeeper from source with `go install gitlab.com/thatjames-go/gatekeeper-go@latest` or download one of the binaries under the [releases](https://gitlab.com/thatjames-go/gatekeeper-go/-/releases) page.
 
+## Building
+
+### Native Binary
+
+```bash
+make build
+```
+
+### Docker Image
+
+```bash
+make docker
+```
 
 ## Running
 
 The binary will look for a `config.yml` file in the PWD, or it can be passed with the `-c <file>` flag.
 
-
 ### Webserver
 
 If the webserver is enabled, but no `htpasswd` file has been specified, then the default login credentials are admin/admin.
 
-In order to secure the webserver, you can create an `htpasswd` file and specify where to find it in the `HTPasswdFile` field under the `Web` config. 
+In order to secure the webserver, you can create an `htpasswd` file and specify where to find it in the `HTPasswdFile` field under the `Web` config.
 
 On Linux, you can create this file using the following commands (requires `openssl`):
 
@@ -97,7 +109,6 @@ An array of values for the NameServer option(s) returned in the DHCP response
 #### ReservedAddresses
 
 A mapping of mac_address:desired_static_ip to provide static IP addresses to clients. Make sure this is outside of the assignable range of start and end addresses
-
 
 ### Web
 
