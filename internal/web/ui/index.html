@@ -1,41 +1,13 @@
+<!doctype html>
 <html lang="en">
-
-<head>
-    <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
-    <meta content="utf-8" http-equiv="encoding">
-    <title>GateKeeper</title>
-    <link rel="icon" href="assets/favicon.ico">
-    <link href="assets/style.css" rel="stylesheet" />
-    <link href="assets/css/bootstrap.min.css" rel="stylesheet" />
-    <script src="assets/js/bootstrap.min.js"></script>
-</head>
-
-<body>
-    <div id="root" class="container">
-        <div id="login-container">
-            <div id="login-header">
-                <h1 class="text-center">GateKeeper</h1>
-            </div>
-            <form id="login-form" class="row">
-                <div class="mb-3" class="row">
-                    <label for="usernameInput" class="form-label">Username</label>
-                    <input type="username" class="form-control" id="txtUsername" placeholder="username" name="username">
-                </div>
-                <div class="mb-3" class="row">
-                    <label for="passwordInput" class="form-label">Password</label>
-                    <input type="password" class="form-control" id="txtPassword" placeholder="password" name="password">
-                </div>
-                <button type="submit" class="btn-block btn-primary">Login</button>
-            </form>
-        </div>
-    </div>
-</body>
-
-<footer>
-    <script type="module">
-        import { Login } from "./assets/js-modules/main.js";
-        document.getElementById("login-form").onsubmit = Login;
-    </script>
-</footer>
-
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vite + Svelte</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
 </html>
