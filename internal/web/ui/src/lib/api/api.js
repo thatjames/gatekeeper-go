@@ -11,7 +11,7 @@ let env = import.meta.env.PROD ? environments.live : environments.dev;
 
 export class API {
   networkRequest(method, path, data) {
-    let url = env.url + path;
+    const url = env.url.replace(/\/$/, "") + "/" + path.replace(/^\//, "");
     return fetch(url, {
       method: method,
       body: data ? JSON.stringify(data) : null,
