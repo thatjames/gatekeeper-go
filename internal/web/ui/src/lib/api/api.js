@@ -7,7 +7,7 @@ const environments = {
   },
 };
 
-let env = environments.dev;
+let env = import.meta.env.PROD ? environments.live : environments.dev;
 
 export class API {
   networkRequest(method, path, data) {
