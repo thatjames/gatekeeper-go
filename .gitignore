@@ -1,2 +1,3 @@
 *.pem
 bin
+internal/web/ui/dist
