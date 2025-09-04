@@ -12,11 +12,10 @@ test:
 version:
 	@echo "Version: $(VERSION)"
 
-# will add this once we have a working docker integration
-# build-docker:
-# 	env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/gatekeeper cmd/gatekeeper/main.go
+build-docker: test
+	env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/gatekeeper cmd/gatekeeper/main.go
 
 
-# docker: build-docker
-# 	docker build -t thatjames/gatekeeper .
+docker: build-docker
+	docker build -t thatjames/gatekeeper .
 
