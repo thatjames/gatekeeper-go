@@ -12,7 +12,6 @@ let env = import.meta.env.PROD ? environments.live : environments.dev;
 export class API {
   networkRequest(method, path, data) {
     let url = env.url + path;
-    console.log(url, method, data);
     return fetch(url, {
       method: method,
       body: data ? JSON.stringify(data) : null,
