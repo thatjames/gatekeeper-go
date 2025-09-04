@@ -2,7 +2,7 @@
   import { login } from "$lib/auth/auth";
 
   const doLogin = () => {
-    login("test", "test")
+    login("username", "password")
   };
 </script>
 

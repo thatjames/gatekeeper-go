@@ -1,37 +1,38 @@
 const environments = {
-    dev: {
-        url: "http://localhost:8085/api/"
-    },
-    live: {
-        url: "/api/"
-    }
-}
+  dev: {
+    url: "http://localhost:8085/api/",
+  },
+  live: {
+    url: "/api/",
+  },
+};
 
 let env = environments.dev;
 
 export class API {
-  networkRequest({ method, path, data }) {
-    let url = env.url + path
+  networkRequest(method, path, data) {
+    let url = env.url + path;
+    console.log(url, method, data);
     return fetch(url, {
-        method: method,
-        body: data ? JSON.stringify(data) : null,
-    })
+      method: method,
+      body: data ? JSON.stringify(data) : null,
+    });
   }
 
-  get({path}) {
-    return this.networkRequest("get", path)
+  get(path) {
+    return this.networkRequest("get", path);
   }
 
-  post({path, data}) {
-    return this.networkRequest("post", path, data)
+  post(path, data) {
+    return this.networkRequest("post", path, data);
   }
 
-  put({path, data}) {
-    return this.networkRequest("put", path, data)
+  put(path, data) {
+    return this.networkRequest("put", path, data);
   }
 
-  delete({path, data}) {
-    return this.networkRequest("delete", path, data)
+  delete(path, data) {
+    return this.networkRequest("delete", path, data);
   }
 }
 
