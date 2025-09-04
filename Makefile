@@ -23,7 +23,7 @@ docker: build-docker
 	docker build -t thatjames/gatekeeper .
 
 docker-run: 
-	docker run --rm -ti -v $(PWD)/config/docker-config.yml:/app/config.yml -p 8085:8085 thatjames/gatekeeper
+	docker run --name gatekeeper --rm -ti -v $(PWD)/config/docker-config.yml:/app/config.yml -p 8085:8085 thatjames/gatekeeper
 
 install:
 	$(MAKE) -C internal/web/ui install

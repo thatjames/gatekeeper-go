@@ -1,23 +1,38 @@
 const environments = {
     dev: {
-        name: "dev",
         url: "http://localhost:8085/api/"
     },
-    prod: {
-        name: "prod",
+    live: {
         url: "/api/"
     }
 }
 
-let environment = environments.dev
+let env = environments.dev;
 
-export const get = async (path) => {
-    return await fetch(environment.url + path)
-}
-
-export const post = async (path, data) => {
-    return fetch(environment.url + path, {
-        method: "POST",
-        body: JSON.stringify(data)
+export class API {
+  networkRequest({ method, path, data }) {
+    let url = env.url + path
+    return fetch(url, {
+        method: method,
+        body: data ? JSON.stringify(data) : null,
     })
+  }
+
+  get({path}) {
+    return this.networkRequest("get", path)
+  }
+
+  post({path, data}) {
+    return this.networkRequest("post", path, data)
+  }
+
+  put({path, data}) {
+    return this.networkRequest("put", path, data)
+  }
+
+  delete({path, data}) {
+    return this.networkRequest("delete", path, data)
+  }
 }
+
+export const api = new API();
