@@ -18,11 +18,16 @@ export class API {
       method: method,
       body: data ? JSON.stringify(data) : null,
       headers: auth.token ? { Authorization: "Bearer " + auth.token } : {},
-    }).then((resp) => {
-      if (resp.headers.get("Content-Type")?.includes("application/json")) {
-        return resp.json();
+    }).then(async (resp) => {
+      if (resp.status >= 200 && resp.status < 399) {
+        if (resp.headers.get("Content-Type")?.includes("application/json")) {
+          return resp.json();
+        }
+        return resp;
+      } else {
+        let error = await resp.json();
+        throw new Error(error.error);
       }
-      return resp;
     });
   }
 

@@ -1,7 +1,7 @@
 {
-  "name": "ui",
+  "name": "gatekeeper-ui",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -19,6 +19,7 @@
     "vite": "^7.1.2"
   },
   "dependencies": {
+    "jwt-decode": "^4.0.0",
     "svelte-spa-router": "^4.0.1"
   }
 }

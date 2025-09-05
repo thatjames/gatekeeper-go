@@ -1,45 +1,12 @@
 <script>
-  import { login, auth, verify } from "$lib/auth/auth.svelte";
-  import {
-    Button,
-    P,
-    Table,
-    TableBodyCell,
-    TableBodyRow,
-    TableHead,
-    TableHeadCell,
-  } from "flowbite-svelte";
+  import { auth } from "$lib/auth/auth.svelte";
+  import { P } from "flowbite-svelte";
+  import { jwtDecode } from "jwt-decode";
 
-  let verifyVal = null;
-
-  const doLogin = () => {
-    login("admin", "admin");
-  };
-
-  const doVerify = () => {
-    verify().then((resp) => {
-      verifyVal = resp;
-    });
-  };
+  let userData = JSON.stringify(auth.user);
+  console.log(jwtDecode(auth.token));
 </script>
 
-<div class="flex flex-col gap-2">
-  <span>
-    <Button onclick={doLogin}>Click me</Button>
-  </span>
-  {#if auth.token}
-    <span><Button onclick={doVerify}>Verify</Button></span>
-    {#if verifyVal}
-      <Table>
-        <TableHead>
-          <TableHeadCell>Username</TableHeadCell>
-          <TableHeadCell>Verified</TableHeadCell>
-        </TableHead>
-        <TableBodyRow>
-          <TableBodyCell>{verifyVal.username}</TableBodyCell>
-          <TableBodyCell>{verifyVal.valid}</TableBodyCell>
-        </TableBodyRow>
-      </Table>
-    {/if}
-  {/if}
+<div class="flex flex-col gap-5">
+  <P>{userData}</P>
 </div>
