@@ -1,3 +1,5 @@
+import { auth } from "$lib/auth/auth.svelte";
+
 const environments = {
   dev: {
     url: "http://localhost:8085/api/",
@@ -10,11 +12,17 @@ const environments = {
 let env = import.meta.env.PROD ? environments.live : environments.dev;
 
 export class API {
-  networkRequest(method, path, data) {
+  async networkRequest(method, path, data) {
     const url = env.url.replace(/\/$/, "") + "/" + path.replace(/^\//, "");
     return fetch(url, {
       method: method,
       body: data ? JSON.stringify(data) : null,
+      headers: auth.token ? { Authorization: "Bearer " + auth.token } : {},
+    }).then((resp) => {
+      if (resp.headers.get("Content-Type")?.includes("application/json")) {
+        return resp.json();
+      }
+      return resp;
     });
   }
 
