@@ -26,6 +26,12 @@ export const login = async ({ username, password }) => {
     });
 };
 
+export const logout = () => {
+  auth.token = "";
+  auth.user = {};
+  sessionStorage.removeItem("auth");
+};
+
 export const verify = () => {
   return api.get("/verify");
 };
