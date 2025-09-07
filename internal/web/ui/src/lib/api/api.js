@@ -2,10 +2,10 @@ import { auth } from "$lib/auth/auth.svelte";
 
 const environments = {
   dev: {
-    url: "http://localhost:8085/api/",
+    url: "http://localhost:8085/api/v1/",
   },
   live: {
-    url: "/api/",
+    url: "/api/v1/",
   },
 };
 

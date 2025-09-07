@@ -1,4 +1,4 @@
-package web
+package v1
 
 import (
 	"net/http"
@@ -8,7 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func spaMiddleware() gin.HandlerFunc {
+func SpaMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if strings.HasPrefix(c.Request.URL.Path, "/api/") ||
 			strings.HasPrefix(c.Request.URL.Path, "/metrics") {
@@ -26,7 +26,7 @@ func spaMiddleware() gin.HandlerFunc {
 	}
 }
 
-func authMiddleware() gin.HandlerFunc {
+func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -35,20 +35,20 @@ func authMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		token := strings.TrimPrefix(authHeader, "Bearer ")
-		if token == authHeader {
+		clientToken := strings.TrimPrefix(authHeader, "Bearer ")
+		if clientToken == authHeader {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Bearer token required"})
 			c.Abort()
 			return
 		}
 
-		if token == "" {
+		if clientToken == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			c.Abort()
 			return
 		}
 
-		claims, err := ParseAuthToken(token)
+		claims, err := ParseAuthToken(clientToken)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			c.Abort()
@@ -60,7 +60,7 @@ func authMiddleware() gin.HandlerFunc {
 	}
 }
 
-func loggingMiddleware() gin.HandlerFunc {
+func LoggingMiddleware() gin.HandlerFunc {
 	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
 		log.WithFields(log.Fields{
 			"status":     param.StatusCode,
