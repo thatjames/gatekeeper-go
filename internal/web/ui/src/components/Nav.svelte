@@ -45,8 +45,6 @@
     <NavLi href="#/">Home</NavLi>
     <NavLi href="#/leases">Leases</NavLi>
     <NavLi href="#/settings">Settings</NavLi>
-    <NavLi href="#/alert">Alert</NavLi>
-    <NavLi href="#/avatar">Avatar</NavLi>
     <DarkMode class="mr-2" />
     <Button onclick={doLogout}>Logout</Button>
   </NavUl>

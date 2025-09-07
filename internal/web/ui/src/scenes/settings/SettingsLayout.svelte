@@ -9,7 +9,4 @@
   });
 </script>
 
-<div class="flex flex-col gap-10">
-  <Heading tag="h4">Settings</Heading>
-  <SettingsScreen {settings} />
-</div>
+<SettingsScreen {settings} />

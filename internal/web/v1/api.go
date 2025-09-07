@@ -10,6 +10,7 @@ import (
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/system"
 )
 
 func LoginHandler(c *gin.Context) {
@@ -90,4 +91,13 @@ func HealthHandler(c *gin.Context) {
 		"status":    "healthy",
 		"timestamp": time.Now().Unix(),
 	})
+}
+
+func GetSystemInfo(c *gin.Context) {
+	sysInfo, err := system.GetSystemInfo()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, sysInfo)
 }

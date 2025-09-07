@@ -50,4 +50,5 @@ func setupAPIRoutes(r *gin.Engine) {
 	protected.GET("/verify", v1.VerifyHandler)
 	protected.GET("/leases", v1.GetLeases)
 	protected.GET("/options", v1.GetDHCPOptions)
+	protected.GET("/system", v1.GetSystemInfo)
 }

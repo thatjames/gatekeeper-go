@@ -18,11 +18,11 @@ func GetSystemInfo() (SystemInfo, error) {
 		return nil, err
 	}
 	hostname, _ := os.Hostname()
-	memoryUsed := uint64(t.Totalram - t.Freeram)
+	// memoryUsed := uint64(t.Totalram - t.Freeram)
 	si := SystemInfo{
 		"Hostname": hostname,
-		"Uptime":   (time.Second * time.Duration(t.Uptime)).Round(time.Second).String(),
-		"Memory":   fmt.Sprintf("%s / %s", byteSize(memoryUsed), byteSize(uint64(t.Totalram))),
+		"Uptime":   formatDuration((time.Second * time.Duration(t.Uptime)).Round(time.Second)),
+		"Memory":   fmt.Sprintf("%s / %s", byteSize(t.Freeram), byteSize(uint64(t.Totalram))),
 	}
 
 	if lanStats, err := getInterfaceStatsByName(config.Config.DHCP.Interface); err == nil {
@@ -109,4 +109,32 @@ func getInterfaceStatsByName(interfaceName string) (*InterfaceStatistics, error)
 		TxBytes: txBytes,
 		RxBytes: rxBytes,
 	}, nil
+}
+
+func formatDuration(d time.Duration) string {
+	if d == 0 {
+		return "0s"
+	}
+
+	days := int(d.Hours()) / 24
+	hours := int(d.Hours()) % 24
+	minutes := int(d.Minutes()) % 60
+	seconds := int(d.Seconds()) % 60
+
+	var parts []string
+
+	if days > 0 {
+		parts = append(parts, fmt.Sprintf("%dd", days))
+	}
+	if hours > 0 {
+		parts = append(parts, fmt.Sprintf("%dh", hours))
+	}
+	if minutes > 0 {
+		parts = append(parts, fmt.Sprintf("%dm", minutes))
+	}
+	if seconds > 0 {
+		parts = append(parts, fmt.Sprintf("%ds", seconds))
+	}
+
+	return strings.Join(parts, ":")
 }

@@ -10,6 +10,9 @@
   let leaseData = "";
 
   const routes = {
+    "/": wrap({
+      asyncComponent: () => import("$scenes/home/HomeScreen.svelte"),
+    }),
     "/leases": wrap({
       asyncComponent: () => import("$scenes/leases/LeaseLayout.svelte"),
     }),
