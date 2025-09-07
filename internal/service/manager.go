@@ -1,5 +1,7 @@
 package service
 
+import "sync"
+
 type ServiceKey string
 
 var (
@@ -9,7 +11,10 @@ var (
 
 type serviceManager map[ServiceKey]Service
 
-var instance = make(serviceManager)
+var (
+	instance = make(serviceManager)
+	lock     = &sync.Mutex{}
+)
 
 type Service interface {
 	Start() error
@@ -34,6 +39,12 @@ func Stop() error {
 		fns = append(fns, service.Stop)
 	}
 	return checkErrors(fns...)
+}
+
+func GetService[T Service](stype ServiceKey) T {
+	lock.Lock()
+	defer lock.Unlock()
+	return instance[stype].(T)
 }
 
 func checkErrors(fns ...func() error) error {

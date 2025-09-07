@@ -20,6 +20,7 @@ func setupAPIRoutes(r *gin.Engine) {
 
 	protected := v1Group.Group("/", v1.AuthMiddleware())
 	protected.GET("/verify", v1.VerifyHandler)
+	protected.GET("/leases", v1.GetLeases)
 }
 
 func Init(ver string, cfg *config.Web, leases *dhcp.LeaseDB) error {

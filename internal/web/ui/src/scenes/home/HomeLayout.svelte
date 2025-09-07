@@ -1,10 +1,23 @@
 <script>
+  import Nav from "$components/Nav.svelte";
   import { auth, logout } from "$lib/auth/auth.svelte";
+  import { getLeases } from "$lib/lease/lease";
   import { Button, P } from "flowbite-svelte";
   import { jwtDecode } from "jwt-decode";
+  import Router from "svelte-spa-router";
+  import wrap from "svelte-spa-router/wrap";
 
-  let userData = JSON.stringify(auth.user);
-  console.log(jwtDecode(auth.token));
+  let leaseData = "";
+
+  const routes = {
+    "/leases": wrap({
+      asyncComponent: () => import("$scenes/leases/LeaseLayout.svelte"),
+    }),
+  };
+
+  getLeases().then((resp) => {
+    leaseData = JSON.stringify(resp);
+  });
 
   const doLogout = () => {
     logout();
@@ -13,6 +26,6 @@
 </script>
 
 <div class="flex flex-col gap-5">
-  <P>{userData}</P>
-  <Button onclick={doLogout}>Logout</Button>
+  <Nav />
+  <Router {routes} />
 </div>

@@ -189,6 +189,10 @@ func (z *DHCPServer) Stop() error {
 	return z.issuedLeases.PeristLeases(leaseFile)
 }
 
+func (z *DHCPServer) LeaseDB() *LeaseDB {
+	return z.issuedLeases
+}
+
 func (z *DHCPServer) listen() {
 	buff := make([]byte, 1500)
 	for {
@@ -364,8 +368,4 @@ func (z *DHCPServer) responsePacketWorker() {
 			log.Error("unable to respond to client: ", err.Error())
 		}
 	}
-}
-
-func (z *DHCPServer) LeaseDB() *LeaseDB {
-	return z.issuedLeases
 }

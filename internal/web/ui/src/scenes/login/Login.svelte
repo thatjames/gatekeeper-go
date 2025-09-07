@@ -1,5 +1,6 @@
 <script>
   import { login } from "$lib/auth/auth.svelte";
+  import { Routes } from "$lib/common/routes";
   import { Button, Heading, Input, Label, P } from "flowbite-svelte";
   import { push } from "svelte-spa-router";
   let loginData = {};
@@ -8,7 +9,7 @@
     e.preventDefault();
     login(loginData)
       .then(() => {
-        push("/");
+        push(Routes.Home);
       })
       .catch((err) => {
         errorText = err;
@@ -17,7 +18,16 @@
 </script>
 
 <div class="flex flex-col gap-5 p-5 h-100 justify-center align-middle">
-  <Heading tag="h1" class="text-center">GateKeeper Login</Heading>
+  <div class="flex gap-5 justify-center items-center">
+    <img
+      src="/logo.png"
+      class="me-3 h-6 sm:h-9 logo"
+      alt="Gate keeper Logo of a padlock"
+    />
+    <Heading tag="h1" class="text-center"
+      >Gate<span class="text-primary-500">Keeper</span></Heading
+    >
+  </div>
   <form class="w-1/2 m-auto" onsubmit={doLogin}>
     <div class="flex flex-col gap-2">
       <Label for="username" class="mb-2">Username</Label>
@@ -41,3 +51,16 @@
   </form>
   <P class="text-center text-primary-600">{errorText}</P>
 </div>
+
+<style>
+  .logo {
+    width: 4rem;
+    height: 4rem;
+  }
+
+  @media (max-width: 640px) {
+    .logo {
+      display: none;
+    }
+  }
+</style>

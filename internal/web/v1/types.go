@@ -30,3 +30,34 @@ type UserClaims struct {
 	User
 	jwt.RegisteredClaims
 }
+
+type DhcpLeaseResponse struct {
+	ActiveLeases   []Lease `json:"active,omitempty"`
+	ReservedLeases []Lease `json:"reserved,omitempty"`
+}
+
+type Lease struct {
+	ClientId string `json:"clientId"`
+	Hostname string `json:"hostname"`
+	IP       string `json:"ip"`
+	State    string `json:"state"`
+	Expiry   string `json:"expiry"`
+}
+
+func MapLease(lease dhcp.Lease) Lease {
+	return Lease{
+		ClientId: lease.ClientId,
+		Hostname: lease.Hostname,
+		IP:       lease.IP.String(),
+		State:    lease.State.String(),
+		Expiry:   lease.Expiry.Format("15:04:05"),
+	}
+}
+
+func MapLeases(leases []dhcp.Lease) []Lease {
+	var leaseList []Lease
+	for _, lease := range leases {
+		leaseList = append(leaseList, MapLease(lease))
+	}
+	return leaseList
+}

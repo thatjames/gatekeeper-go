@@ -8,6 +8,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/tg123/go-htpasswd"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
 )
 
 func LoginHandler(c *gin.Context) {
@@ -54,6 +56,16 @@ func VerifyHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"valid":    true,
 		"username": username,
+	})
+}
+
+func GetLeases(c *gin.Context) {
+	dhcpService := service.GetService[*dhcp.DHCPServer](service.DHCP)
+	activeLeases := dhcpService.LeaseDB().ActiveLeases()
+	reservedLeases := dhcpService.LeaseDB().ReservedLeases()
+	c.JSON(http.StatusOK, DhcpLeaseResponse{
+		ActiveLeases:   MapLeases(activeLeases),
+		ReservedLeases: MapLeases(reservedLeases),
 	})
 }
 
