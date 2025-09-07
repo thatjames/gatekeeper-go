@@ -9,7 +9,6 @@
     TableHeadCell,
   } from "flowbite-svelte";
 
-  export let title = "";
   export let leases = [];
 </script>
 

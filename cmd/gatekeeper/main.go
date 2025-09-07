@@ -25,7 +25,7 @@ var (
 
 func main() {
 	flag.StringVar(&configFile, "c", "config.yml", "config file")
-	flag.BoolVar(&debug, "v", false, "verbose printout")
+	flag.BoolVar(&debug, "debug", false, "verbose printout")
 	flag.Parse()
 	if err := config.LoadConfig(configFile); err != nil {
 		panic(err)

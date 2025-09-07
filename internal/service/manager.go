@@ -1,6 +1,10 @@
 package service
 
-import "sync"
+import (
+	"sync"
+
+	log "github.com/sirupsen/logrus"
+)
 
 type ServiceKey string
 
@@ -35,7 +39,8 @@ func Start() error {
 
 func Stop() error {
 	fns := make([]func() error, 0, len(instance))
-	for _, service := range instance {
+	for name, service := range instance {
+		log.Debug("stopping service ", name)
 		fns = append(fns, service.Stop)
 	}
 	return checkErrors(fns...)

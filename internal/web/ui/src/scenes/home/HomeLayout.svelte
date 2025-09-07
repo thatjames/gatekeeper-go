@@ -13,6 +13,9 @@
     "/leases": wrap({
       asyncComponent: () => import("$scenes/leases/LeaseLayout.svelte"),
     }),
+    "/settings": wrap({
+      asyncComponent: () => import("$scenes/settings/SettingsLayout.svelte"),
+    }),
   };
 
   getLeases().then((resp) => {
@@ -27,5 +30,7 @@
 
 <div class="flex flex-col gap-5">
   <Nav />
-  <Router {routes} />
+  <div class="pl-6 pr-8">
+    <Router {routes} />
+  </div>
 </div>

@@ -69,6 +69,22 @@ func GetLeases(c *gin.Context) {
 	})
 }
 
+func GetDHCPOptions(c *gin.Context) {
+	dhcpService := service.GetService[*dhcp.DHCPServer](service.DHCP)
+	opts := dhcpService.Options()
+	c.JSON(http.StatusOK, DhcpOptionsResponse{
+		Interface:      opts.Interface,
+		StartAddr:      opts.StartFrom.String(),
+		EndAddr:        opts.EndAt.String(),
+		LeaseTTL:       opts.LeaseTTL,
+		Router:         opts.Router.String(),
+		SubnetMask:     opts.SubnetMask.String(),
+		DomainName:     opts.DomainName,
+		ReservedLeases: opts.ReservedLeases,
+		LeaseFile:      opts.LeaseFile,
+	})
+}
+
 func HealthHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":    "healthy",

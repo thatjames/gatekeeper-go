@@ -28,7 +28,7 @@
       >Gate<span class="text-primary-500">Keeper</span></Heading
     >
   </div>
-  <form class="w-1/2 m-auto" onsubmit={doLogin}>
+  <form class="md:w-1/2 m-auto" onsubmit={doLogin}>
     <div class="flex flex-col gap-2">
       <Label for="username" class="mb-2">Username</Label>
       <Input

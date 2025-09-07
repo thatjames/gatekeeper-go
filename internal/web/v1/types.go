@@ -44,6 +44,18 @@ type Lease struct {
 	Expiry   string `json:"expiry"`
 }
 
+type DhcpOptionsResponse struct {
+	Interface      string            `json:"interface"`
+	StartAddr      string            `json:"startAddr"`
+	EndAddr        string            `json:"endAddr"`
+	LeaseTTL       int               `json:"leaseTTL"`
+	Router         string            `json:"router"`
+	SubnetMask     string            `json:"subnetMask"`
+	DomainName     string            `json:"domainName"`
+	ReservedLeases map[string]string `json:"reservedLeases"`
+	LeaseFile      string            `json:"leaseFile"`
+}
+
 func MapLease(lease dhcp.Lease) Lease {
 	return Lease{
 		ClientId: lease.ClientId,

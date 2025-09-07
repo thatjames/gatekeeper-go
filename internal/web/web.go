@@ -12,24 +12,11 @@ import (
 	v1 "gitlab.com/thatjames-go/gatekeeper-go/internal/web/v1"
 )
 
-func setupAPIRoutes(r *gin.Engine) {
-	api := r.Group("/api")
-	v1Group := api.Group("/v1")
-	v1Group.POST("/login", v1.LoginHandler)
-	v1Group.GET("/health", v1.HealthHandler)
-
-	protected := v1Group.Group("/", v1.AuthMiddleware())
-	protected.GET("/verify", v1.VerifyHandler)
-	protected.GET("/leases", v1.GetLeases)
-}
-
 func Init(ver string, cfg *config.Web, leases *dhcp.LeaseDB) error {
 	version = ver
 	leaseDB = leases
 
 	r := gin.New()
-
-	r.Use(v1.LoggingMiddleware())
 	r.Use(gin.Recovery())
 
 	corsConfig := cors.DefaultConfig()
@@ -51,4 +38,16 @@ func Init(ver string, cfg *config.Web, leases *dhcp.LeaseDB) error {
 		log.Info("Starting HTTP server on ", cfg.Address)
 		return r.Run(cfg.Address)
 	}
+}
+
+func setupAPIRoutes(r *gin.Engine) {
+	api := r.Group("/api")
+	v1Group := api.Group("/v1")
+	v1Group.POST("/login", v1.LoginHandler)
+	v1Group.GET("/health", v1.HealthHandler)
+
+	protected := v1Group.Group("/", v1.AuthMiddleware(), v1.LoggingMiddleware())
+	protected.GET("/verify", v1.VerifyHandler)
+	protected.GET("/leases", v1.GetLeases)
+	protected.GET("/options", v1.GetDHCPOptions)
 }

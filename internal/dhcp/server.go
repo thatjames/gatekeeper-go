@@ -193,6 +193,10 @@ func (z *DHCPServer) LeaseDB() *LeaseDB {
 	return z.issuedLeases
 }
 
+func (z *DHCPServer) Options() *DHCPServerOpts {
+	return z.opts
+}
+
 func (z *DHCPServer) listen() {
 	buff := make([]byte, 1500)
 	for {
