@@ -20,6 +20,4 @@
   }
 </script>
 
-<div class="p-8 flex flex-col">
-  <Router {routes} />
-</div>
+<Router {routes} />

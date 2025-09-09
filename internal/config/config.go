@@ -12,8 +12,9 @@ import (
 var Config ConfigInstance
 
 type ConfigInstance struct {
-	DHCP *DHCP `yaml:"DHCP"`
-	Web  *Web  `yaml:"Web"`
+	DHCP     *DHCP     `yaml:"DHCP"`
+	Web      *Web      `yaml:"Web"`
+	Database *Database `yaml:"Database"`
 }
 
 func (c ConfigInstance) String() string {
@@ -77,6 +78,14 @@ type Web struct {
 type TLSConfig struct {
 	PublicKey  string `yaml:"PublicKey"`
 	PrivateKey string `yaml:"PrivateKey"`
+}
+
+type Database struct {
+	SQLite *SQLiteConfig `yaml:"sqllite"`
+}
+
+type SQLiteConfig struct {
+	File string `yaml:"File"`
 }
 
 func LoadConfig(filePath string) error {

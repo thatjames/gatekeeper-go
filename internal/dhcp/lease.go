@@ -11,6 +11,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/common"
 )
 
 type LeaseState int
@@ -246,24 +247,36 @@ func (l *LeaseDB) LoadLeases(file string, ttl time.Duration) error {
 	return nil
 }
 
-func (l *LeaseDB) ActiveLeases() []Lease {
+func (l *LeaseDB) ActiveLeases() []common.Lease {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	var leases []Lease
+	var leases []common.Lease
 	for i := range l.leases {
 		if l.leases[i].State == LeaseActive && time.Now().Before(l.leases[i].Expiry) {
-			leases = append(leases, *l.leases[i])
+			leases = append(leases, common.Lease{
+				ClientId: l.leases[i].ClientId,
+				Hostname: l.leases[i].Hostname,
+				IP:       l.leases[i].IP,
+				State:    common.LeaseState(l.leases[i].State),
+				Expiry:   l.leases[i].Expiry,
+			})
 		}
 	}
 	return leases
 }
 
-func (l *LeaseDB) ReservedLeases() []Lease {
+func (l *LeaseDB) ReservedLeases() []common.Lease {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	var leases []Lease
+	var leases []common.Lease
 	for _, lease := range l.reservedAddresses {
-		leases = append(leases, *lease)
+		leases = append(leases, common.Lease{
+			ClientId: lease.ClientId,
+			Hostname: lease.Hostname,
+			IP:       lease.IP,
+			State:    common.LeaseState(lease.State),
+			Expiry:   lease.Expiry,
+		})
 	}
 
 	return leases

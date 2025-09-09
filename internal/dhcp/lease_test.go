@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/common"
 )
 
 var (
@@ -18,7 +19,7 @@ var (
 )
 
 func Test_ReservedLease_Pass(t *testing.T) {
-	db := NewLeaseDB(net.ParseIP("10.0.0.1"), net.ParseIP("10.0.0.10"))
+	db := NewLeasePool(net.ParseIP("10.0.0.1"), net.ParseIP("10.0.0.10"))
 	db.ReserveLease("test", net.ParseIP("10.0.0.100"))
 	lease := db.GetLease("test")
 	if lease == nil {
@@ -26,7 +27,7 @@ func Test_ReservedLease_Pass(t *testing.T) {
 	}
 
 	assert.Equal(t, net.IP{10, 0, 0, 100}, lease.IP.To4(), "expected address 10.0.0.100 but got", lease.IP.To4())
-	assert.Equal(t, LeaseReserved, lease.State, "expected LeaseReserved but got", lease.State)
+	assert.Equal(t, common.LeaseReserved, lease.State, "expected LeaseReserved but got", lease.State)
 	assert.Equal(t, "test", lease.ClientId, "expected test but got", lease.ClientId)
 
 }
@@ -37,7 +38,7 @@ func Test_InitSuccess(t *testing.T) {
 	for i, lease := range db.leases {
 		targetIP := binary.BigEndian.Uint32(start) + uint32(i)
 		switch {
-		case lease.State != LeaseAvailable:
+		case lease.State != common.LeaseAvailable:
 			t.Fatalf("lease should be available but is %s", lease.State)
 		case binary.BigEndian.Uint32(lease.IP) != targetIP:
 			t.Fatalf("lease IP mismatch on %v", lease.IP)
@@ -49,11 +50,11 @@ func Test_InitSuccess(t *testing.T) {
 	for i := 0; i < len(db.leases); i++ {
 		lease := db.NextAvailableLease(fmt.Sprintf("%d", i))
 		assert.NotNil(t, lease)
-		assert.Equal(t, LeaseOffered, lease.State)
+		assert.Equal(t, common.LeaseOffered, lease.State)
 		targetIP := binary.BigEndian.Uint32(start) + uint32(i)
 		assert.Equal(t, targetIP, binary.BigEndian.Uint32(lease.IP))
 		db.AcceptLease(lease, time.Minute*5)
-		assert.Equal(t, LeaseActive, db.leases[i].State)
+		assert.Equal(t, common.LeaseActive, db.leases[i].State)
 	}
 }
 
@@ -62,7 +63,7 @@ func Test_OfferAndAcceptLeaseOnce_Pass(t *testing.T) {
 	lease := db.NextAvailableLease("test")
 	assert.True(t, lease.IP.Equal(net.ParseIP("10.0.0.1")), "incorrect IP offered")
 	assert.False(t, lease.Expiry.IsZero(), "should not have 0 expiry")
-	assert.Equal(t, LeaseOffered, lease.State, "lease state should be LeaseOffered but is", lease.State)
+	assert.Equal(t, common.LeaseOffered, lease.State, "lease state should be LeaseOffered but is", lease.State)
 	assert.Equal(t, "test", lease.ClientId, "lease clientId should be test but is", lease.ClientId)
 
 	db.AcceptLease(lease, time.Hour)
@@ -70,7 +71,7 @@ func Test_OfferAndAcceptLeaseOnce_Pass(t *testing.T) {
 	resultLease := db.GetLease(lease.ClientId)
 	assert.NotNil(t, resultLease, "should have correspoding lease for client, but got nil")
 	assert.True(t, resultLease.IP.Equal(lease.IP), "returned lease has IP mismatch, expected", lease.IP, "but got", resultLease.IP)
-	assert.Equal(t, LeaseActive, resultLease.State, "state should be active, but got", resultLease.State)
+	assert.Equal(t, common.LeaseActive, resultLease.State, "state should be active, but got", resultLease.State)
 }
 
 func Test_OfferLeaseTwiceAndAcceptLeaseOnce_Pass(t *testing.T) {
@@ -79,7 +80,7 @@ func Test_OfferLeaseTwiceAndAcceptLeaseOnce_Pass(t *testing.T) {
 	lease := db.NextAvailableLease("test")
 	assert.True(t, lease.IP.Equal(net.ParseIP("10.0.0.1")), "incorrect IP offered")
 	assert.False(t, lease.Expiry.IsZero(), "should not have 0 expiry")
-	assert.Equal(t, LeaseOffered, lease.State, "lease state should be LeaseOffered but is", lease.State)
+	assert.Equal(t, common.LeaseOffered, lease.State, "lease state should be LeaseOffered but is", lease.State)
 	assert.Equal(t, "test", lease.ClientId, "lease clientId should be test but is", lease.ClientId)
 
 	db.AcceptLease(lease, time.Hour)
@@ -87,7 +88,7 @@ func Test_OfferLeaseTwiceAndAcceptLeaseOnce_Pass(t *testing.T) {
 	resultLease := db.GetLease(lease.ClientId)
 	assert.NotNil(t, resultLease, "should have correspoding lease for client, but got nil")
 	assert.True(t, resultLease.IP.Equal(lease.IP), "returned lease has IP mismatch, expected", lease.IP, "but got", resultLease.IP)
-	assert.Equal(t, LeaseActive, resultLease.State, "state should be active, but got", resultLease.State)
+	assert.Equal(t, common.LeaseActive, resultLease.State, "state should be active, but got", resultLease.State)
 }
 
 func Test_OfferLeaseTwiceAndAcceptLeaseAfterExpiryForNewClient_Pass(t *testing.T) {
@@ -97,7 +98,7 @@ func Test_OfferLeaseTwiceAndAcceptLeaseAfterExpiryForNewClient_Pass(t *testing.T
 	lease := db.NextAvailableLease("test")
 	assert.True(t, lease.IP.Equal(net.ParseIP("10.0.0.1")), "incorrect IP offered")
 	assert.False(t, lease.Expiry.IsZero(), "should not have 0 expiry")
-	assert.Equal(t, LeaseOffered, lease.State, "lease state should be LeaseOffered but is", lease.State)
+	assert.Equal(t, common.LeaseOffered, lease.State, "lease state should be LeaseOffered but is", lease.State)
 	assert.Equal(t, "test", lease.ClientId, "lease clientId should be test but is", lease.ClientId)
 
 	db.AcceptLease(lease, time.Hour)
@@ -105,7 +106,7 @@ func Test_OfferLeaseTwiceAndAcceptLeaseAfterExpiryForNewClient_Pass(t *testing.T
 	resultLease := db.GetLease(lease.ClientId)
 	assert.NotNil(t, resultLease, "should have correspoding lease for client, but got nil")
 	assert.True(t, resultLease.IP.Equal(lease.IP), "returned lease has IP mismatch, expected", lease.IP, "but got", resultLease.IP)
-	assert.Equal(t, LeaseActive, resultLease.State, "state should be active, but got", resultLease.State)
+	assert.Equal(t, common.LeaseActive, resultLease.State, "state should be active, but got", resultLease.State)
 }
 
 func Test_GetExipiredLease(t *testing.T) {
@@ -137,10 +138,10 @@ func Test_SaveAndReadLeases(t *testing.T) {
 		targetIP := binary.BigEndian.Uint32(start) + uint32(i)
 		assert.Equal(t, targetIP, binary.BigEndian.Uint32(lease.IP), "incorrect IP assigned")
 		assert.Equal(t, fmt.Sprintf("%d", i), lease.ClientId, "mismatched client ID")
-		assert.Equal(t, LeaseActive, lease.State, "incorrect lease state")
+		assert.Equal(t, common.LeaseActive, lease.State, "incorrect lease state")
 	}
 }
 
-func basicDB() *LeaseDB {
-	return NewLeaseDB(start, end)
+func basicDB() *LeasePool {
+	return NewLeasePool(start, end)
 }

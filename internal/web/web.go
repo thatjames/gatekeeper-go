@@ -12,9 +12,13 @@ import (
 	v1 "gitlab.com/thatjames-go/gatekeeper-go/internal/web/v1"
 )
 
-func Init(ver string, cfg *config.Web, leases *dhcp.LeaseDB) error {
+var (
+	leasePool *dhcp.LeasePool
+)
+
+func Init(ver string, cfg *config.Web, leases *dhcp.LeasePool) error {
 	version = ver
-	leaseDB = leases
+	leasePool = leases
 
 	r := gin.New()
 	r.Use(gin.Recovery())

@@ -11,6 +11,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/datasource"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/web"
@@ -46,12 +47,23 @@ func main() {
 		if config.Config.Web != nil {
 			log.Debug("Registering web server")
 			go func() {
-				if err := web.Init(version, config.Config.Web, dhcpServer.LeaseDB()); err != nil {
+				if err := web.Init(version, config.Config.Web, dhcpServer.LeasePool()); err != nil {
 					log.Error("unable to start web server:", err)
 				}
 			}()
 		}
 
+	}
+	if config.Config.Database != nil {
+		switch {
+		case config.Config.Database.SQLite != nil:
+			log.Info("Registering SQLLite database")
+			datasource.InitDataSource(datasource.DataSourceTypeSQLite, datasource.SqlLiteDataSourceOpts{
+				File: config.Config.Database.SQLite.File,
+			})
+		default:
+			log.Fatal("unknown database type")
+		}
 	}
 	// routingMan, err := routing.New()
 	// if err != nil {

@@ -7,14 +7,12 @@ import (
 
 	"github.com/gin-contrib/static"
 	log "github.com/sirupsen/logrus"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
 )
 
 //go:embed ui/dist/*
 var staticFiles embed.FS
 
 var (
-	leaseDB *dhcp.LeaseDB
 	version string
 )
 
