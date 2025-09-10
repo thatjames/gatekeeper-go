@@ -4,6 +4,8 @@ import (
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/common"
 )
 
+//go:generate mockgen -source=interface.go -destination=mocks/mock_datasource.go -package=mocks
+
 type DataSourceType string
 
 const (
@@ -18,6 +20,7 @@ type DHCPDataSource interface {
 	AddLease(lease *common.Lease) error
 	DeleteLease(mac string) error
 	ListLeases() ([]common.Lease, error)
+	PersistLeases(leases []common.Lease) error
 }
 
 func InitDataSource(dsType DataSourceType, opts any) {

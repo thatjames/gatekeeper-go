@@ -17,7 +17,7 @@ docker: docker-binary ## Builds the docker binary, the web ui and the docker ima
 	docker build -t thatjames/gatekeeper .
 
 ##@ Test
-test: ## Runs the golang unit tests
+test: generate-mocks ## Runs the golang unit tests
 	go test -v ./...
 
 ##@ Run
@@ -37,5 +37,16 @@ version: ## Prints the build version
 
 clean: ## Cleans the build directories
 	rm -rf bin
+	rm -rf internal/datasource/mocks
 	$(MAKE) -C internal/web/ui clean
 
+generate-mocks: install-mockgen ## Generates the test DB mocks
+	@rm -rf internal/datasource/mocks
+	@go generate ./...
+	@go mod tidy
+
+install-mockgen: ## Installs the mockgen tool if it's missing
+	@if ! command -v mockgen >/dev/null 2>&1; then \
+		echo "Installing mockgen..."; \
+		go install github.com/golang/mock/mockgen@latest; \
+	fi

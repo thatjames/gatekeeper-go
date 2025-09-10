@@ -45,3 +45,7 @@ func (p *PostgresDataSource) DeleteLease(mac string) error {
 func (p *PostgresDataSource) ListLeases() ([]common.Lease, error) {
 	panic("not implemented") // TODO: Implement
 }
+
+func (p *PostgresDataSource) PersistLeases(leases []common.Lease) error {
+	panic("not implemented") // TODO: Implement
+}

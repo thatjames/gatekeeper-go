@@ -67,6 +67,33 @@ func (s *SqlLiteDataSource) ListLeases() ([]common.Lease, error) {
 	return leases, nil
 }
 
+func (s *SqlLiteDataSource) PersistLeases(leases []common.Lease) error {
+	if len(leases) == 0 {
+		return nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare(`INSERT INTO leases (client_id, hostname, ip, expiry, state) VALUES (?, ?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, lease := range leases {
+		_, err = stmt.Exec(lease.ClientId, lease.Hostname, lease.IP.String(), lease.Expiry, lease.State)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
 func openDb(fileName string) (*sql.DB, error) {
 	initDb := false
 	if _, err := os.Open(fileName); os.IsNotExist(err) {

@@ -2,15 +2,14 @@ package dhcp
 
 import (
 	"encoding/binary"
-	"io/ioutil"
 	"net"
-	"os"
 	"strings"
 	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/common"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/datasource"
 )
 
 type LeasePool struct {
@@ -113,86 +112,24 @@ func (l *LeasePool) ReserveLease(clientID string, reservedIP net.IP) {
 }
 
 func (l *LeasePool) PeristLeases(file string) error {
-	f, err := os.OpenFile(file, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	buff := make([]byte, 1)
-	var counter byte = 0
-	l.lock.Lock()
+	leases := l.ReservedLeases()
 	for _, lease := range l.leases {
-		if lease == nil {
-			break
-		}
-		if lease.State == common.LeaseActive {
-			counter++
-			leaseBuff := make([]byte, 0)
-			leaseBuff = append(leaseBuff, byte(len(lease.ClientId)))
-			leaseBuff = append(leaseBuff, []byte(lease.ClientId)...)
-			leaseBuff = append(leaseBuff, byte(len(lease.Hostname)))
-			leaseBuff = append(leaseBuff, []byte(lease.Hostname)...)
-			leaseBuff = append(leaseBuff, lease.IP...)
-			leaseBuff = append(leaseBuff, byte(lease.State))
-			buff = append(buff, leaseBuff...)
-		}
+		leases = append(leases, *lease)
 	}
-	l.lock.Unlock()
-
-	if counter > 0 {
-		buff[0] = counter
-		_, err := f.Write(buff)
-		return err
-	}
-
-	return nil
+	return datasource.DataSource.PersistLeases(leases)
 }
 
 func (l *LeasePool) LoadLeases(file string, ttl time.Duration) error {
-	f, err := os.OpenFile(file, os.O_RDONLY, 0600)
-	switch {
-	case err == nil:
-		defer f.Close()
-	case os.IsNotExist(err):
-		return nil
-	default:
-		return err
-	}
-
-	data, err := ioutil.ReadAll(f)
+	leases, err := datasource.DataSource.ListLeases()
 	if err != nil {
 		return err
 	}
-
-	if len(data) == 0 {
-		return nil
-	}
-	leaseCount := int(data[0])
-	data = data[1:]
-	leases := make([]*common.Lease, 0)
-	for i := 0; i < leaseCount; i++ {
-		var lease = new(common.Lease)
-		cidLen := data[0]
-		lease.ClientId = string(data[1 : 1+cidLen])
-		data = data[1+cidLen:]
-		hostLen := data[0]
-		lease.Hostname = string(data[1 : 1+hostLen])
-		data = data[1+hostLen:]
-		lease.IP = data[:4]
-		data = data[4:]
-		lease.State = common.LeaseState(data[0])
-		lease.Expiry = time.Now().Add(ttl)
-		data = data[1:]
-		leases = append(leases, lease)
-	}
-
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	for _, lease := range leases {
 		for j, createdLease := range l.leases {
 			if lease.IP.Equal(createdLease.IP) {
-				*l.leases[j] = *lease
+				*l.leases[j] = lease
 				log.Debug("restore lease ", l.leases[j])
 			}
 		}

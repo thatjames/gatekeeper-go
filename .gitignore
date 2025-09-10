@@ -3,3 +3,4 @@ bin
 internal/web/ui/dist
 **/*.htpasswd
 leases.db
+**/mocks
