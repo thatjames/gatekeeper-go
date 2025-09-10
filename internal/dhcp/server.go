@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	log "github.com/sirupsen/logrus"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/common"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
 )
 
@@ -45,7 +46,7 @@ type DHCPPacket struct {
 
 type DHCPServer struct {
 	opts          *DHCPServerOpts
-	issuedLeases  *LeaseDB
+	issuedLeases  *LeasePool
 	packetConn    net.PacketConn
 	interfaceAddr net.IP
 	broadcastAddr net.IP
@@ -99,7 +100,7 @@ func NewDHCPServerFromConfig(config *config.DHCP) *DHCPServer {
 func NewDHCPServerWithOpts(opts *DHCPServerOpts) *DHCPServer {
 	return &DHCPServer{
 		opts:         opts,
-		issuedLeases: NewLeaseDB(opts.StartFrom, opts.EndAt),
+		issuedLeases: NewLeasePool(opts.StartFrom, opts.EndAt),
 		responseChan: make(chan *DHCPPacket, 100),
 		requestChan:  make(chan *DHCPPacket, 100),
 	}
@@ -150,7 +151,7 @@ func (z *DHCPServer) Start() error {
 	} else {
 		counter := 0
 		for _, lease := range z.issuedLeases.leases {
-			if lease != nil && lease.State == LeaseActive {
+			if lease != nil && lease.State == common.LeaseActive {
 				counter++
 			}
 		}
@@ -189,7 +190,7 @@ func (z *DHCPServer) Stop() error {
 	return z.issuedLeases.PeristLeases(leaseFile)
 }
 
-func (z *DHCPServer) LeaseDB() *LeaseDB {
+func (z *DHCPServer) LeaseDB() *LeasePool {
 	return z.issuedLeases
 }
 
@@ -298,14 +299,14 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 				msgType = DHCPAck
 				setIP = requestedAddr
 				switch lease.State {
-				case LeaseOffered:
+				case common.LeaseOffered:
 					log.Infof("confirm address %s for %s", requestedAddr, id)
 					z.issuedLeases.AcceptLease(lease, time.Second*time.Duration(z.opts.LeaseTTL))
 					activeLeaseGauge.Inc()
-				case LeaseReserved:
+				case common.LeaseReserved:
 					z.issuedLeases.AcceptLease(lease, time.Second*time.Duration(z.opts.LeaseTTL))
 					log.Infof("send ack for reserved address %s to %s", requestedAddr, id)
-				case LeaseActive:
+				case common.LeaseActive:
 					z.issuedLeases.AcceptLease(lease, time.Second*time.Duration(z.opts.LeaseTTL))
 					lease.Expiry = time.Now().Add(time.Second * time.Duration(z.opts.LeaseTTL))
 					log.Infof("send ack for active address %s to %s", lease.IP.To4().String(), id)
