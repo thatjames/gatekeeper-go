@@ -7,7 +7,7 @@ all: web test build
 build: test web ## Builds the native go binary
 	go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/gatekeeper cmd/gatekeeper/main.go
 
-web: ## Builds the web ui
+web: install## Builds the web ui
 	$(MAKE) -C internal/web/ui build
 
 docker-binary: web test ## Builds the docker binary
