@@ -14,7 +14,8 @@ stages:
   - build
   - distribute
 
-test:
+# YAML Templates
+.go_common: &go_common
   stage: build
   rules:
     - if: $CI_COMMIT_TAG
@@ -22,6 +23,21 @@ test:
   before_script:
     - sed -i "/^replace/d" go.mod
     - go mod tidy
+  tags:
+    - go
+
+.build_template: &build_template
+  <<: *go_common
+  script:
+    - go build -v -o bin/$BIN_NAME -ldflags "-s -w -X main.version=$CI_COMMIT_TAG"
+  artifacts:
+    paths:
+      - bin/
+    expire_in: 2days
+
+# Jobs
+test:
+  <<: *go_common
   script:
     - go test ./internal/dhcp -run TestFeaturesWithOutputFile -cucumber-junit=./test-report.xml
   artifacts:
@@ -29,53 +45,54 @@ test:
     reports:
       junit: test-report.xml
     expire_in: 1week
-  tags:
-    - go
 
+# Build matrix using templates
 build_x86_linux:
-  extends: .go_build
+  <<: *build_template
   variables:
-    GOARCH: 386
+    GOARCH: "386"
     GOOS: linux
-    BIN_NAME: $BASE_NAME-$GOARCH
+    BIN_NAME: $BASE_NAME-386
 
 build_x86_win:
-  extends: .go_build
+  <<: *build_template
   variables:
-    GOARCH: 386
+    GOARCH: "386"
     GOOS: windows
-    BIN_NAME: $BASE_NAME-$GOARCH.exe
+    BIN_NAME: $BASE_NAME-386.exe
 
 build_amd64_linux:
-  extends: .go_build
+  <<: *build_template
   variables:
     GOARCH: amd64
     GOOS: linux
-    BIN_NAME: $BASE_NAME-$GOARCH
+    BIN_NAME: $BASE_NAME-amd64
 
 build_amd64_windows:
-  extends: .go_build
+  <<: *build_template
   variables:
     GOARCH: amd64
     GOOS: windows
-    BIN_NAME: $BASE_NAME-$GOARCH.exe
+    BIN_NAME: $BASE_NAME-amd64.exe
 
 build_arm:
-  extends: .go_build
+  <<: *build_template
   variables:
     GOARCH: arm
     GOOS: linux
-    BIN_NAME: $BASE_NAME-$GOARCH
+    BIN_NAME: $BASE_NAME-arm
 
 build_arm64:
-  extends: .go_build
+  <<: *build_template
   variables:
     GOARCH: arm64
     GOOS: linux
-    BIN_NAME: $BASE_NAME-$GOARCH
+    BIN_NAME: $BASE_NAME-arm64
 
 s3_upload:
   stage: distribute
+  rules:
+    - if: $CI_COMMIT_TAG
   script:
     - aws s3 sync bin s3://gatekeeper-go/$CI_COMMIT_TAG
   tags:
