@@ -77,19 +77,19 @@ build_amd64_windows:
     GOOS: windows
     BIN_NAME: $BASE_NAME-amd64.exe
 
-# build_arm:
-#   <<: *build_template
-#   variables:
-#     GOARCH: arm
-#     GOOS: linux
-#     BIN_NAME: $BASE_NAME-arm
+build_arm:
+  <<: *build_template
+  variables:
+    GOARCH: arm
+    GOOS: linux
+    BIN_NAME: $BASE_NAME-arm
 
-# build_arm64:
-#   <<: *build_template
-#   variables:
-#     GOARCH: arm64
-#     GOOS: linux
-#     BIN_NAME: $BASE_NAME-arm64
+build_arm64:
+  <<: *build_template
+  variables:
+    GOARCH: arm64
+    GOOS: linux
+    BIN_NAME: $BASE_NAME-arm64
 
 build_docker:
   variables:
