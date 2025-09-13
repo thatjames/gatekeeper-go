@@ -4,3 +4,4 @@ internal/web/ui/dist
 **/*.htpasswd
 leases.db
 **/mocks
+test-report.json

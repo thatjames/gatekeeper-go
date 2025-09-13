@@ -21,7 +21,7 @@ type LeasePool struct {
 }
 
 func NewLeasePool(startAddr, endAddr net.IP) *LeasePool {
-	leaseRange := int(binary.BigEndian.Uint32(endAddr) - binary.BigEndian.Uint32(startAddr))
+	leaseRange := int(binary.BigEndian.Uint32(endAddr)-binary.BigEndian.Uint32(startAddr)) + 1
 	start := binary.BigEndian.Uint32(startAddr)
 	leases := make([]*common.Lease, leaseRange)
 	for i := range leases {

@@ -17,3 +17,7 @@ Web:
   Address: ":8085"
   HTPasswdFile: ".htpasswd"
   Prometheus: true
+
+Database:
+  sqllite:
+    File: "leases.db"

@@ -18,7 +18,11 @@ docker: docker-binary ## Builds the docker binary, the web ui and the docker ima
 
 ##@ Test
 test: generate-mocks ## Runs the golang unit tests
-	go test -v ./...
+	go test ./internal/dhcp -run TestFeatures -v
+	go test ./internal/dhcp/packet_test.go internal/dhcp/packet.go
+
+test-report: generate-mocks ## Runs the golang unit tests and generates a test report
+	go test ./internal/dhcp -run TestFeaturesWithOutputFile -cucumber-json=${PWD}/test-report.json -v
 
 ##@ Run
 docker-run: ## Runs the docker image
