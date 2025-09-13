@@ -48,20 +48,6 @@ test:
     expire_in: 1year
 
 # Build matrix using templates
-build_x86_linux:
-  <<: *build_template
-  variables:
-    GOARCH: "386"
-    GOOS: linux
-    BIN_NAME: $BASE_NAME-386
-
-build_x86_win:
-  <<: *build_template
-  variables:
-    GOARCH: "386"
-    GOOS: windows
-    BIN_NAME: $BASE_NAME-386.exe
-
 build_amd64_linux:
   <<: *build_template
   variables:
@@ -100,6 +86,8 @@ build_docker:
     - if: $CI_COMMIT_TAG
   script:
     - make BIN_NAME=$BIN_NAME docker
+  tags:
+    - shell
 
 s3_upload:
   stage: distribute
