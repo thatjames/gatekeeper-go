@@ -24,12 +24,12 @@ stages:
     - sed -i "/^replace/d" go.mod
     - go mod tidy
   tags:
-    - go
+    - shell
 
 .build_template: &build_template
   <<: *go_common
   script:
-    - go build -v -o bin/$BIN_NAME -ldflags "-s -w -X main.version=$CI_COMMIT_TAG"
+    - make BIN_NAME=$BIN_NAME build
   artifacts:
     paths:
       - bin/
@@ -42,20 +42,13 @@ test:
   rules:
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH
-  before_script:
-    - go install github.com/golang/mock/mockgen@latest
-    - rm -rf internal/datasource/mocks
-    - go generate ./...
-    - go mod tidy
   script:
-    - go test ./internal/dhcp -run TestFeaturesWithOutputFile -report-file=$PWD/test-report.xml
-  after_script:
-    - ls -l
+    - make test-report
   artifacts:
     when: always
     reports:
       junit: test-report.xml
-    expire_in: 1week
+    expire_in: 1year
 
 # Build matrix using templates
 build_x86_linux:
@@ -99,6 +92,17 @@ build_arm64:
     GOARCH: arm64
     GOOS: linux
     BIN_NAME: $BASE_NAME-arm64
+
+build_docker:
+  variables:
+    GOARCH: amd64
+    GOOS: linux
+    BIN_NAME: $BASE_NAME-amd64
+  stage: build
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - make BIN_NAME=$BIN_NAME docker
 
 s3_upload:
   stage: distribute
