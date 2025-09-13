@@ -27,7 +27,7 @@ stages:
 .build_template: &build_template
   <<: *go_common
   script:
-    - make BIN_NAME=$BIN_NAME build-pipeline
+    - make build-pipeline
   artifacts:
     paths:
       - bin/
