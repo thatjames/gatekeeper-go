@@ -46,6 +46,7 @@ test:
     - rm -rf internal/datasource/mocks
     - go generate ./...
     - go mod tidy
+    - go install github.com/golang/mock/mockgen@latest
   script:
     - go test ./internal/dhcp -run TestFeaturesWithOutputFile -cucumber-junit=./test-report.xml
   artifacts:
