@@ -353,7 +353,7 @@ var opts = godog.Options{
 	Format: "pretty",
 }
 
-var jsonOutput = flag.String("cucumber-json", "", "Output cucumber file for JSON report")
+var reportFile = flag.String("report-file", "", "Output cucumber file for JSON report")
 
 func init() {
 	godog.BindCommandLineFlags("godog.", &opts)
@@ -431,9 +431,9 @@ func TestLeaseOffering(t *testing.T) {
 func TestFeaturesWithOutputFile(t *testing.T) {
 	flag.Parse()
 
-	if *jsonOutput != "" {
+	if *reportFile != "" {
 		// Create output file for JSON
-		file, err := os.Create(*jsonOutput)
+		file, err := os.Create(*reportFile)
 		if err != nil {
 			t.Fatalf("Failed to create output file: %v", err)
 		}

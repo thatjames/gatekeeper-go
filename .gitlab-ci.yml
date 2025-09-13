@@ -48,7 +48,7 @@ test:
     - go generate ./...
     - go mod tidy
   script:
-    - go test ./internal/dhcp -run TestFeaturesWithOutputFile -cucumber-junit=./test-report.xml
+    - go test ./internal/dhcp -run TestFeaturesWithOutputFile -report-file=./test-report.xml
   artifacts:
     when: always
     reports:
