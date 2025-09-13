@@ -10,7 +10,7 @@ build: test web ## Builds the native go binary
 build-pipeline: ## Builds the binary for the pipeline
 	go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/$(BIN_NAME) cmd/gatekeeper/main.go
 
-web: install## Builds the web ui
+web: install ## Builds the web ui
 	$(MAKE) -C internal/web/ui build
 
 docker-binary: web test ## Builds the docker binary
