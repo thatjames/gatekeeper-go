@@ -29,8 +29,6 @@ stages:
 
 test:
   stage: build
-  rules:
-    - if: $CI_COMMIT
   before_script:
     - sed -i "/^replace/d" go.mod
     - go mod tidy
