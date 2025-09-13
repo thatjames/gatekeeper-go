@@ -12,12 +12,13 @@ variables:
 
 stages:
   - test
-  - build
+  - build_web
+  - build_go
   - distribute
 
 # YAML Templates
 .go_common: &go_common
-  stage: build
+  stage: build_go
   rules:
     - if: $CI_COMMIT_TAG
   tags:
@@ -30,6 +31,7 @@ stages:
   artifacts:
     paths:
       - bin/
+      - internal/web/ui/dist/
     expire_in: 2days
 
 # Jobs
@@ -47,6 +49,17 @@ test:
       junit: test-report.xml
     expire_in: 1year
 
+build_web:
+  stage: build_web
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - make build-web
+  artifacts:
+    paths:
+      - internal/web/ui/dist
+    expire_in: 2days
+
 # Build matrix using templates
 build_amd64_linux:
   <<: *build_template
@@ -62,19 +75,19 @@ build_amd64_windows:
     GOOS: windows
     BIN_NAME: $BASE_NAME-amd64.exe
 
-build_arm:
-  <<: *build_template
-  variables:
-    GOARCH: arm
-    GOOS: linux
-    BIN_NAME: $BASE_NAME-arm
+# build_arm:
+#   <<: *build_template
+#   variables:
+#     GOARCH: arm
+#     GOOS: linux
+#     BIN_NAME: $BASE_NAME-arm
 
-build_arm64:
-  <<: *build_template
-  variables:
-    GOARCH: arm64
-    GOOS: linux
-    BIN_NAME: $BASE_NAME-arm64
+# build_arm64:
+#   <<: *build_template
+#   variables:
+#     GOARCH: arm64
+#     GOOS: linux
+#     BIN_NAME: $BASE_NAME-arm64
 
 build_docker:
   variables:
