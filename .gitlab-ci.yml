@@ -59,6 +59,8 @@ build_web:
     paths:
       - internal/web/ui/dist
     expire_in: 2days
+  tags:
+    - shell
 
 # Build matrix using templates
 build_amd64_linux:
