@@ -46,6 +46,6 @@
     <NavLi href="#/leases">Leases</NavLi>
     <NavLi href="#/settings">Settings</NavLi>
     <DarkMode class="mr-2" />
-    <Button onclick={doLogout}>Logout</Button>
+    <Button outline color="red" onclick={doLogout}>Logout</Button>
   </NavUl>
 </Navbar>

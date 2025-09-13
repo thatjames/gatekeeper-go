@@ -6,6 +6,7 @@ DHCP:
   LeaseTTL: 300
   SubnetMask: 255.255.255.0
   Router: 10.0.0.1
+  LeaseFile: /var/lib/gatekeeper/leases
   NameServers:
     - 8.8.8.8
     - 1.1.1.1
@@ -17,7 +18,3 @@ Web:
   Address: ":8085"
   HTPasswdFile: ".htpasswd"
   Prometheus: true
-
-Database:
-  sqllite:
-    File: "leases.db"

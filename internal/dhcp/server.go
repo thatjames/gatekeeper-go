@@ -92,6 +92,7 @@ func NewDHCPServerFromConfig(config *config.DHCP) *DHCPServer {
 		SubnetMask:     net.ParseIP(config.SubnetMask).To4(),
 		DomainName:     config.DomainName,
 		ReservedLeases: config.ReservedAddresses,
+		LeaseFile:      config.LeaseFile,
 	}
 
 	return NewDHCPServerWithOpts(options)
@@ -187,7 +188,7 @@ func (z *DHCPServer) Stop() error {
 		return err
 	}
 
-	return z.issuedLeases.PeristLeases(leaseFile)
+	return z.issuedLeases.PeristLeases(z.opts.LeaseFile)
 }
 
 func (z *DHCPServer) LeaseDB() *LeasePool {

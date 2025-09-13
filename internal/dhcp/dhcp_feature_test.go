@@ -2,7 +2,6 @@ package dhcp
 
 import (
 	"context"
-	"encoding/binary"
 	"flag"
 	"fmt"
 	"net"
@@ -15,8 +14,6 @@ import (
 	"github.com/cucumber/godog/colors"
 	"github.com/golang/mock/gomock"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/common"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/datasource"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/datasource/mocks"
 )
 
 // ============================================================================
@@ -25,39 +22,27 @@ import (
 
 type TestSuite struct {
 	leasePool    *LeasePool
-	mockDS       *mocks.MockDHCPDataSource
 	ctrl         *gomock.Controller
-	originalDS   datasource.DHCPDataSource
 	currentLease *common.Lease
 	error        error
 	leases       []common.Lease
 	clientID     string
 	filename     string
+	leaseFile    string
 }
 
 func (ts *TestSuite) reset() {
 	if ts.ctrl != nil {
 		ts.ctrl.Finish()
 	}
-	if ts.originalDS != nil {
-		datasource.DataSource = ts.originalDS
-	}
 	ts.leasePool = nil
-	ts.mockDS = nil
 	ts.ctrl = nil
 	ts.currentLease = nil
 	ts.error = nil
 	ts.leases = nil
 	ts.clientID = ""
 	ts.filename = ""
-}
-
-func (ts *TestSuite) setupMockDataSource() {
-	// Create a mock controller - we need to use a custom testing.T mock
-	ts.ctrl = gomock.NewController(&mockTestingT{})
-	ts.mockDS = mocks.NewMockDHCPDataSource(ts.ctrl)
-	ts.originalDS = datasource.DataSource
-	datasource.DataSource = ts.mockDS
+	ts.leaseFile = ""
 }
 
 // Mock testing.T for gomock
@@ -201,47 +186,9 @@ func (ts *TestSuite) iShouldReceiveNoLease() error {
 	return nil
 }
 
-// Step definitions for persistence (mocked)
-func (ts *TestSuite) iHaveAMockedDataSource() error {
-	ts.setupMockDataSource()
-	return nil
-}
-
-func (ts *TestSuite) theDataSourceExpectsToPersistLeases() error {
-	if ts.mockDS == nil {
-		return fmt.Errorf("mock datasource not set up")
-	}
-	ts.mockDS.EXPECT().PersistLeases(gomock.Any()).Return(nil).Times(1)
-	return nil
-}
-
-func (ts *TestSuite) theDataSourceExpectsToReturnNLeases(count int) error {
-	if ts.mockDS == nil {
-		return fmt.Errorf("mock datasource not set up")
-	}
-
-	// Create test leases
-	var testLeases []common.Lease
-	start := net.ParseIP("10.0.0.1")
-	for i := 0; i < count; i++ {
-		ip := make(net.IP, 4)
-		binary.BigEndian.PutUint32(ip, binary.BigEndian.Uint32(start)+uint32(i))
-		testLeases = append(testLeases, common.Lease{
-			ClientId: fmt.Sprintf("client%d", i),
-			IP:       ip,
-			State:    common.LeaseActive,
-			Expiry:   time.Now().Add(time.Hour),
-		})
-	}
-
-	ts.leases = testLeases
-	ts.mockDS.EXPECT().ListLeases().Return(testLeases, nil).Times(1)
-	return nil
-}
-
 func (ts *TestSuite) iPersistLeasesToFile(filename string) error {
 	ts.filename = filename
-	ts.error = ts.leasePool.PeristLeases(filename)
+	ts.error = ts.leasePool.PeristLeases(ts.leaseFile)
 	return nil
 }
 
@@ -334,14 +281,6 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	// Multiple leases
 	ctx.Step(`^I request (\d+) leases for different clients$`, ts.iRequestNLeasesForDifferentClients)
 	ctx.Step(`^the lease pool should contain (\d+) active leases$`, ts.theLeasePoolShouldContainNActiveLeases)
-
-	// Persistence (mocked)
-	ctx.Step(`^I have a mocked data source$`, ts.iHaveAMockedDataSource)
-	ctx.Step(`^the data source expects to persist leases$`, ts.theDataSourceExpectsToPersistLeases)
-	ctx.Step(`^the data source expects to return (\d+) leases$`, ts.theDataSourceExpectsToReturnNLeases)
-	ctx.Step(`^I persist leases to file "([^"]*)"$`, ts.iPersistLeasesToFile)
-	ctx.Step(`^I load (\d)+ leases from the persistence layer`, ts.iLoadNLeasesFromThePersistenceLayer)
-	ctx.Step(`^the operation should succeed$`, ts.theOperationShouldSucceed)
 }
 
 // ============================================================================
