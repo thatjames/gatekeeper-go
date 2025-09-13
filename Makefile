@@ -5,7 +5,7 @@ all: web test build
 
 ##@ Build
 build: test web ## Builds the native go binary
-	go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/gatekeeper cmd/gatekeeper/main.go
+	go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/$(BIN_NAME) cmd/gatekeeper/main.go
 
 web: install## Builds the web ui
 	$(MAKE) -C internal/web/ui build
@@ -22,7 +22,7 @@ test: generate-mocks ## Runs the golang unit tests
 	go test ./internal/dhcp/packet_test.go internal/dhcp/packet.go
 
 test-report: generate-mocks ## Runs the golang unit tests and generates a test report
-	go test ./internal/dhcp -run TestFeaturesWithOutputFile -cucumber-json=${PWD}/test-report.xml
+	go test ./internal/dhcp -run TestFeaturesWithOutputFile -report-file=${PWD}/test-report.xml
 
 ##@ Run
 docker-run: ## Runs the docker image
