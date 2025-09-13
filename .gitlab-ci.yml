@@ -48,11 +48,13 @@ test:
     - go generate ./...
     - go mod tidy
   script:
-    - go test ./internal/dhcp -run TestFeaturesWithOutputFile -report-file=./test-report.xml
+    - go test ./internal/dhcp -run TestFeaturesWithOutputFile -report-file=$PWD/test-report.xml
+  after_script:
+    - ls -l
   artifacts:
     when: always
     reports:
-      junit: **/*test-report.xml
+      junit: test-report.xml
     expire_in: 1week
 
 # Build matrix using templates
