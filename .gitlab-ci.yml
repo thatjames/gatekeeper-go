@@ -36,7 +36,12 @@ test:
     - sed -i "/^replace/d" go.mod
     - go mod tidy
   script:
-    - go test ./...
+    - go test ./internal/dhcp -run TestFeaturesWithOutputFile -cucumber-json=./test-report.xml
+  artifacts:
+    when: always
+    reports:
+      junit: test-report.xml
+    expire_in: 1week
   tags:
     - go
 

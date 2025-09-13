@@ -350,7 +350,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 
 var opts = godog.Options{
 	Output: colors.Colored(os.Stdout),
-	Format: "cucumber",
+	Format: "pretty",
 }
 
 var jsonOutput = flag.String("cucumber-json", "", "Output cucumber file for JSON report")
@@ -442,6 +442,7 @@ func TestFeaturesWithOutputFile(t *testing.T) {
 	}
 
 	opts.TestingT = t
+	opts.Format = "junit"
 
 	status := godog.TestSuite{
 		Name:                "DHCP Lease Management",

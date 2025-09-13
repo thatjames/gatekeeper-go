@@ -22,7 +22,7 @@ test: generate-mocks ## Runs the golang unit tests
 	go test ./internal/dhcp/packet_test.go internal/dhcp/packet.go
 
 test-report: generate-mocks ## Runs the golang unit tests and generates a test report
-	go test ./internal/dhcp -run TestFeaturesWithOutputFile -cucumber-json=${PWD}/test-report.json -v
+	go test ./internal/dhcp -run TestFeaturesWithOutputFile -cucumber-json=${PWD}/test-report.xml
 
 ##@ Run
 docker-run: ## Runs the docker image
