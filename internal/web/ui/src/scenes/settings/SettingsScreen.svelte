@@ -15,12 +15,10 @@
   let edit = false;
 
   const editSettings = () => {
-    console.log("Editing settings");
     edit = true;
   };
 
   const saveSettings = () => {
-    console.log("Saving settings");
     edit = false;
   };
 </script>

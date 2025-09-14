@@ -59,6 +59,12 @@ func reserveLease(c *gin.Context) {
 	if err := c.ShouldBindJSON(&lease); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
 		return
+	} else if validationErrors := lease.Validate(); validationErrors != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:  "Unable to reserve lease",
+			Fields: validationErrors,
+		})
+		return
 	}
 	dhcpService.LeaseDB().ReserveLease(lease.ClientId, net.ParseIP(lease.IP).To4())
 	config.Config.DHCP.ReservedAddresses[lease.ClientId] = lease.IP

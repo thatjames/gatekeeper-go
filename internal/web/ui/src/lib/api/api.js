@@ -26,7 +26,7 @@ export class API {
         return resp;
       } else {
         let error = await resp.json();
-        throw new Error(error.error);
+        throw error;
       }
     });
   }
