@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	log "github.com/sirupsen/logrus"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
@@ -72,7 +71,37 @@ func reserveLease(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	log.Debugf("Config: %v", config.Config)
+	activeLeases := dhcpService.LeaseDB().ActiveLeases()
+	reservedLeases := dhcpService.LeaseDB().ReservedLeases()
+	c.JSON(http.StatusOK, DhcpLeaseResponse{
+		ActiveLeases:   MapLeases(activeLeases),
+		ReservedLeases: MapLeases(reservedLeases),
+	})
+}
+
+func updateLease(c *gin.Context) {
+	dhcpService := service.GetService[*dhcp.DHCPServer](service.DHCP)
+	var lease DhcpLeaseRequest
+	if err := c.ShouldBindJSON(&lease); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		return
+	} else if validationErrors := lease.Validate(); validationErrors != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:  "Unable to update reserved lease",
+			Fields: validationErrors,
+		})
+		return
+	}
+	if err := dhcpService.LeaseDB().UpdateLease(lease.ClientId, net.ParseIP(lease.IP).To4()); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error: err.Error(),
+		})
+		return
+	}
+	if err := config.UpdateConfig(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	activeLeases := dhcpService.LeaseDB().ActiveLeases()
 	reservedLeases := dhcpService.LeaseDB().ReservedLeases()
 	c.JSON(http.StatusOK, DhcpLeaseResponse{

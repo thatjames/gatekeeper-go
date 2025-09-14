@@ -27,6 +27,7 @@ func setupDHCPRoutes(g *gin.RouterGroup) {
 	dhcp.GET("/leases", getLeases)
 	dhcp.DELETE("/leases/:clientId", deleteLease)
 	dhcp.POST("/leases/reserve", reserveLease)
+	dhcp.PUT("/leases", updateLease)
 	dhcp.GET("/options", getDHCPOptions)
 }
 

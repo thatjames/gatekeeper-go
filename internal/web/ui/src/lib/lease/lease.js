@@ -14,3 +14,10 @@ export const reserveLease = (clientId, ipAddress) => {
     ip: ipAddress,
   });
 };
+
+export const updateLease = (lease) => {
+  return api.put(`/dhcp/leases`, {
+    clientId: lease.clientId,
+    ip: lease.ip,
+  });
+};

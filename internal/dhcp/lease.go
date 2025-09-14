@@ -2,6 +2,7 @@ package dhcp
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -116,6 +117,23 @@ func (l *LeasePool) AcceptLease(ls *Lease, ttl time.Duration) {
 			return
 		}
 	}
+}
+
+func (l *LeasePool) UpdateLease(clientId string, ip net.IP) error {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	if reservedLease, ok := l.reservedAddresses[clientId]; ok {
+		reservedLease.IP = ip
+		return config.UpdateConfig()
+	}
+	for _, lease := range l.leases {
+		if lease.ClientId == clientId {
+			lease.IP = ip
+			return nil
+		}
+	}
+
+	return errors.New("lease not found")
 }
 
 func (l *LeasePool) NextAvailableLease(clientId string) *Lease {
