@@ -2,6 +2,7 @@ package dhcp
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
@@ -10,23 +11,67 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/common"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
 )
+
+type LeaseState int
+
+func (ls LeaseState) String() string {
+	switch ls {
+	case LeaseAvailable:
+		return "Available"
+	case LeaseOffered:
+		return "Offered"
+	case LeaseReserved:
+		return "Reserved"
+	case LeaseActive:
+		return "Active"
+	default:
+		return "unknown"
+	}
+}
+
+const (
+	LeaseAvailable LeaseState = iota
+	LeaseOffered
+	LeaseReserved
+	LeaseActive
+)
+
+type Lease struct {
+	Id       int
+	ClientId string
+	Hostname string
+	IP       net.IP
+	Expiry   time.Time
+	State    LeaseState
+}
+
+func (l *Lease) String() string {
+	return fmt.Sprintf("%s: %s - %s: %s expiring at %s", l.Hostname, l.IP.String(), l.ClientId, l.State, l.Expiry.Format("15:04:05"))
+}
+
+func (l *Lease) Clear() {
+	l.ClientId = ""
+	l.Hostname = ""
+	l.Expiry = time.Time{}
+	l.State = LeaseAvailable
+}
 
 type LeasePool struct {
 	start             net.IP
 	end               net.IP
-	leases            []*common.Lease
+	leases            []*Lease
 	lock              *sync.Mutex
-	reservedAddresses map[string]*common.Lease
+	reservedAddresses map[string]*Lease
 }
 
 func NewLeasePool(startAddr, endAddr net.IP) *LeasePool {
 	leaseRange := int(binary.BigEndian.Uint32(endAddr)-binary.BigEndian.Uint32(startAddr)) + 1
 	start := binary.BigEndian.Uint32(startAddr)
-	leases := make([]*common.Lease, leaseRange)
+	leases := make([]*Lease, leaseRange)
 	for i := range leases {
-		leases[i] = &common.Lease{
+		leases[i] = &Lease{
 			IP: make(net.IP, 4),
 		}
 		binary.BigEndian.PutUint32(leases[i].IP, start+uint32(i))
@@ -36,11 +81,11 @@ func NewLeasePool(startAddr, endAddr net.IP) *LeasePool {
 		end:               endAddr,
 		lock:              new(sync.Mutex),
 		leases:            leases,
-		reservedAddresses: make(map[string]*common.Lease),
+		reservedAddresses: make(map[string]*Lease),
 	}
 }
 
-func (l *LeasePool) GetLease(clientId string) *common.Lease {
+func (l *LeasePool) GetLease(clientId string) *Lease {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	if reservedLease, ok := l.reservedAddresses[clientId]; ok {
@@ -58,33 +103,33 @@ func (l *LeasePool) GetLease(clientId string) *common.Lease {
 	return nil
 }
 
-func (l *LeasePool) AcceptLease(ls *common.Lease, ttl time.Duration) {
-	if ls.State == common.LeaseReserved {
+func (l *LeasePool) AcceptLease(ls *Lease, ttl time.Duration) {
+	if ls.State == LeaseReserved {
 		return
 	}
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	for _, lease := range l.leases {
 		if lease.ClientId == ls.ClientId {
-			lease.State = common.LeaseActive
+			lease.State = LeaseActive
 			lease.Expiry = time.Now().Add(ttl)
 			return
 		}
 	}
 }
 
-func (l *LeasePool) NextAvailableLease(clientId string) *common.Lease {
+func (l *LeasePool) NextAvailableLease(clientId string) *Lease {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	for _, lease := range l.leases {
 		switch lease.State {
-		case common.LeaseAvailable:
+		case LeaseAvailable:
 			lease.ClientId = clientId
-			lease.State = common.LeaseOffered
+			lease.State = LeaseOffered
 			lease.Expiry = time.Now().Add(time.Second * 60)
 			return lease
 
-		case common.LeaseOffered:
+		case LeaseOffered:
 			if strings.EqualFold(clientId, lease.ClientId) {
 				lease.Expiry = time.Now().Add(time.Second * 60)
 				return lease
@@ -94,10 +139,10 @@ func (l *LeasePool) NextAvailableLease(clientId string) *common.Lease {
 				return lease
 			}
 
-		case common.LeaseActive:
+		case LeaseActive:
 			if time.Now().After(lease.Expiry) {
 				lease.ClientId = clientId
-				lease.State = common.LeaseOffered
+				lease.State = LeaseOffered
 				lease.Expiry = time.Now().Add(time.Second * 60)
 				return lease
 			}
@@ -109,7 +154,14 @@ func (l *LeasePool) NextAvailableLease(clientId string) *common.Lease {
 func (l *LeasePool) ReserveLease(clientID string, reservedIP net.IP) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	l.reservedAddresses[clientID] = &common.Lease{ClientId: clientID, IP: reservedIP, State: common.LeaseReserved}
+	for _, lease := range l.leases {
+		if lease.ClientId == clientID && lease.State != LeaseAvailable {
+			log.Debugf("client %s already has an active lease with IP %s", clientID, lease.IP.String())
+			lease.Clear()
+			break
+		}
+	}
+	l.reservedAddresses[clientID] = &Lease{ClientId: clientID, IP: reservedIP, State: LeaseReserved}
 }
 
 func (l *LeasePool) PeristLeases(file string) error {
@@ -126,7 +178,7 @@ func (l *LeasePool) PeristLeases(file string) error {
 		if lease == nil {
 			break
 		}
-		if lease.State == common.LeaseActive {
+		if lease.State == LeaseActive {
 			counter++
 			leaseBuff := make([]byte, 0)
 			leaseBuff = append(leaseBuff, byte(len(lease.ClientId)))
@@ -170,9 +222,9 @@ func (l *LeasePool) LoadLeases(file string, ttl time.Duration) error {
 	}
 	leaseCount := int(data[0])
 	data = data[1:]
-	leases := make([]*common.Lease, 0)
+	leases := make([]*Lease, 0)
 	for i := 0; i < leaseCount; i++ {
-		var lease = new(common.Lease)
+		var lease = new(Lease)
 		cidLen := data[0]
 		lease.ClientId = string(data[1 : 1+cidLen])
 		data = data[1+cidLen:]
@@ -181,7 +233,7 @@ func (l *LeasePool) LoadLeases(file string, ttl time.Duration) error {
 		data = data[1+hostLen:]
 		lease.IP = data[:4]
 		data = data[4:]
-		lease.State = common.LeaseState(data[0])
+		lease.State = LeaseState(data[0])
 		lease.Expiry = time.Now().Add(ttl)
 		data = data[1:]
 		leases = append(leases, lease)
@@ -201,17 +253,17 @@ func (l *LeasePool) LoadLeases(file string, ttl time.Duration) error {
 	return nil
 }
 
-func (l *LeasePool) ActiveLeases() []common.Lease {
+func (l *LeasePool) ActiveLeases() []Lease {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	var leases []common.Lease
+	var leases []Lease
 	for i := range l.leases {
-		if l.leases[i].State == common.LeaseActive && time.Now().Before(l.leases[i].Expiry) {
-			leases = append(leases, common.Lease{
+		if l.leases[i].State == LeaseActive && time.Now().Before(l.leases[i].Expiry) {
+			leases = append(leases, Lease{
 				ClientId: l.leases[i].ClientId,
 				Hostname: l.leases[i].Hostname,
 				IP:       l.leases[i].IP,
-				State:    common.LeaseState(l.leases[i].State),
+				State:    LeaseState(l.leases[i].State),
 				Expiry:   l.leases[i].Expiry,
 			})
 		}
@@ -219,16 +271,16 @@ func (l *LeasePool) ActiveLeases() []common.Lease {
 	return leases
 }
 
-func (l *LeasePool) ReservedLeases() []common.Lease {
+func (l *LeasePool) ReservedLeases() []Lease {
 	l.lock.Lock()
 	defer l.lock.Unlock()
-	var leases []common.Lease
+	var leases []Lease
 	for _, lease := range l.reservedAddresses {
-		leases = append(leases, common.Lease{
+		leases = append(leases, Lease{
 			ClientId: lease.ClientId,
 			Hostname: lease.Hostname,
 			IP:       lease.IP,
-			State:    common.LeaseState(lease.State),
+			State:    LeaseState(lease.State),
 			Expiry:   lease.Expiry,
 		})
 	}
@@ -236,9 +288,15 @@ func (l *LeasePool) ReservedLeases() []common.Lease {
 	return leases
 }
 
-func (l *LeasePool) ReleaseLease(relLease *common.Lease) {
+func (l *LeasePool) ReleaseLease(relLease *Lease) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
+	if _, ok := l.reservedAddresses[relLease.ClientId]; ok {
+		delete(l.reservedAddresses, relLease.ClientId)
+		delete(config.Config.DHCP.ReservedAddresses, relLease.ClientId)
+		config.UpdateConfig()
+		return
+	}
 	for _, lease := range l.leases {
 		if strings.EqualFold(relLease.ClientId, lease.ClientId) {
 			lease.Clear()

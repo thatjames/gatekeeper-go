@@ -1,20 +1,20 @@
 DHCP:
-  DomainName: international-space-station
   Interface: eth0
   StartAddr: 10.0.0.2
   EndAddr: 10.0.0.99
-  LeaseTTL: 300
-  SubnetMask: 255.255.255.0
-  Router: 10.0.0.1
-  LeaseFile: /var/lib/gatekeeper/leases
+  DomainName: international-space-station
   NameServers:
     - 8.8.8.8
     - 1.1.1.1
+  LeaseTTL: 300
+  SubnetMask: 255.255.255.0
+  Router: 10.0.0.1
   ReservedAddresses:
-    bc:5f:f4:ac:ea:c4: 10.0.0.100
     00:d8:61:39:b5:6a: 10.0.0.101
-
+    bc:5f:f4:ac:ea:c4: 10.0.0.100
+  LeaseFile: /var/lib/gatekeeper/leases
 Web:
-  Address: ":8085"
-  HTPasswdFile: ".htpasswd"
+  Address: :8085
+  TLS: null
+  HTPasswdFile: .htpasswd
   Prometheus: true

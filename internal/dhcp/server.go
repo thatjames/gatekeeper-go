@@ -13,7 +13,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	log "github.com/sirupsen/logrus"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/common"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
 )
 
@@ -152,7 +151,7 @@ func (z *DHCPServer) Start() error {
 	} else {
 		counter := 0
 		for _, lease := range z.issuedLeases.leases {
-			if lease != nil && lease.State == common.LeaseActive {
+			if lease != nil && lease.State == LeaseActive {
 				counter++
 			}
 		}
@@ -300,14 +299,14 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 				msgType = DHCPAck
 				setIP = requestedAddr
 				switch lease.State {
-				case common.LeaseOffered:
+				case LeaseOffered:
 					log.Infof("confirm address %s for %s", requestedAddr, id)
 					z.issuedLeases.AcceptLease(lease, time.Second*time.Duration(z.opts.LeaseTTL))
 					activeLeaseGauge.Inc()
-				case common.LeaseReserved:
+				case LeaseReserved:
 					z.issuedLeases.AcceptLease(lease, time.Second*time.Duration(z.opts.LeaseTTL))
 					log.Infof("send ack for reserved address %s to %s", requestedAddr, id)
-				case common.LeaseActive:
+				case LeaseActive:
 					z.issuedLeases.AcceptLease(lease, time.Second*time.Duration(z.opts.LeaseTTL))
 					lease.Expiry = time.Now().Add(time.Second * time.Duration(z.opts.LeaseTTL))
 					log.Infof("send ack for active address %s to %s", lease.IP.To4().String(), id)

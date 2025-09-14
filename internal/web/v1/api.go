@@ -2,18 +2,40 @@ package v1
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"github.com/tg123/go-htpasswd"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/system"
 )
 
-func LoginHandler(c *gin.Context) {
+func SetupV1Endpoints(r *gin.RouterGroup) {
+	r.POST("/login", loginHandler)
+	r.GET("/health", healthHandler)
+
+	v1Group := r.Group("/v1")
+	v1Group.POST("/login", loginHandler)
+	v1Group.GET("/health", healthHandler)
+
+	protected := v1Group.Group("/", authMiddleware(), loggingMiddleware())
+	setupDHCPRoutes(protected)
+	setupSystemRoutes(protected)
+}
+
+func setupDHCPRoutes(g *gin.RouterGroup) {
+	dhcp := g.Group("/dhcp")
+	dhcp.GET("/leases", getLeases)
+	dhcp.DELETE("/leases/:clientId", deleteLease)
+	dhcp.POST("/leases/reserve", reserveLease)
+	dhcp.GET("/options", getDHCPOptions)
+}
+
+func setupSystemRoutes(g *gin.RouterGroup) {
+	system := g.Group("/system")
+	system.GET("/info", getSystemInfo)
+}
+
+func loginHandler(c *gin.Context) {
 	var req UserLoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
@@ -45,59 +67,4 @@ func LoginHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"token": token,
 	})
-}
-
-func VerifyHandler(c *gin.Context) {
-	username, exists := c.Get("username")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "No username in context"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"valid":    true,
-		"username": username,
-	})
-}
-
-func GetLeases(c *gin.Context) {
-	dhcpService := service.GetService[*dhcp.DHCPServer](service.DHCP)
-	activeLeases := dhcpService.LeaseDB().ActiveLeases()
-	reservedLeases := dhcpService.LeaseDB().ReservedLeases()
-	c.JSON(http.StatusOK, DhcpLeaseResponse{
-		ActiveLeases:   MapLeases(activeLeases),
-		ReservedLeases: MapLeases(reservedLeases),
-	})
-}
-
-func GetDHCPOptions(c *gin.Context) {
-	dhcpService := service.GetService[*dhcp.DHCPServer](service.DHCP)
-	opts := dhcpService.Options()
-	c.JSON(http.StatusOK, DhcpOptionsResponse{
-		Interface:      opts.Interface,
-		StartAddr:      opts.StartFrom.String(),
-		EndAddr:        opts.EndAt.String(),
-		LeaseTTL:       opts.LeaseTTL,
-		Router:         opts.Router.String(),
-		SubnetMask:     opts.SubnetMask.String(),
-		DomainName:     opts.DomainName,
-		ReservedLeases: opts.ReservedLeases,
-		LeaseFile:      opts.LeaseFile,
-	})
-}
-
-func HealthHandler(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"status":    "healthy",
-		"timestamp": time.Now().Unix(),
-	})
-}
-
-func GetSystemInfo(c *gin.Context) {
-	sysInfo, err := system.GetSystemInfo()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, sysInfo)
 }

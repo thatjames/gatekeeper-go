@@ -13,7 +13,6 @@ import (
 	"github.com/cucumber/godog"
 	"github.com/cucumber/godog/colors"
 	"github.com/golang/mock/gomock"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/common"
 )
 
 // ============================================================================
@@ -23,9 +22,9 @@ import (
 type TestSuite struct {
 	leasePool    *LeasePool
 	ctrl         *gomock.Controller
-	currentLease *common.Lease
+	currentLease *Lease
 	error        error
-	leases       []common.Lease
+	leases       []Lease
 	clientID     string
 	filename     string
 	leaseFile    string
@@ -110,16 +109,16 @@ func (ts *TestSuite) theLeaseStateShouldBe(expectedState string) error {
 		return fmt.Errorf("no current lease to check state")
 	}
 
-	var expected common.LeaseState
+	var expected LeaseState
 	switch strings.ToLower(expectedState) {
 	case "reserved":
-		expected = common.LeaseReserved
+		expected = LeaseReserved
 	case "active":
-		expected = common.LeaseActive
+		expected = LeaseActive
 	case "offered":
-		expected = common.LeaseOffered
+		expected = LeaseOffered
 	case "available":
-		expected = common.LeaseAvailable
+		expected = LeaseAvailable
 	default:
 		return fmt.Errorf("unknown lease state: %s", expectedState)
 	}

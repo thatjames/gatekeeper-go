@@ -1,6 +1,8 @@
 package web
 
 import (
+	"strings"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
@@ -30,9 +32,10 @@ func Init(ver string, cfg *config.Web, leases *dhcp.LeasePool) error {
 
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
-	setupAPIRoutes(r)
+	api := r.Group("/api")
+	v1.SetupV1Endpoints(api)
 
-	r.Use(v1.SpaMiddleware())
+	r.Use(spaMiddleware())
 	r.Use(static.Serve("/", NewEmbeddedFS()))
 
 	if cfg.TLS != nil {
@@ -44,15 +47,20 @@ func Init(ver string, cfg *config.Web, leases *dhcp.LeasePool) error {
 	}
 }
 
-func setupAPIRoutes(r *gin.Engine) {
-	api := r.Group("/api")
-	v1Group := api.Group("/v1")
-	v1Group.POST("/login", v1.LoginHandler)
-	v1Group.GET("/health", v1.HealthHandler)
+func spaMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/api/") ||
+			strings.HasPrefix(c.Request.URL.Path, "/metrics") {
+			c.Next()
+			return
+		}
 
-	protected := v1Group.Group("/", v1.AuthMiddleware(), v1.LoggingMiddleware())
-	protected.GET("/verify", v1.VerifyHandler)
-	protected.GET("/leases", v1.GetLeases)
-	protected.GET("/options", v1.GetDHCPOptions)
-	protected.GET("/system", v1.GetSystemInfo)
+		if strings.Contains(c.Request.URL.Path, ".") {
+			c.Next()
+			return
+		}
+
+		c.Request.URL.Path = "/"
+		c.Next()
+	}
 }

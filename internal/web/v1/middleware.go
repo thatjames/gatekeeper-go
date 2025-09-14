@@ -8,25 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func SpaMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if strings.HasPrefix(c.Request.URL.Path, "/api/") ||
-			strings.HasPrefix(c.Request.URL.Path, "/metrics") {
-			c.Next()
-			return
-		}
-
-		if strings.Contains(c.Request.URL.Path, ".") {
-			c.Next()
-			return
-		}
-
-		c.Request.URL.Path = "/"
-		c.Next()
-	}
-}
-
-func AuthMiddleware() gin.HandlerFunc {
+func authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -60,7 +42,7 @@ func AuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-func LoggingMiddleware() gin.HandlerFunc {
+func loggingMiddleware() gin.HandlerFunc {
 	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
 		log.WithFields(log.Fields{
 			"status":     param.StatusCode,

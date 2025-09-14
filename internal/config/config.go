@@ -6,10 +6,13 @@ import (
 	"os"
 	"reflect"
 
-	"gopkg.in/yaml.v2"
+	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 )
 
-var Config ConfigInstance
+var loadedFilePath *string
+
+var Config *ConfigInstance
 
 type ConfigInstance struct {
 	DHCP *DHCP `yaml:"DHCP"`
@@ -85,7 +88,30 @@ func LoadConfig(filePath string) error {
 	if err != nil {
 		return err
 	}
+	loadedFilePath = &filePath
 
 	defer f.Close()
 	return yaml.NewDecoder(f).Decode(&Config)
+}
+
+func UpdateConfig() error {
+	if loadedFilePath == nil {
+		return fmt.Errorf("no config file path loaded")
+	}
+
+	log.Debugf("Updating config to %s", *loadedFilePath)
+
+	// Open file for writing (this will truncate/overwrite the existing file)
+	f, err := os.Create(*loadedFilePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	// Create encoder that writes to the file
+	encoder := yaml.NewEncoder(f)
+	encoder.SetIndent(2)
+	defer encoder.Close()
+
+	return encoder.Encode(Config)
 }

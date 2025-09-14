@@ -1,5 +1,5 @@
 import { api } from "$lib/api/api";
 
 export const getSettings = () => {
-  return api.get("/options");
+  return api.get("/dhcp/options");
 };

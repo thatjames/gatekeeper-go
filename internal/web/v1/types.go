@@ -2,7 +2,7 @@ package v1
 
 import (
 	"github.com/golang-jwt/jwt/v5"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/common"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
 )
 
 type Role string
@@ -18,7 +18,7 @@ type UserLoginRequest struct {
 }
 
 type PageData struct {
-	Leases []common.Lease
+	Leases []dhcp.Lease
 }
 
 type User struct {
@@ -34,6 +34,11 @@ type UserClaims struct {
 type DhcpLeaseResponse struct {
 	ActiveLeases   []Lease `json:"active,omitempty"`
 	ReservedLeases []Lease `json:"reserved,omitempty"`
+}
+
+type DhcpLeaseRequest struct {
+	ClientId string `json:"clientId"`
+	IP       string `json:"ip"`
 }
 
 type Lease struct {
@@ -56,7 +61,7 @@ type DhcpOptionsResponse struct {
 	LeaseFile      string            `json:"leaseFile"`
 }
 
-func MapLease(lease common.Lease) Lease {
+func MapLease(lease dhcp.Lease) Lease {
 	return Lease{
 		ClientId: lease.ClientId,
 		Hostname: lease.Hostname,
@@ -66,7 +71,7 @@ func MapLease(lease common.Lease) Lease {
 	}
 }
 
-func MapLeases(leases []common.Lease) []Lease {
+func MapLeases(leases []dhcp.Lease) []Lease {
 	var leaseList []Lease
 	for _, lease := range leases {
 		leaseList = append(leaseList, MapLease(lease))
