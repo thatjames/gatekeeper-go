@@ -70,17 +70,31 @@ Remember to replace `username` and `password` with your own values
 
 #### Screenshots
 
+##### WebUI Home Page
+
 ![WebUI Home Page](images/web_home_page.png)
+
+##### WebUI DHCP View
 
 ![WebUI DHCP View](images/web_dhcp_active_leases.png)
 
+##### WebUI DHCP Active Lease Options
+
 ![WebUI DHCP Active Lease Options](images/web_dhcp_active_lease_options.png)
+
+##### WebUI DHCP Reserved Leases
 
 ![WebUI DHCP Reserved Leases](images/web_dhcp_reserved_leases.png)
 
+##### WebUI DHCP Reserved Lease Options
+
 ![WebUI DHCP Reserved Lease Options](images/web_dhcp_reserved_lease_options.png)
 
+##### WebUI DHCP Config
+
 ![WebUI DHCP Options](images/web_dhcp_options_display.png)
+
+##### WebUI DHCP Edit Config
 
 ![WebUI DHCP Options Config](images/web_dhcp_options_form.png)
 
