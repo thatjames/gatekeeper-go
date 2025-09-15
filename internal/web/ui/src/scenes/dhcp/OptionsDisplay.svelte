@@ -15,5 +15,9 @@
     <SimpleCard title="Subnet Mask" description={settings.subnetMask} />
     <SimpleCard title="Domain Name" description={settings.domainName} />
     <SimpleCard title="Lease File" description={settings.leaseFile} />
+    <SimpleCard
+      title="Domain Name Servers"
+      description={settings.nameServers?.replaceAll(",", " ")}
+    />
   </div>
 </div>

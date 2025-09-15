@@ -162,5 +162,19 @@
         >
       {/if}
     </div>
+    <Label for="nameServers" class="mb-2">Domain Name Servers</Label>
+    <div class="flex flex-col">
+      <Input
+        type="text"
+        id="nameServers"
+        placeholder="/etc/gatekeeper/leases.json"
+        bind:value={settings.nameServers}
+      />
+      {#if fieldErrors.nameServers}
+        <Helper class="mt-2 text-primary-500 dark:text-primary-500"
+          >{fieldErrors.nameServers}</Helper
+        >
+      {/if}
+    </div>
   </div>
 </form>

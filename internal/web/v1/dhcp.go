@@ -3,6 +3,7 @@ package v1
 import (
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
@@ -39,15 +40,20 @@ func deleteLease(c *gin.Context) {
 func getDHCPOptions(c *gin.Context) {
 	dhcpService := service.GetService[*dhcp.DHCPServer](service.DHCP)
 	opts := dhcpService.Options()
+	nameServers := make([]string, 0)
+	for _, nameServer := range opts.NameServers {
+		nameServers = append(nameServers, nameServer.String())
+	}
 	c.JSON(http.StatusOK, DhcpOptions{
-		Interface:  opts.Interface,
-		StartAddr:  opts.StartFrom.String(),
-		EndAddr:    opts.EndAt.String(),
-		LeaseTTL:   opts.LeaseTTL,
-		Gateway:    opts.Gateway.String(),
-		SubnetMask: opts.SubnetMask.String(),
-		DomainName: opts.DomainName,
-		LeaseFile:  opts.LeaseFile,
+		Interface:   opts.Interface,
+		StartAddr:   opts.StartFrom.String(),
+		EndAddr:     opts.EndAt.String(),
+		LeaseTTL:    opts.LeaseTTL,
+		Gateway:     opts.Gateway.String(),
+		SubnetMask:  opts.SubnetMask.String(),
+		DomainName:  opts.DomainName,
+		LeaseFile:   opts.LeaseFile,
+		NameServers: strings.Join(nameServers, ","),
 	})
 }
 
@@ -66,6 +72,10 @@ func updateDHCPOptions(c *gin.Context) {
 	}
 	var oldOpts = new(dhcp.DHCPServerOpts)
 	*oldOpts = *dhcpService.Options()
+	nameServers := make([]net.IP, 0)
+	for _, nameServer := range strings.Split(opts.NameServers, ",") {
+		nameServers = append(nameServers, net.ParseIP(nameServer).To4())
+	}
 	dhcpService.UpdateOptions(&dhcp.DHCPServerOpts{
 		Interface:      opts.Interface,
 		StartFrom:      net.ParseIP(opts.StartAddr).To4(),
@@ -76,6 +86,7 @@ func updateDHCPOptions(c *gin.Context) {
 		DomainName:     opts.DomainName,
 		LeaseFile:      opts.LeaseFile,
 		ReservedLeases: dhcpService.Options().ReservedLeases,
+		NameServers:    nameServers,
 	})
 
 	if err := dhcpService.Stop(); err != nil {
@@ -98,6 +109,7 @@ func updateDHCPOptions(c *gin.Context) {
 		SubnetMask:        opts.SubnetMask,
 		DomainName:        opts.DomainName,
 		LeaseFile:         opts.LeaseFile,
+		NameServers:       strings.Split(opts.NameServers, ","),
 		ReservedAddresses: dhcpService.Options().ReservedLeases,
 	}
 	if err := config.UpdateConfig(); err != nil {
@@ -106,14 +118,15 @@ func updateDHCPOptions(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, DhcpOptions{
-		Interface:  opts.Interface,
-		StartAddr:  opts.StartAddr,
-		EndAddr:    opts.EndAddr,
-		LeaseTTL:   opts.LeaseTTL,
-		Gateway:    opts.Gateway,
-		SubnetMask: opts.SubnetMask,
-		DomainName: opts.DomainName,
-		LeaseFile:  opts.LeaseFile,
+		Interface:   opts.Interface,
+		StartAddr:   opts.StartAddr,
+		EndAddr:     opts.EndAddr,
+		LeaseTTL:    opts.LeaseTTL,
+		Gateway:     opts.Gateway,
+		SubnetMask:  opts.SubnetMask,
+		DomainName:  opts.DomainName,
+		LeaseFile:   opts.LeaseFile,
+		NameServers: opts.NameServers,
 	})
 }
 

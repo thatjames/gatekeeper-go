@@ -2,8 +2,10 @@ package v1
 
 import (
 	"encoding/binary"
+	"fmt"
 	"net"
 	"regexp"
+	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
@@ -103,14 +105,15 @@ type Lease struct {
 }
 
 type DhcpOptions struct {
-	Interface  string `json:"interface"`
-	StartAddr  string `json:"startAddr"`
-	EndAddr    string `json:"endAddr"`
-	LeaseTTL   int    `json:"leaseTTL"`
-	Gateway    string `json:"gateway"`
-	SubnetMask string `json:"subnetMask"`
-	DomainName string `json:"domainName"`
-	LeaseFile  string `json:"leaseFile"`
+	Interface   string `json:"interface"`
+	StartAddr   string `json:"startAddr"`
+	EndAddr     string `json:"endAddr"`
+	LeaseTTL    int    `json:"leaseTTL"`
+	Gateway     string `json:"gateway"`
+	SubnetMask  string `json:"subnetMask"`
+	DomainName  string `json:"domainName"`
+	LeaseFile   string `json:"leaseFile"`
+	NameServers string `json:"nameServers"`
 }
 
 func (opts *DhcpOptions) Validate() []ValidationError {
@@ -250,6 +253,17 @@ func (opts *DhcpOptions) Validate() []ValidationError {
 				Field:   "subnetMask",
 				Message: "Subnet mask must be a valid IPv4 address",
 			})
+		}
+	}
+
+	if nameServers := strings.Split(opts.NameServers, ","); len(nameServers) > 0 {
+		for i, nameServer := range nameServers {
+			if net.ParseIP(nameServer).To4() == nil {
+				validationErrors = append(validationErrors, ValidationError{
+					Field:   "nameServers",
+					Message: fmt.Sprintf("Name server %d must be a valid IPv4 address", i+1),
+				})
+			}
 		}
 	}
 

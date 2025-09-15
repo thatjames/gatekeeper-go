@@ -3,7 +3,9 @@ DHCP:
   StartAddr: 10.0.0.2
   EndAddr: 10.0.0.99
   DomainName: international-space-station
-  NameServers: []
+  NameServers:
+    - 8.8.8.8
+    - 1.1.1.1
   LeaseTTL: 300
   SubnetMask: 255.255.255.0
   Gateway: 10.0.0.1
