@@ -1,6 +1,7 @@
 <script>
   import Nav from "$components/Nav.svelte";
   import SideMenu from "$components/SideMenu.svelte";
+  import { MenuComponent } from "$lib/common/menu-types";
   import { Routes } from "$lib/common/routes";
   import { getLeases } from "$lib/lease/lease";
   import { Button, P } from "flowbite-svelte";
@@ -18,19 +19,28 @@
     "/": wrap({
       asyncComponent: () => import("$scenes/home/HomeScreen.svelte"),
     }),
-    "/leases": wrap({
+    "/dhcp/leases": wrap({
       asyncComponent: () => import("$scenes/leases/LeaseLayout.svelte"),
     }),
-    "/settings": wrap({
+    "/dhcp/settings": wrap({
       asyncComponent: () => import("$scenes/settings/SettingsLayout.svelte"),
     }),
   };
 
   const menuOptions = [
     { label: "Home", location: Routes.Home, icon: HomeOutline },
-    { label: "Leases", location: Routes.Leases, icon: ServerOutline },
-    { label: "Settings", location: Routes.Settings, icon: CogOutline },
-    // { label: "DNS", location: Routes.DNS, icon: LinkOutline },
+    {
+      label: "DHCP",
+      type: MenuComponent.Dropdown,
+      items: [
+        {
+          label: "Leases",
+          location: Routes.Leases,
+          icon: ServerOutline,
+        },
+        { label: "Settings", location: Routes.Settings, icon: CogOutline },
+      ],
+    },
   ];
 </script>
 

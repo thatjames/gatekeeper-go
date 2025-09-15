@@ -1,14 +1,20 @@
 <script>
-  import { Button, DarkMode } from "flowbite-svelte";
-  import { BarsFromLeftOutline, HomeOutline } from "flowbite-svelte-icons";
+  import { Button, DarkMode, Dropdown } from "flowbite-svelte";
+  import {
+    BarsFromLeftOutline,
+    ChevronDownOutline,
+    ChevronRightOutline,
+    HomeOutline,
+  } from "flowbite-svelte-icons";
   import { onDestroy, onMount } from "svelte";
   import { push } from "svelte-spa-router";
   import { location } from "svelte-spa-router";
-  import { isMenuOpen } from "$lib/stores/menu.js"; // Import the store
+  import { isMenuOpen, isDropDownClicked } from "$lib/stores/menu.js"; // Import the store
   import { logout } from "$lib/auth/auth.svelte";
   import { Routes } from "$lib/common/routes";
+  import { MenuComponent } from "$lib/common/menu-types";
 
-  let { menuOptions = [] } = $props();
+  let { menuOptions = [], children } = $props();
   let componentId = Math.random().toString(36).substr(2, 9);
   let isLargeScreen = $state(false);
   const checkScreenSize = () => {
@@ -65,31 +71,84 @@
           <DarkMode class="w-full" />
         </div>
         {#each menuOptions as option}
-          <div
-            class="flex items-center justify-between rounded dark:hover:bg-gray-500 hover:bg-gray-100 hover:cursor-pointer transition-colors py-2 pl-3 my-1 {$location ===
-            option.location
-              ? 'bg-primary-500'
-              : ''}"
-            onclick={(e) => {
-              e.stopPropagation();
-              push(option.location);
-            }}
-          >
-            <span class="text-black dark:text-gray-100">
-              {option.label}
-            </span>
-            <svelte:component
-              this={option.icon}
-              class="w-5 h-5 mr-3 text-black dark:text-gray-100"
-            />
+          <div>
+            <div
+              class="flex items-center justify-between rounded dark:hover:bg-gray-500 hover:bg-gray-100 hover:cursor-pointer transition-colors py-2 pl-3 my-1 {$location ===
+              option.location
+                ? 'bg-primary-500'
+                : ''}"
+              onclick={option.type !== MenuComponent.Dropdown
+                ? (e) => {
+                    push(option?.location);
+                  }
+                : (e) => {
+                    $isDropDownClicked = !$isDropDownClicked;
+                  }}
+              role="button"
+              tabindex="0"
+              onkeydown={option.type !== MenuComponent.Dropdown
+                ? (e) => e.key === "Enter" && push(option?.location)
+                : (e) => {
+                    if (e.key === "Enter") {
+                      $isDropDownClicked = !$isDropDownClicked;
+                    }
+                  }}
+            >
+              <span class="text-black dark:text-gray-100">
+                {option?.label}
+              </span>
+              <span class="w-5 h-5 mr-2 text-black dark:text-gray-100">
+                {#if option.type === MenuComponent.Dropdown}
+                  <div
+                    class="transform transition-transform duration-300 ease-in-out {$isDropDownClicked
+                      ? 'rotate-90'
+                      : 'rotate-0'}"
+                  >
+                    <ChevronRightOutline class="w-5 h-5" />
+                  </div>
+                {:else}
+                  {@render option?.icon({})}
+                {/if}
+              </span>
+            </div>
+
+            <div
+              class="transition-all duration-300 ease-in-out overflow-hidden ml-6 {option.type ===
+                MenuComponent.Dropdown && $isDropDownClicked
+                ? 'max-h-96 opacity-100'
+                : 'max-h-0 opacity-0'}"
+            >
+              {#if option.type === MenuComponent.Dropdown}
+                {#each option.items as item}
+                  <div
+                    class="py-2 px-3 my-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded cursor-pointer text-black dark:text-gray-100 text-sm transition-colors duration-200 {$location ===
+                    item.location
+                      ? 'bg-primary-500'
+                      : ''}"
+                    onclick={() => push(item.location)}
+                    role="button"
+                    tabindex="0"
+                    onkeydown={(e) => e.key === "Enter" && push(item.location)}
+                  >
+                    <div class="flex items-center justify-between">
+                      <span class="text-black dark:text-gray-100">
+                        {item.label}
+                      </span>
+                      <span class="w-5 h-5 mr-2 text-black dark:text-gray-100">
+                        {@render item.icon({})}
+                      </span>
+                    </div>
+                  </div>
+                {/each}
+              {/if}
+            </div>
           </div>
         {/each}
-        <Button class="w-full" outline onclick={doLogout}>Logout</Button>
+        <Button class="mt-5 w-full" outline onclick={doLogout}>Logout</Button>
       </div>
     </div>
   </div>
 
-  <!-- Fixed: Remove duplicate div -->
   <div
     class="transition-all duration-300 ease-in-out min-h-screen {$isMenuOpen ||
     isLargeScreen
@@ -97,7 +156,7 @@
       : 'ml-0'}"
   >
     <div class="2xl:pt-20">
-      <slot></slot>
+      {@render children?.()}
     </div>
   </div>
 </div>

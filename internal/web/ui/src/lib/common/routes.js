@@ -1,8 +1,8 @@
 export const Routes = {
   Home: "/",
   Login: "/auth/login",
-  Leases: "/leases",
+  Leases: "/dhcp/leases",
   LeaseDetails: "/leases/details",
-  Settings: "/settings",
+  Settings: "/dhcp/settings",
   DNS: "/dns",
 };
