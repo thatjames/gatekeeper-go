@@ -3,6 +3,7 @@ package system
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -35,6 +36,45 @@ func GetSystemInfo() (SystemInfo, error) {
 		si["WAN Rx"] = byteSize(uint64(lanStats.RxBytes))
 	}
 	return si, nil
+}
+
+func GetDHCPInterfaces() ([]string, error) {
+	interfaces := make([]string, 0)
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+
+		if iface.Flags&net.FlagPointToPoint != 0 {
+			continue
+		}
+
+		if iface.Flags&net.FlagBroadcast == 0 && iface.Flags&net.FlagMulticast == 0 {
+			continue
+		}
+
+		name := strings.ToLower(iface.Name)
+		if strings.HasPrefix(name, "docker") ||
+			strings.HasPrefix(name, "br-") || // Docker bridges
+			strings.HasPrefix(name, "bridge") ||
+			strings.HasPrefix(name, "veth") || // Virtual Ethernet pairs
+			strings.HasPrefix(name, "virbr") || // Libvirt bridges
+			strings.HasPrefix(name, "ham") || // Hamachi bridges
+			strings.Contains(name, "bridge") {
+			continue
+		}
+
+		if iface.Flags&net.FlagUp != 0 && len(iface.HardwareAddr) > 0 {
+			interfaces = append(interfaces, iface.Name)
+		}
+	}
+
+	return interfaces, nil
 }
 
 const (

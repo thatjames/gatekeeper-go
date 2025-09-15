@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"encoding/binary"
 	"net"
 	"regexp"
 
@@ -126,17 +127,41 @@ func (opts *DhcpOptions) Validate() []ValidationError {
 			Message: "Start address is required",
 		})
 	} else {
-		ipRegex := regexp.MustCompile(`^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$`)
-		if !ipRegex.MatchString(opts.StartAddr) {
-			validationErrors = append(validationErrors, ValidationError{
-				Field:   "startAddr",
-				Message: "Start address must be a valid IP address",
-			})
-		} else if net.ParseIP(opts.StartAddr).To4() == nil {
+		if net.ParseIP(opts.StartAddr).To4() == nil {
 			validationErrors = append(validationErrors, ValidationError{
 				Field:   "startAddr",
 				Message: "Start address must be a valid IPv4 address",
 			})
+		} else if opts.StartAddr == opts.EndAddr {
+			validationErrors = append(validationErrors, ValidationError{
+				Field:   "startAddr",
+				Message: "Start address must not be the same as the end address",
+			})
+		} else if opts.StartAddr == opts.Gateway {
+			validationErrors = append(validationErrors, ValidationError{
+				Field:   "startAddr",
+				Message: "Start address must not be the same as the gateway address",
+			})
+		} else {
+			startIP := net.ParseIP(opts.StartAddr).To4()
+			endIP := net.ParseIP(opts.EndAddr).To4()
+
+			if endIP == nil {
+				validationErrors = append(validationErrors, ValidationError{
+					Field:   "endAddr",
+					Message: "End address must be a valid IPv4 address",
+				})
+			} else {
+				startUint32 := binary.BigEndian.Uint32(startIP)
+				endUint32 := binary.BigEndian.Uint32(endIP)
+
+				if startUint32 >= endUint32 {
+					validationErrors = append(validationErrors, ValidationError{
+						Field:   "startAddr",
+						Message: "Start address must be less than end address",
+					})
+				}
+			}
 		}
 	}
 	if opts.EndAddr == "" {
@@ -145,17 +170,41 @@ func (opts *DhcpOptions) Validate() []ValidationError {
 			Message: "End address is required",
 		})
 	} else {
-		ipRegex := regexp.MustCompile(`^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$`)
-		if !ipRegex.MatchString(opts.EndAddr) {
-			validationErrors = append(validationErrors, ValidationError{
-				Field:   "endAddr",
-				Message: "End address must be a valid IP address",
-			})
-		} else if net.ParseIP(opts.EndAddr).To4() == nil {
+		if net.ParseIP(opts.EndAddr).To4() == nil {
 			validationErrors = append(validationErrors, ValidationError{
 				Field:   "endAddr",
 				Message: "End address must be a valid IPv4 address",
 			})
+		} else if opts.EndAddr == opts.StartAddr {
+			validationErrors = append(validationErrors, ValidationError{
+				Field:   "endAddr",
+				Message: "End address must not be the same as the start address",
+			})
+		} else if opts.EndAddr == opts.Gateway {
+			validationErrors = append(validationErrors, ValidationError{
+				Field:   "endAddr",
+				Message: "End address must not be the same as the gateway address",
+			})
+		} else {
+			startIP := net.ParseIP(opts.StartAddr).To4()
+			endIP := net.ParseIP(opts.EndAddr).To4()
+
+			if startIP == nil {
+				validationErrors = append(validationErrors, ValidationError{
+					Field:   "startAddr",
+					Message: "Start address must be a valid IPv4 address",
+				})
+			} else {
+				startUint32 := binary.BigEndian.Uint32(startIP)
+				endUint32 := binary.BigEndian.Uint32(endIP)
+
+				if endUint32 <= startUint32 {
+					validationErrors = append(validationErrors, ValidationError{
+						Field:   "endAddr",
+						Message: "End address must be greater than start address",
+					})
+				}
+			}
 		}
 	}
 

@@ -17,6 +17,7 @@
   let settingsFormData = $state({});
   let edit = $state(false);
   let errors = $state(null);
+  let interfaces = $state([]);
 
   getSettings().then((resp) => {
     settings = resp;
@@ -45,8 +46,8 @@
     <Heading tag="h4">Edit Settings</Heading>
     <div class="w-4/5 mx-auto flex flex-col gap-5">
       <SettingsForm
-        bind:settings={settingsFormData}
         externalErrors={errors}
+        bind:settings={settingsFormData}
         on:errorsCleared={() => (errors = null)}
       />
       <div class="grid grid-cols-2 gap-5">

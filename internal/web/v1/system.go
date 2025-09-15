@@ -23,3 +23,12 @@ func getSystemInfo(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, sysInfo)
 }
+
+func getDHCPInterfaces(c *gin.Context) {
+	interfaces, err := system.GetDHCPInterfaces()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, interfaces)
+}

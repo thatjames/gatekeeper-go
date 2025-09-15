@@ -1,10 +1,19 @@
 <script>
-  import { Helper, Input, Label, Textarea } from "flowbite-svelte";
+  import { dhcpInterfaces } from "$lib/system/system";
+  import { Helper, Input, Label, Select } from "flowbite-svelte";
   import { createEventDispatcher } from "svelte";
 
   const dispatch = createEventDispatcher();
   let { settings, externalErrors } = $props();
   let fieldErrors = $state({});
+  let interfaceItems = $state(
+    $dhcpInterfaces.map((interfaceItem) => {
+      return {
+        value: interfaceItem,
+        name: interfaceItem,
+      };
+    }),
+  );
 
   $effect(() => {
     fieldErrors =
@@ -28,11 +37,12 @@
   <div class="flex flex-col gap-2 md:grid md:grid-cols-2 md:gap-4">
     <Label for="interface" class="mb-2">Interface</Label>
     <div class="flex flex-col">
-      <Input
+      <Select
         type="text"
         id="interface"
         placeholder="eth0"
         required
+        items={interfaceItems}
         bind:value={settings.interface}
       />
       {#if fieldErrors.interface}

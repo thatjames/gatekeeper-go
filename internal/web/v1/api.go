@@ -35,6 +35,7 @@ func setupDHCPRoutes(g *gin.RouterGroup) {
 func setupSystemRoutes(g *gin.RouterGroup) {
 	system := g.Group("/system")
 	system.GET("/info", getSystemInfo)
+	system.GET("/interfaces/dhcp", getDHCPInterfaces)
 }
 
 func loginHandler(c *gin.Context) {
