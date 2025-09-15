@@ -3,4 +3,6 @@ export const Routes = {
   Login: "/auth/login",
   Leases: "/leases",
   LeaseDetails: "/leases/details",
+  Settings: "/settings",
+  DNS: "/dns",
 };
