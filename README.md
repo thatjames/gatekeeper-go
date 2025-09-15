@@ -4,6 +4,8 @@ GateKeeper is a configurable hobbyist DHCP server written in Go.
 
 It is **not** intended for production use, but it powers my home network just fine!
 
+**UPDATE** Version 2.0.0 brings a new UI and a docker image!
+
 ## Installation
 
 Install gatekeeper from source with `go install gitlab.com/thatjames-go/gatekeeper-go@latest` or download one of the binaries under the [releases](https://gitlab.com/thatjames-go/gatekeeper-go/-/releases) page.
@@ -24,7 +26,33 @@ make docker
 
 ## Running
 
-The binary will look for a `config.yml` file in the PWD, or it can be passed with the `-c <file>` flag.
+### Native
+
+The binary will look for a `config.yml` file in the PWD, or it can be passed with the `-config <file>` flag.
+
+### Docker
+
+You can run the docker image with the following command:
+
+```bash
+docker run --name gatekeeper -dp 8080:8080 -v/path/to/config.yml:/app/config.yml -v /path/to/leases:/var/lib/gatekeeper/leases thatjames/gatekeeper:latest
+```
+
+#### Docker Compose
+
+You can also use docker compose to run the docker image:
+
+````yaml
+version: "3.9"
+services:
+  gatekeeper:
+    image: thatjames/gatekeeper:latest
+    container_name: gatekeeper
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.yml:/app/config.yml
+      - ./leases:/var/lib/gatekeeper/leases
 
 ### Webserver
 
@@ -36,15 +64,27 @@ On Linux, you can create this file using the following commands (requires `opens
 
 ```bash
 echo username:$(echo password | openssl passwd -stdin -apr1) > .htpasswd
-```
+````
 
 Remember to replace `username` and `password` with your own values
 
 #### Screenshots
 
-![home page for the webview, showing various system stats such as uptime and data usage](images/web_home_page.png)
+[WebUI Home Page](images/web_home_page.png)
 
-![dhcp page for the webview, showing various system dhcp stats such as assigned leases and options](images/web_dhcp_view.png)
+[WebUI DHCP View](images/web_dhcp_active_leases.png)
+
+[WebUI DHCP Active Lease Options](images/web_dhcp_active_lease_options.png)
+
+[WebUI DHCP Reserved Leases](images/web_dhcp_reserved_leases.png)
+
+[WebUI DHCP Reserved Lease Options](images/web_dhcp_reserved_lease_options.png)
+
+[WebUI DHCP Options](images/web_dhcp_options_display.png)
+
+[WebUI DHCP Options Config](images/web_dhcp_options_form.png)
+
+[WebUI DHCP View]
 
 ## Configuration
 
@@ -53,21 +93,23 @@ Example config:
 ```yaml
 DHCP:
   Interface: eth0
-  DomainName: gatekeeper
   StartAddr: 10.0.0.2
   EndAddr: 10.0.0.99
-  LeaseTTL: 300
-  SubnetMask: 255.255.255.0
-  Router: 10.0.0.1
+  DomainName: international-space-station
   NameServers:
     - 8.8.8.8
     - 1.1.1.1
+  LeaseTTL: 300
+  SubnetMask: 255.255.255.0
+  Gateway: 10.0.0.1
   ReservedAddresses:
-    aa:aa:aa:aa:aa:aa: 10.0.0.100
-
+    00:d8:61:39:b5:6a: 10.0.0.101
+    bc:5f:f4:ac:ea:c4: 10.0.0.100
+  LeaseFile: /var/lib/gatekeeper/leases
 Web:
-  Address: :8080
+  Address: :8085
   HTPasswdFile: .htpasswd
+  Prometheus: true
 ```
 
 ### DHCP
@@ -92,15 +134,15 @@ The last assignable DHCP address gatekeeper will hand out. This makes the effect
 
 #### Lease TTL
 
-Time To Live for given leases
+Time To Live for given leases, in seconds. Our example has a TLL of 300 seconds, or 5 minutes.
 
 #### SubnetMask
 
 The subnet mask option returned in the DHCP response
 
-#### Router
+#### Gateway
 
-The router option returned in the DHCP response
+The gateway option returned in the DHCP response
 
 #### NameServers:
 
@@ -121,5 +163,9 @@ Listen address the webserver should bind to
 #### HTPasswdFile
 
 Relative or Fully Qualified path to the htaccess file
+
+#### Prometheus
+
+If true, the webserver will expose a prometheus metrics endpoint at `/metrics`
 
 **note:** if no `HTPasswdFile` is provided, then the default username/password is admin/admin
