@@ -4,7 +4,7 @@
   export let settings = {};
 </script>
 
-<form class="m:w-1/2 w-150 m-auto">
+<form class="m:w-1/2">
   <div class="flex flex-col gap-2 md:grid md:grid-cols-2 md:gap-4">
     <Label for="interface" class="mb-2">Interface</Label>
     <Input

@@ -23,11 +23,23 @@
   };
 </script>
 
-<div class="flex flex-col gap-5 w-full">
+<div class="flex flex-col gap-5 justify-center">
   {#if edit}
-    <Heading tag="h4">Settings</Heading>
-    <SettingsForm bind:settings />
-    <Button onclick={saveSettings} class="w-1/3 mx-auto">Save</Button>
+    <Heading tag="h4">Edit Settings</Heading>
+    <div class="w-4/5 mx-auto flex flex-col gap-5">
+      <SettingsForm bind:settings />
+      <div class="grid grid-cols-2 gap-5">
+        <Button outline onclick={saveSettings} class="w-full mx-auto"
+          >Save</Button
+        >
+        <Button
+          outline
+          color="alternative"
+          onclick={() => (edit = false)}
+          class="w-full mx-auto">Cancel</Button
+        >
+      </div>
+    </div>
   {:else}
     <div class="flex gap-5 items-center">
       <Heading tag="h4">Settings</Heading>
