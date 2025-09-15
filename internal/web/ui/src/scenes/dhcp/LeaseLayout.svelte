@@ -4,7 +4,7 @@
     getLeases,
     reserveLease,
     updateLease,
-  } from "$lib/lease/lease";
+  } from "$lib/dhcp/lease";
   import {
     Button,
     Heading,
@@ -97,15 +97,14 @@
 
   const handleError = (error) => {
     if (error.fields && Array.isArray(error.fields)) {
-      const newFieldErrors = {};
-      error.fields.forEach((fieldError) => {
-        newFieldErrors[fieldError.field] = fieldError.message;
-      });
-      fieldErrors = newFieldErrors;
-    }
+      fieldErrors = error.fields.reduce((acc, fieldError) => {
+        acc[fieldError.field] = fieldError.message;
+        return acc;
+      }, {});
 
-    if (error.error) {
-      generalError = error.error;
+      if (error.error) {
+        generalError = error.error;
+      }
     }
   };
 

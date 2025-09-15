@@ -66,7 +66,7 @@ type DHCP struct {
 	NameServers       []string          `yaml:"NameServers"`
 	LeaseTTL          int               `yaml:"LeaseTTL"`
 	SubnetMask        string            `yaml:"SubnetMask"`
-	Router            string            `yaml:"Router"`
+	Gateway           string            `yaml:"Gateway"`
 	ReservedAddresses map[string]string `yaml:"ReservedAddresses"`
 	LeaseFile         string            `yaml:"LeaseFile"`
 }

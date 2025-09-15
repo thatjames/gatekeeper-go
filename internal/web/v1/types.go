@@ -101,16 +101,113 @@ type Lease struct {
 	Expiry   string `json:"expiry"`
 }
 
-type DhcpOptionsResponse struct {
-	Interface      string            `json:"interface"`
-	StartAddr      string            `json:"startAddr"`
-	EndAddr        string            `json:"endAddr"`
-	LeaseTTL       int               `json:"leaseTTL"`
-	Router         string            `json:"router"`
-	SubnetMask     string            `json:"subnetMask"`
-	DomainName     string            `json:"domainName"`
-	ReservedLeases map[string]string `json:"reservedLeases"`
-	LeaseFile      string            `json:"leaseFile"`
+type DhcpOptions struct {
+	Interface  string `json:"interface"`
+	StartAddr  string `json:"startAddr"`
+	EndAddr    string `json:"endAddr"`
+	LeaseTTL   int    `json:"leaseTTL"`
+	Gateway    string `json:"gateway"`
+	SubnetMask string `json:"subnetMask"`
+	DomainName string `json:"domainName"`
+	LeaseFile  string `json:"leaseFile"`
+}
+
+func (opts *DhcpOptions) Validate() []ValidationError {
+	validationErrors := make([]ValidationError, 0)
+	if opts.Interface == "" {
+		validationErrors = append(validationErrors, ValidationError{
+			Field:   "interface",
+			Message: "Interface is required",
+		})
+	}
+	if opts.StartAddr == "" {
+		validationErrors = append(validationErrors, ValidationError{
+			Field:   "startAddr",
+			Message: "Start address is required",
+		})
+	} else {
+		ipRegex := regexp.MustCompile(`^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$`)
+		if !ipRegex.MatchString(opts.StartAddr) {
+			validationErrors = append(validationErrors, ValidationError{
+				Field:   "startAddr",
+				Message: "Start address must be a valid IP address",
+			})
+		} else if net.ParseIP(opts.StartAddr).To4() == nil {
+			validationErrors = append(validationErrors, ValidationError{
+				Field:   "startAddr",
+				Message: "Start address must be a valid IPv4 address",
+			})
+		}
+	}
+	if opts.EndAddr == "" {
+		validationErrors = append(validationErrors, ValidationError{
+			Field:   "endAddr",
+			Message: "End address is required",
+		})
+	} else {
+		ipRegex := regexp.MustCompile(`^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$`)
+		if !ipRegex.MatchString(opts.EndAddr) {
+			validationErrors = append(validationErrors, ValidationError{
+				Field:   "endAddr",
+				Message: "End address must be a valid IP address",
+			})
+		} else if net.ParseIP(opts.EndAddr).To4() == nil {
+			validationErrors = append(validationErrors, ValidationError{
+				Field:   "endAddr",
+				Message: "End address must be a valid IPv4 address",
+			})
+		}
+	}
+
+	if opts.LeaseTTL == 0 {
+		validationErrors = append(validationErrors, ValidationError{
+			Field:   "leaseTTL",
+			Message: "Lease TTL is required",
+		})
+	}
+	if opts.Gateway == "" {
+		validationErrors = append(validationErrors, ValidationError{
+			Field:   "gateway",
+			Message: "Gateway is required",
+		})
+	} else {
+		ipRegex := regexp.MustCompile(`^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$`)
+		if !ipRegex.MatchString(opts.Gateway) {
+			validationErrors = append(validationErrors, ValidationError{
+				Field:   "gateway",
+				Message: "Gateway must be a valid IP address",
+			})
+		} else if net.ParseIP(opts.Gateway).To4() == nil {
+			validationErrors = append(validationErrors, ValidationError{
+				Field:   "gateway",
+				Message: "Gateway must be a valid IPv4 address",
+			})
+		}
+	}
+	if opts.SubnetMask == "" {
+		validationErrors = append(validationErrors, ValidationError{
+			Field:   "subnetMask",
+			Message: "Subnet mask is required",
+		})
+	} else {
+		ipRegex := regexp.MustCompile(`^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$`)
+		if !ipRegex.MatchString(opts.SubnetMask) {
+			validationErrors = append(validationErrors, ValidationError{
+				Field:   "subnetMask",
+				Message: "Subnet mask must be a valid IP address",
+			})
+		} else if net.ParseIP(opts.SubnetMask).To4() == nil {
+			validationErrors = append(validationErrors, ValidationError{
+				Field:   "subnetMask",
+				Message: "Subnet mask must be a valid IPv4 address",
+			})
+		}
+	}
+
+	if len(validationErrors) > 0 {
+		return validationErrors
+	}
+	return nil
 }
 
 func MapLease(lease dhcp.Lease) Lease {

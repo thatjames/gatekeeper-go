@@ -51,6 +51,7 @@ type DHCPServer struct {
 	broadcastAddr net.IP
 	requestChan   chan *DHCPPacket
 	responseChan  chan *DHCPPacket
+	stopChan      chan struct{}
 }
 
 type DHCPServerOpts struct {
@@ -59,7 +60,7 @@ type DHCPServerOpts struct {
 	EndAt          net.IP
 	NameServers    []net.IP
 	LeaseTTL       int
-	Router         net.IP
+	Gateway        net.IP
 	SubnetMask     net.IP
 	DomainName     string
 	ReservedLeases map[string]string
@@ -87,7 +88,7 @@ func NewDHCPServerFromConfig(config *config.DHCP) *DHCPServer {
 		EndAt:          net.ParseIP(config.EndAddr).To4(),
 		NameServers:    nameServers,
 		LeaseTTL:       config.LeaseTTL,
-		Router:         net.ParseIP(config.Router).To4(),
+		Gateway:        net.ParseIP(config.Gateway).To4(),
 		SubnetMask:     net.ParseIP(config.SubnetMask).To4(),
 		DomainName:     config.DomainName,
 		ReservedLeases: config.ReservedAddresses,
@@ -108,6 +109,7 @@ func NewDHCPServerWithOpts(opts *DHCPServerOpts) *DHCPServer {
 
 func (z *DHCPServer) Start() error {
 	log.Debug("looking for interface ", z.opts.Interface)
+	z.stopChan = make(chan struct{})
 	iface, err := net.InterfaceByName(z.opts.Interface)
 	if err != nil {
 		return err
@@ -187,6 +189,9 @@ func (z *DHCPServer) Stop() error {
 		return err
 	}
 
+	close(z.stopChan)
+	z.packetConn.Close()
+
 	return z.issuedLeases.PeristLeases(z.opts.LeaseFile)
 }
 
@@ -198,21 +203,31 @@ func (z *DHCPServer) Options() *DHCPServerOpts {
 	return z.opts
 }
 
+func (z *DHCPServer) UpdateOptions(opts *DHCPServerOpts) error {
+	z.opts = opts
+	return nil
+}
+
 func (z *DHCPServer) listen() {
 	buff := make([]byte, 1500)
 	for {
-		n, addr, err := z.packetConn.ReadFrom(buff)
-		if err != nil {
-			log.Error("unable to read datastream: ", err.Error())
-			continue
-		}
-
-		if msg := Message(buff[:n]); n >= 240 && msg.OpCode() == OpRequest {
-			z.requestChan <- &DHCPPacket{
-				Message:      msg,
-				ResponseAddr: addr,
+		select {
+		case <-z.stopChan:
+			return
+		default:
+			n, addr, err := z.packetConn.ReadFrom(buff)
+			if err != nil {
+				log.Error("unable to read datastream: ", err.Error())
+				continue
 			}
 
+			if msg := Message(buff[:n]); n >= 240 && msg.OpCode() == OpRequest {
+				z.requestChan <- &DHCPPacket{
+					Message:      msg,
+					ResponseAddr: addr,
+				}
+
+			}
 		}
 	}
 }
@@ -268,7 +283,7 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 		responseOptions[OptionServerIdentifier] = z.interfaceAddr.To4()
 		responseOptions[OptionIPLeaseTime] = make([]byte, 4)
 		binary.BigEndian.PutUint32(responseOptions[OptionIPLeaseTime], uint32(z.opts.LeaseTTL))
-		responseOptions[OptionRouter] = z.opts.Router.To4()
+		responseOptions[OptionGateway] = z.opts.Gateway.To4()
 		responseOptions[OptionSubnetMask] = z.opts.SubnetMask.To4()
 		nameServers := make([]byte, 4*len(z.opts.NameServers))
 		for i, nameServer := range z.opts.NameServers {
@@ -329,7 +344,7 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 		responseOptions[OptionServerIdentifier] = z.interfaceAddr.To4()
 		responseOptions[OptionIPLeaseTime] = make([]byte, 4)
 		binary.BigEndian.PutUint32(responseOptions[OptionIPLeaseTime], uint32(z.opts.LeaseTTL))
-		responseOptions[OptionRouter] = z.opts.Router.To4()
+		responseOptions[OptionGateway] = z.opts.Gateway.To4()
 		responseOptions[OptionSubnetMask] = z.opts.SubnetMask.To4()
 		nameServers := make([]byte, 4*len(z.opts.NameServers))
 		for i, nameServer := range z.opts.NameServers {

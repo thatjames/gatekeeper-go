@@ -29,6 +29,7 @@ func setupDHCPRoutes(g *gin.RouterGroup) {
 	dhcp.POST("/leases/reserve", reserveLease)
 	dhcp.PUT("/leases", updateLease)
 	dhcp.GET("/options", getDHCPOptions)
+	dhcp.PUT("/options", updateDHCPOptions)
 }
 
 func setupSystemRoutes(g *gin.RouterGroup) {

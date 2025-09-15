@@ -62,7 +62,7 @@ const (
 	OptionPad                       OptionTag = iota //0
 	OptionSubnetMask                                 //1
 	OptionTimeOffset                                 //2
-	OptionRouter                                     //3
+	OptionGateway                                    //3
 	OptionTimeServer                                 //4
 	OptionNameServer                                 //5
 	OptionDomainNameServer                           //6
@@ -88,7 +88,7 @@ const (
 	OptionEndField          OptionTag = 255
 )
 
-//DHCP Extensions
+// DHCP Extensions
 const (
 	OptionRequestedIPAddress   OptionTag = iota + 50 //50
 	OptionIPLeaseTime                                //51
@@ -145,8 +145,8 @@ func (o OptionTag) String() string {
 		return "SubnetMask"
 	case OptionTimeOffset:
 		return "TimeOffset"
-	case OptionRouter:
-		return "Router"
+	case OptionGateway:
+		return "Gateway"
 	case OptionTimeServer:
 		return "TimeServer"
 	case OptionNameServer:
@@ -223,7 +223,7 @@ var DHCPCookie = []byte{99, 130, 83, 99}
 // The entire packet needs to be 300 bytes when sent over UDP
 var zeroes [300]byte
 
-//DHCP Message
+// DHCP Message
 type Message []byte
 
 func NewMessage(opCode OpCode) Message {

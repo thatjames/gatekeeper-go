@@ -3,7 +3,7 @@
   import SideMenu from "$components/SideMenu.svelte";
   import { MenuComponent } from "$lib/common/menu-types";
   import { Routes } from "$lib/common/routes";
-  import { getLeases } from "$lib/lease/lease";
+  import { getLeases } from "$lib/dhcp/lease";
   import { Button, P } from "flowbite-svelte";
   import {
     CogOutline,
@@ -20,10 +20,10 @@
       asyncComponent: () => import("$scenes/home/HomeScreen.svelte"),
     }),
     "/dhcp/leases": wrap({
-      asyncComponent: () => import("$scenes/leases/LeaseLayout.svelte"),
+      asyncComponent: () => import("$scenes/dhcp/LeaseLayout.svelte"),
     }),
     "/dhcp/settings": wrap({
-      asyncComponent: () => import("$scenes/settings/SettingsLayout.svelte"),
+      asyncComponent: () => import("$scenes/dhcp/OptionsLayout.svelte"),
     }),
   };
 

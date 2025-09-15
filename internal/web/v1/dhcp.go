@@ -39,16 +39,81 @@ func deleteLease(c *gin.Context) {
 func getDHCPOptions(c *gin.Context) {
 	dhcpService := service.GetService[*dhcp.DHCPServer](service.DHCP)
 	opts := dhcpService.Options()
-	c.JSON(http.StatusOK, DhcpOptionsResponse{
+	c.JSON(http.StatusOK, DhcpOptions{
+		Interface:  opts.Interface,
+		StartAddr:  opts.StartFrom.String(),
+		EndAddr:    opts.EndAt.String(),
+		LeaseTTL:   opts.LeaseTTL,
+		Gateway:    opts.Gateway.String(),
+		SubnetMask: opts.SubnetMask.String(),
+		DomainName: opts.DomainName,
+		LeaseFile:  opts.LeaseFile,
+	})
+}
+
+func updateDHCPOptions(c *gin.Context) {
+	dhcpService := service.GetService[*dhcp.DHCPServer](service.DHCP)
+	var opts DhcpOptions
+	if err := c.ShouldBindJSON(&opts); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		return
+	} else if validationErrors := opts.Validate(); validationErrors != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:  "Unable to update options",
+			Fields: validationErrors,
+		})
+		return
+	}
+	var oldOpts = new(dhcp.DHCPServerOpts)
+	*oldOpts = *dhcpService.Options()
+	dhcpService.UpdateOptions(&dhcp.DHCPServerOpts{
 		Interface:      opts.Interface,
-		StartAddr:      opts.StartFrom.String(),
-		EndAddr:        opts.EndAt.String(),
+		StartFrom:      net.ParseIP(opts.StartAddr).To4(),
+		EndAt:          net.ParseIP(opts.EndAddr).To4(),
 		LeaseTTL:       opts.LeaseTTL,
-		Router:         opts.Router.String(),
-		SubnetMask:     opts.SubnetMask.String(),
+		Gateway:        net.ParseIP(opts.Gateway).To4(),
+		SubnetMask:     net.ParseIP(opts.SubnetMask).To4(),
 		DomainName:     opts.DomainName,
-		ReservedLeases: opts.ReservedLeases,
 		LeaseFile:      opts.LeaseFile,
+		ReservedLeases: dhcpService.Options().ReservedLeases,
+	})
+
+	if err := dhcpService.Stop(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		dhcpService.UpdateOptions(oldOpts)
+		return
+	} else if err = dhcpService.Start(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		dhcpService.UpdateOptions(oldOpts)
+		// recover the service
+		dhcpService.Start()
+		return
+	}
+	config.Config.DHCP = &config.DHCP{
+		Interface:         opts.Interface,
+		StartAddr:         opts.StartAddr,
+		EndAddr:           opts.EndAddr,
+		LeaseTTL:          opts.LeaseTTL,
+		Gateway:           opts.Gateway,
+		SubnetMask:        opts.SubnetMask,
+		DomainName:        opts.DomainName,
+		LeaseFile:         opts.LeaseFile,
+		ReservedAddresses: dhcpService.Options().ReservedLeases,
+	}
+	if err := config.UpdateConfig(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		dhcpService.UpdateOptions(oldOpts)
+		return
+	}
+	c.JSON(http.StatusOK, DhcpOptions{
+		Interface:  opts.Interface,
+		StartAddr:  opts.StartAddr,
+		EndAddr:    opts.EndAddr,
+		LeaseTTL:   opts.LeaseTTL,
+		Gateway:    opts.Gateway,
+		SubnetMask: opts.SubnetMask,
+		DomainName: opts.DomainName,
+		LeaseFile:  opts.LeaseFile,
 	})
 }
 

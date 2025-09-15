@@ -1,6 +1,6 @@
 <script>
   import { Heading } from "flowbite-svelte";
-  import SimpleCard from "./SimpleCard.svelte";
+  import SimpleCard from "../../components/SimpleCard.svelte";
 
   export let settings = {};
 </script>
@@ -11,7 +11,7 @@
     <SimpleCard title="Start Address" description={settings.startAddr} />
     <SimpleCard title="End Address" description={settings.endAddr} />
     <SimpleCard title="Lease TTL" description={settings.leaseTTL} />
-    <SimpleCard title="Router" description={settings.router} />
+    <SimpleCard title="Gateway" description={settings.gateway} />
     <SimpleCard title="Subnet Mask" description={settings.subnetMask} />
     <SimpleCard title="Domain Name" description={settings.domainName} />
     <SimpleCard title="Lease File" description={settings.leaseFile} />
