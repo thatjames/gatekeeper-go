@@ -169,7 +169,7 @@ func (l *LeasePool) NextAvailableLease(clientId string) *Lease {
 	return nil
 }
 
-func (l *LeasePool) ReserveLease(clientID string, reservedIP net.IP) {
+func (l *LeasePool) ReserveLease(clientID string, reservedIP net.IP) error {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	for _, lease := range l.leases {
@@ -179,7 +179,14 @@ func (l *LeasePool) ReserveLease(clientID string, reservedIP net.IP) {
 			break
 		}
 	}
+	for _, lease := range l.reservedAddresses {
+		if lease.ClientId != clientID && lease.IP.Equal(reservedIP) {
+			log.Errorf("ip %s already reserved for client %s", reservedIP.String(), lease.ClientId)
+			return errors.New("ip already reserved")
+		}
+	}
 	l.reservedAddresses[clientID] = &Lease{ClientId: clientID, IP: reservedIP, State: LeaseReserved}
+	return nil
 }
 
 func (l *LeasePool) PeristLeases(file string) error {

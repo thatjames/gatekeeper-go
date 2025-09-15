@@ -20,4 +20,6 @@
   }
 </script>
 
-<Router {routes} />
+<div class="h-full 2xl:w-1/2 m-auto">
+  <Router {routes} />
+</div>

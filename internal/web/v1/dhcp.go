@@ -65,7 +65,18 @@ func reserveLease(c *gin.Context) {
 		})
 		return
 	}
-	dhcpService.LeaseDB().ReserveLease(lease.ClientId, net.ParseIP(lease.IP).To4())
+	if err := dhcpService.LeaseDB().ReserveLease(lease.ClientId, net.ParseIP(lease.IP).To4()); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error: err.Error(),
+			Fields: []ValidationError{
+				{
+					Field:   "ip",
+					Message: "IP already reserved",
+				},
+			},
+		})
+		return
+	}
 	config.Config.DHCP.ReservedAddresses[lease.ClientId] = lease.IP
 	if err := config.UpdateConfig(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

@@ -23,7 +23,7 @@
   };
 </script>
 
-<div class="flex flex-col gap-5">
+<div class="flex flex-col gap-5 w-full">
   {#if edit}
     <Heading tag="h4">Settings</Heading>
     <SettingsForm bind:settings />

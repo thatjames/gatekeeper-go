@@ -4,7 +4,7 @@
   export let settings = {};
 </script>
 
-<form class="m:w-1/2 m-auto">
+<form class="m:w-1/2 w-150 m-auto">
   <div class="flex flex-col gap-2 md:grid md:grid-cols-2 md:gap-4">
     <Label for="interface" class="mb-2">Interface</Label>
     <Input
@@ -62,8 +62,6 @@
       required
       bind:value={settings.domainName}
     />
-    <!-- <Label for="reservedLeases" class="mb-2">Reserved Leases</Label>
-      <Textarea id="reservedLeases" required class="w-full"></Textarea> -->
     <Label for="leaseFile" class="mb-2">Lease File</Label>
     <Input
       type="text"
