@@ -42,17 +42,18 @@ docker run --name gatekeeper -dp 8080:8080 -v/path/to/config.yml:/app/config.yml
 
 You can also use docker compose to run the docker image:
 
-````yaml
-version: "3.9"
+```yaml
+version: '3.9'
 services:
   gatekeeper:
     image: smokeycircles/gatekeeper:latest
     container_name: gatekeeper
     ports:
-      - "8080:8080"
+      - '8080:8080'
     volumes:
       - ./config.yml:/app/config.yml
       - ./leases:/var/lib/gatekeeper/leases
+```
 
 ### Webserver
 
@@ -64,7 +65,7 @@ On Linux, you can create this file using the following commands (requires `opens
 
 ```bash
 echo username:$(echo password | openssl passwd -stdin -apr1) > .htpasswd
-````
+```
 
 Remember to replace `username` and `password` with your own values
 
