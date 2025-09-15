@@ -17,7 +17,7 @@ docker-binary: web test ## Builds the docker binary
 	env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/gatekeeper cmd/gatekeeper/main.go
 
 docker: docker-binary ## Builds the docker binary, the web ui and the docker image
-	docker build -t thatjames/gatekeeper .
+	docker build -t smokeycircles/gatekeeper .
 
 ##@ Test
 test: generate-mocks ## Runs the golang unit tests
@@ -29,7 +29,7 @@ test-report: generate-mocks ## Runs the golang unit tests and generates a test r
 
 ##@ Run
 docker-run: ## Runs the docker image
-	docker run --name gatekeeper --rm -ti -v $(PWD)/config/docker-config.yml:/app/config.yml -v /tmp/leases:/var/lib/gatekeeper -p 8085:8085 thatjames/gatekeeper -debug
+	docker run --name gatekeeper --rm -ti -v $(PWD)/config/docker-config.yml:/app/config.yml -v /tmp/leases:/var/lib/gatekeeper -p 8085:8085 smokeycircles/gatekeeper -debug
 
 ##@ Web
 install: ## Installs the web ui

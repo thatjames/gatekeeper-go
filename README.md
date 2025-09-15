@@ -35,7 +35,7 @@ The binary will look for a `config.yml` file in the PWD, or it can be passed wit
 You can run the docker image with the following command:
 
 ```bash
-docker run --name gatekeeper -dp 8080:8080 -v/path/to/config.yml:/app/config.yml -v /path/to/leases:/var/lib/gatekeeper/leases thatjames/gatekeeper:latest
+docker run --name gatekeeper -dp 8080:8080 -v/path/to/config.yml:/app/config.yml -v /path/to/leases:/var/lib/gatekeeper/leases smokeycircles/gatekeeper:latest
 ```
 
 #### Docker Compose
@@ -46,7 +46,7 @@ You can also use docker compose to run the docker image:
 version: "3.9"
 services:
   gatekeeper:
-    image: thatjames/gatekeeper:latest
+    image: smokeycircles/gatekeeper:latest
     container_name: gatekeeper
     ports:
       - "8080:8080"
