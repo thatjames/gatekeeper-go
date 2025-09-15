@@ -7,6 +7,12 @@ api.get("/system/interfaces/dhcp").then((resp) => {
   dhcpInterfaces.set(resp);
 });
 
+export let version = writable("1.0.0");
+
+api.get("/system/version").then((resp) => {
+  version.set(resp.version);
+});
+
 export const getSystemInfo = () => {
   return api.get("/system/info");
 };

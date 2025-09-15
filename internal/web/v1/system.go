@@ -32,3 +32,9 @@ func getDHCPInterfaces(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, interfaces)
 }
+
+func getVersion(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"version": system.Version,
+	})
+}

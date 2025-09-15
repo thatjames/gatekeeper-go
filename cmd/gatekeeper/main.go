@@ -13,6 +13,7 @@ import (
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/system"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/web"
 )
 
@@ -36,6 +37,7 @@ func main() {
 	}
 	log.Info("Starting gatekeeper")
 	log.Info("Version ", version)
+	system.Version = version
 	log.Debugf("Config: %v", config.Config)
 
 	if config.Config.DHCP != nil {
