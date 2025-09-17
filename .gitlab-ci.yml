@@ -68,6 +68,8 @@ build_web:
 test-coverage:
   <<: *go_common
   stage: test
+  dependencies:
+    - build_web
   rules:
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH
