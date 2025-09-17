@@ -7,6 +7,10 @@ import (
 	"net"
 )
 
+var (
+	ErrDNSPacketTooShort = errors.New("DNS packet too short for header")
+)
+
 type DNSType uint16
 
 const (
@@ -99,7 +103,7 @@ type DNSPacket struct {
 
 func ParseDNSPacket(data []byte) (*DNSPacket, error) {
 	if len(data) < 12 {
-		return nil, errors.New("DNS packet too short for header")
+		return nil, ErrDNSPacketTooShort
 	}
 
 	var dnsPacket DNSPacket
@@ -196,7 +200,8 @@ func parseDNSName(data []byte, offset int) (string, int, error) {
 	originalOffset := offset
 	jumped := false
 	jumps := 0
-	maxJumps := 5 // Prevent infinite loops
+	maxJumps := 5                 // Prevent infinite loops
+	visited := make(map[int]bool) // Track visited positions to prevent loops
 
 	for {
 		if offset >= len(data) {
@@ -210,14 +215,34 @@ func parseDNSName(data []byte, offset int) (string, int, error) {
 			if offset+1 >= len(data) {
 				return "", offset, errors.New("incomplete compression pointer")
 			}
+
 			// Extract 14-bit offset
 			pointer := int(binary.BigEndian.Uint16(data[offset:offset+2]) & 0x3FFF)
+
+			// Validate pointer is within packet bounds
+			if pointer >= len(data) {
+				return "", offset, fmt.Errorf("compression pointer %d exceeds packet length %d", pointer, len(data))
+			}
+
+			// Prevent pointing to locations that would cause loops
+			if visited[pointer] {
+				return "", offset, errors.New("compression pointer loop detected")
+			}
+			visited[pointer] = true
+
+			// Ensure we're not pointing to another compression pointer immediately
+			// (this would be valid but we need to be careful about infinite loops)
+			if pointer == offset {
+				return "", offset, errors.New("compression pointer points to itself")
+			}
+
 			if !jumped {
 				originalOffset = offset + 2 // Save position after pointer
 			}
 			offset = pointer
 			jumped = true
 			jumps++
+
 			if jumps > maxJumps {
 				return "", offset, errors.New("too many compression jumps")
 			}
@@ -229,6 +254,11 @@ func parseDNSName(data []byte, offset int) (string, int, error) {
 		// End of name
 		if length == 0 {
 			break
+		}
+
+		// Validate label length is reasonable (DNS labels max 63 bytes)
+		if length > 63 {
+			return "", offset, fmt.Errorf("invalid label length %d (max 63)", length)
 		}
 
 		// Check bounds for label
@@ -244,6 +274,11 @@ func parseDNSName(data []byte, offset int) (string, int, error) {
 		// Extract label
 		name += string(data[offset : offset+int(length)])
 		offset += int(length)
+
+		// Prevent excessively long domain names
+		if len(name) > 253 { // DNS name max length
+			return "", offset, errors.New("domain name too long")
+		}
 	}
 
 	// If we jumped, return the saved offset

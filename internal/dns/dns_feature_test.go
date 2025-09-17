@@ -25,6 +25,7 @@ var (
 const (
 	DNSQueryContextKey  = "dnsQuery"
 	DNSPacketContextKey = "dnsPacket"
+	DNSErrorContextKey  = "dnsError"
 )
 
 type DNSFeatureTestSuite struct {
@@ -36,8 +37,6 @@ func (ts *DNSFeatureTestSuite) reset() {
 	ts.resolver = NewDNSResolver()
 	ts.packetBytes = nil
 }
-
-// === DNS PACKET PARSING FEATURES ===
 
 func (ts *DNSFeatureTestSuite) givenTheDNSPacket(ctx context.Context, packetBase64 string) error {
 	decoded, err := base64.StdEncoding.DecodeString(packetBase64)
@@ -51,7 +50,7 @@ func (ts *DNSFeatureTestSuite) givenTheDNSPacket(ctx context.Context, packetBase
 func (ts *DNSFeatureTestSuite) iParseTheDNSPacket(ctx context.Context) (context.Context, error) {
 	packet, err := ParseDNSPacket(ts.packetBytes)
 	if err != nil {
-		return ctx, fmt.Errorf("failed to parse DNS packet: %v", err)
+		return context.WithValue(ctx, DNSErrorContextKey, err), nil
 	}
 	return context.WithValue(ctx, DNSPacketContextKey, packet), nil
 }
@@ -79,12 +78,9 @@ func (ts *DNSFeatureTestSuite) iShouldReceiveADNSQueryFor(ctx context.Context, e
 	return nil
 }
 
-// This function handles the expectation of IP in a DNS packet
-// It should work for RESPONSE packets, not query packets
 func (ts *DNSFeatureTestSuite) iShouldReceiveADNSPacketWithTheIP(ctx context.Context, expectedIP string) error {
 	packet := ctx.Value(DNSPacketContextKey).(*DNSPacket)
 
-	// Check if this is a response
 	if packet.Header.QR != 1 {
 		return fmt.Errorf("expected DNS response packet to contain IP, but got query packet (QR=%d)", packet.Header.QR)
 	}
@@ -109,8 +105,6 @@ func (ts *DNSFeatureTestSuite) iShouldReceiveADNSPacketWithTheIP(ctx context.Con
 
 	return nil
 }
-
-// === DNS RESOLVER FEATURES ===
 
 func (ts *DNSFeatureTestSuite) thatServerHasACacheForWithIP(domain string, ip string) error {
 	ts.resolver.cache[domain] = net.ParseIP(ip).To4()
@@ -143,6 +137,28 @@ func (ts *DNSFeatureTestSuite) theDNSServerShouldRespondWith(ctx context.Context
 	netIP := net.ParseIP(expectedResponse).To4()
 	if !net.IP(dnsRecord.RData).Equal(netIP) {
 		return fmt.Errorf("expected IP %s, but got %s", netIP, dnsRecord.RData)
+	}
+	return nil
+}
+
+func (ts *DNSFeatureTestSuite) iShouldReceiveTheError(ctx context.Context, expectedError string) error {
+	err := ctx.Value(DNSErrorContextKey).(error)
+	if err == nil {
+		return fmt.Errorf("expected error %s, but got nil", expectedError)
+	}
+
+	if err.Error() != expectedError {
+		return fmt.Errorf("expected error %s, but got %s", expectedError, err.Error())
+	}
+
+	return nil
+}
+
+func (ts *DNSFeatureTestSuite) thePacketShouldParse(ctx context.Context) error {
+	if err, ok := ctx.Value(DNSErrorContextKey).(error); ok {
+		if err != nil {
+			return fmt.Errorf("expected packet to parse, but got error: %v", err)
+		}
 	}
 	return nil
 }
@@ -202,14 +218,14 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 		return ctx, nil
 	})
 
-	// DNS Packet Parsing step definitions
 	ctx.Given(`^the DNS packet "([^"]*)"$`, ts.givenTheDNSPacket)
 	ctx.When(`^I parse the DNS packet$`, ts.iParseTheDNSPacket)
 	ctx.Then(`^I should receive a DNS query for "([^"]*)"$`, ts.iShouldReceiveADNSQueryFor)
 	ctx.Then(`^I should receive a DNS packet with the IP "([^"]*)"$`, ts.iShouldReceiveADNSPacketWithTheIP)
 
-	// DNS Resolver step definitions
 	ctx.Given(`^the resolver has a cache for "([^"]*)" with IP "([^"]*)"$`, ts.thatServerHasACacheForWithIP)
 	ctx.When(`^I send a DNS request A for "([^"]*)"$`, ts.iSendADNSRequestAFor)
 	ctx.Then(`^I should receive a valid DNS response with IP "([^"]*)"$`, ts.theDNSServerShouldRespondWith)
+	ctx.Then(`^I should receive the error "([^"]*)"$`, ts.iShouldReceiveTheError)
+	ctx.Step(`^The packet should parse`, ts.thePacketShouldParse)
 }
