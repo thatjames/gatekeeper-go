@@ -12,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/dns"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/system"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/web"
@@ -49,7 +50,11 @@ func main() {
 
 	if config.Config.DNS != nil {
 		log.Info("Registering DNS server")
-		dnsServer := dns.NewDNSServer(dns.NewDNSResolverFromConfig(config.Config.DNS))
+		dnsServer := dns.NewDNSServerWithOpts(dns.DNSServerOpts{
+			Interface: config.Config.DNS.Interface,
+			Port:      config.Config.DNS.Port,
+			Upstream:  config.Config.DNS.UpstreamServers,
+		})
 		service.Register(dnsServer, service.DNS)
 	}
 

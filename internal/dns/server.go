@@ -33,10 +33,10 @@ func NewDNSServer() *DNSServer {
 	}
 }
 
-func NewDNSServerWithOpts(opts *DNSServerOpts) *DNSServer {
+func NewDNSServerWithOpts(opts DNSServerOpts) *DNSServer {
 	return &DNSServer{
 		resolver:   NewDNSResolver(),
-		opts:       opts,
+		opts:       &opts,
 		packetConn: nil,
 	}
 }
