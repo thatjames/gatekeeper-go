@@ -4,6 +4,6 @@ Feature: DNS Requests
   I want to be able to handle DNS requests
 
   Scenario: A DNS request
-    Given I have a DNS server
+    Given the resolver has a cache for "slimjim.xyz" with IP "10.0.0.1"
     When I send a DNS request A for "slimjim.xyz"
     Then I should receive a valid DNS response with IP "10.0.0.1"

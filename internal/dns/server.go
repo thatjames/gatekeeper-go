@@ -1,6 +1,13 @@
 package dns
 
 type DNSServer struct {
+	resolver *DNSResolver
+}
+
+func NewDNSServer(resolver *DNSResolver) *DNSServer {
+	return &DNSServer{
+		resolver: resolver,
+	}
 }
 
 func (d *DNSServer) Start() error {
