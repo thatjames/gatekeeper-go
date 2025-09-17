@@ -24,6 +24,7 @@ type DNSServer struct {
 	resolver     *DNSResolver
 	packetConn   net.PacketConn
 	receiverChan chan *DNSPacket
+	responseChan chan *DNSPacket
 	exitChan     chan struct{}
 }
 
@@ -36,7 +37,8 @@ func NewDNSServerWithOpts(opts DNSServerOpts) *DNSServer {
 		resolver:     NewDNSResolverWithDefaultOpts(),
 		opts:         &opts,
 		packetConn:   nil,
-		receiverChan: make(chan *DNSPacket, 10),
+		receiverChan: make(chan *DNSPacket, 100),
+		responseChan: make(chan *DNSPacket, 100),
 		exitChan:     make(chan struct{}),
 	}
 }
@@ -49,16 +51,19 @@ func (d *DNSServer) Start() error {
 	}
 	go d.listen()
 	go d.receiverWorker()
+	go d.responseWorker()
 	return nil
 }
 
 func (d *DNSServer) Stop() error {
 	log.Info("stopping DNS server")
+	close(d.exitChan)
 	return nil
 }
 
 func (d *DNSServer) listen() {
 	buff := make([]byte, 1500)
+	defer d.packetConn.Close()
 	for {
 		select {
 		case <-d.exitChan:
@@ -86,6 +91,38 @@ func (d *DNSServer) listen() {
 
 func (d *DNSServer) receiverWorker() {
 	for packet := range d.receiverChan {
-		log.Debugf("received DNS packet %s from %s", packet, packet.ResponseAddr.String())
+		log.Debugf("received DNS packet from %s", packet.ResponseAddr.String())
+		response, err := d.resolver.Resolve(packet.DNSMessage.Questions[0].Name)
+		if err != nil {
+			if err == ErrNxDomain {
+				packet.DNSMessage.Header.SetRCODE(RCODENameFailure)
+			} else {
+				packet.DNSMessage.Header.SetRCODE(RCODEServerFailure)
+			}
+			log.Error("unable to resolve: ", err.Error())
+			continue
+		} else {
+			packet.DNSMessage.Header.SetRCODE(RCODESuccess)
+			packet.DNSMessage.Answers = append(make([]DNSRecord, 0), *response)
+		}
+		d.responseChan <- packet
+	}
+}
+
+func (d *DNSServer) responseWorker() {
+	for packet := range d.responseChan {
+		log.Debugf("sending DNS packet to %s", packet.ResponseAddr.String())
+		packet.Header.SetQR(true)
+		data, err := MarshalDNSMessage(packet.DNSMessage)
+		if err != nil {
+			log.Error("unable to marshal DNS packet: ", err.Error())
+			continue
+		}
+		n, err := d.packetConn.WriteTo(data, packet.ResponseAddr)
+		if err != nil {
+			log.Error("unable to send DNS packet: ", err.Error())
+		} else {
+			log.Debugf("sent %d bytes to %s", n, packet.ResponseAddr.String())
+		}
 	}
 }

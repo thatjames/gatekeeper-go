@@ -1,11 +1,16 @@
 package dns
 
 import (
+	"errors"
 	"net"
 	"sort"
 	"time"
 
 	log "github.com/sirupsen/logrus"
+)
+
+var (
+	ErrNxDomain = errors.New("domain unavailable/blocked")
 )
 
 type DNSResolver struct {
@@ -57,8 +62,7 @@ func (r *DNSResolver) Resolve(domain string) (*DNSRecord, error) {
 	log.Debugf("resolving %s", domain)
 	if index := sort.SearchStrings(r.blacklist, domain); index < len(r.blacklist) && r.blacklist[index] == domain {
 		log.Debugf("found %s in blacklist", domain)
-		//TODO return NXDOMAIN
-		return nil, nil
+		return nil, ErrNxDomain
 	}
 	if cacheItem, ok := r.cache[domain]; ok {
 		if cacheItem.ttl.After(time.Now()) {
@@ -69,7 +73,13 @@ func (r *DNSResolver) Resolve(domain string) (*DNSRecord, error) {
 		}
 	}
 	//TODO return NXDOMAIN
-	return nil, nil
+	return &DNSRecord{
+		Name:  domain,
+		Type:  DNSTypeA,
+		Class: 1,
+		TTL:   300,
+		RData: net.ParseIP("10.0.0.1"),
+	}, nil
 }
 
 func (r *DNSResolver) Lookup(domain string) (*DNSRecord, error) {

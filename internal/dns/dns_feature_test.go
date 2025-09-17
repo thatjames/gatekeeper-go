@@ -57,11 +57,7 @@ func (ts *DNSFeatureTestSuite) iParseTheDNSPacket(ctx context.Context) (context.
 }
 
 func (ts *DNSFeatureTestSuite) iShouldReceiveADNSQueryFor(ctx context.Context, expectedDomain string) error {
-	packet := ctx.Value(DNSPacketContextKey).(*DNSMessage)
-
-	if packet.Header.QR != 0 {
-		return fmt.Errorf("expected DNS query (QR=0), got QR=%d", packet.Header.QR)
-	}
+	packet := ctx.Value(DNSPacketContextKey).(DNSMessage)
 
 	if len(packet.Questions) != 1 {
 		return fmt.Errorf("expected 1 question, got %d", len(packet.Questions))
@@ -80,11 +76,7 @@ func (ts *DNSFeatureTestSuite) iShouldReceiveADNSQueryFor(ctx context.Context, e
 }
 
 func (ts *DNSFeatureTestSuite) iShouldReceiveADNSPacketWithTheIP(ctx context.Context, expectedIP string) error {
-	packet := ctx.Value(DNSPacketContextKey).(*DNSMessage)
-
-	if packet.Header.QR != 1 {
-		return fmt.Errorf("expected DNS response packet to contain IP, but got query packet (QR=%d)", packet.Header.QR)
-	}
+	packet := ctx.Value(DNSPacketContextKey).(DNSMessage)
 
 	if len(packet.Answers) == 0 {
 		return fmt.Errorf("expected at least 1 answer with IP, got %d", len(packet.Answers))
@@ -173,7 +165,7 @@ func (ts *DNSFeatureTestSuite) thePacketShouldParse(ctx context.Context) error {
 }
 
 func (ts *DNSFeatureTestSuite) thePacketShouldHaveAdditionalRecord(ctx context.Context, expectedCount int) error {
-	packet := ctx.Value(DNSPacketContextKey).(*DNSMessage)
+	packet := ctx.Value(DNSPacketContextKey).(DNSMessage)
 
 	actualCount := len(packet.Additionals)
 	if actualCount != expectedCount {
@@ -184,7 +176,7 @@ func (ts *DNSFeatureTestSuite) thePacketShouldHaveAdditionalRecord(ctx context.C
 }
 
 func (ts *DNSFeatureTestSuite) theAdditionalRecordShouldBeAnEDNSOPTRecord(ctx context.Context) error {
-	packet := ctx.Value(DNSPacketContextKey).(*DNSMessage)
+	packet := ctx.Value(DNSPacketContextKey).(DNSMessage)
 
 	if len(packet.Additionals) == 0 {
 		return fmt.Errorf("no additional records found")

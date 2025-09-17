@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 )
 
 var (
-	ErrDNSPacketTooShort = errors.New("DNS packet too short for header")
+	ErrDNSPacketTooShort   = errors.New("DNS packet too short for header")
+	ErrDNSTooManyQuestions = errors.New("DNS packet contains more than 1 question")
 )
 
 type DNSType uint16
@@ -81,21 +83,75 @@ type DNSMessage struct {
 	Additionals []DNSRecord
 }
 
-func (m *DNSMessage) String() string {
-	return fmt.Sprintf("DNS Message: ID=%d, QR=%d, Opcode=%s, AA=%d, TC=%d, RD=%d, RA=%d, Z=%d, RCODE=%d", m.Header.ID, m.Header.QR, m.Header.Opcode, m.Header.AA, m.Header.TC, m.Header.RD, m.Header.RA, m.Header.Z, m.Header.RCODE)
+type DNSHeader struct {
+	ID    uint16
+	Flags uint16
+	/*
+			Bit: 15 14 13 12 11 10  9  8  7  6  5  4  3  2  1  0
+		         QR |   Opcode  |AA|TC|RD|RA|   Z    |   RCODE   |
+	*/
 }
 
-type DNSHeader struct {
-	ID     uint16    // Identification: Identifier for the message
-	QR     uint8     // Query/Response: 0 for a query, 1 for a response
-	Opcode DNSOpCode // Operation Code: See DnsOpCode for more
-	AA     uint8     // Authoritative Answer: This server is an authority for the domain and can return answers
-	TC     uint8     // Truncated: Message was truncated
-	RD     uint8     // Recursion Desired: This message is a query with the recursion desired bit set
-	RA     uint8     // Recursion Available: Message is a response to a query with the recursion available bit set
-	Z      uint8     // Reserved: Reserved for future use
-	RCODE  uint8     // Response Code: Response code
+func (h DNSHeader) SetQR(qr bool) { //where true is a response
+	if qr {
+		h.Flags |= 0x8000
+	} else {
+		h.Flags &= 0x7FFF
+	}
 }
+
+func (h DNSHeader) SetOpcode(opcode DNSOpCode) {
+	h.Flags = (h.Flags & 0x87FF) | (uint16(opcode) << 11)
+}
+
+func (h DNSHeader) SetAA(aa bool) {
+	if aa {
+		h.Flags |= 0x0400
+	} else {
+		h.Flags &= 0xFBFF
+	}
+}
+
+func (h DNSHeader) SetTC(tc bool) {
+	if tc {
+		h.Flags |= 0x0200
+	} else {
+		h.Flags &= 0xFDFF
+	}
+}
+
+func (h DNSHeader) SetRD(rd bool) {
+	if rd {
+		h.Flags |= 0x0100
+	} else {
+		h.Flags &= 0xFEFF
+	}
+}
+
+func (h DNSHeader) SetRA(ra bool) {
+	if ra {
+		h.Flags |= 0x0080
+	} else {
+		h.Flags &= 0xFF7F
+	}
+}
+
+func (h DNSHeader) SetZ(z uint8) {
+	h.Flags = (h.Flags & 0xFF8F) | (uint16(z) << 4)
+}
+
+func (h DNSHeader) SetRCODE(rcode RCODE) {
+	h.Flags = (h.Flags & 0xFFF0) | uint16(rcode)
+}
+
+type RCODE uint8
+
+const (
+	RCODESuccess       RCODE = 0
+	RCODEFormatError   RCODE = 1
+	RCODEServerFailure RCODE = 2
+	RCODENameFailure   RCODE = 3
+)
 
 type DNSQuestion struct {
 	Name  string
@@ -104,15 +160,14 @@ type DNSQuestion struct {
 }
 
 type DNSPacket struct {
-	*DNSMessage
+	DNSMessage
 	ResponseAddr net.Addr
 }
 
-func ParseDNSMessage(data []byte) (*DNSMessage, error) {
+func ParseDNSMessage(data []byte) (DNSMessage, error) {
 	if len(data) < 12 {
-		return nil, ErrDNSPacketTooShort
+		return DNSMessage{}, ErrDNSPacketTooShort
 	}
-
 	var dnsMessage DNSMessage
 	offset := 0
 
@@ -120,16 +175,8 @@ func ParseDNSMessage(data []byte) (*DNSMessage, error) {
 	dnsMessage.Header.ID = binary.BigEndian.Uint16(data[offset : offset+2])
 	offset += 2
 
-	// Parse flags (2 bytes combined)
-	flags := binary.BigEndian.Uint16(data[offset : offset+2])
-	dnsMessage.Header.QR = uint8((flags >> 15) & 0x1)
-	dnsMessage.Header.Opcode = DNSOpCode((flags >> 11) & 0xF)
-	dnsMessage.Header.AA = uint8((flags >> 10) & 0x1)
-	dnsMessage.Header.TC = uint8((flags >> 9) & 0x1)
-	dnsMessage.Header.RD = uint8((flags >> 8) & 0x1)
-	dnsMessage.Header.RA = uint8((flags >> 7) & 0x1)
-	dnsMessage.Header.Z = uint8((flags >> 4) & 0x7)
-	dnsMessage.Header.RCODE = uint8(flags & 0xF)
+	// Parse flags (2 bytes combined) - store the raw flags
+	dnsMessage.Header.Flags = binary.BigEndian.Uint16(data[offset : offset+2])
 	offset += 2
 
 	// Parse counts
@@ -142,26 +189,27 @@ func ParseDNSMessage(data []byte) (*DNSMessage, error) {
 	arCount := binary.BigEndian.Uint16(data[offset : offset+2])
 	offset += 2
 
+	// 99% of real world traffic only uses 1 question, so we will FORMERR if we see more than 1
+	if qdCount > 1 {
+		return DNSMessage{}, ErrDNSTooManyQuestions
+	}
+
 	// Parse questions
 	dnsMessage.Questions = make([]DNSQuestion, 0, qdCount)
 	for i := 0; i < int(qdCount); i++ {
 		var question DNSQuestion
 		var err error
-
 		question.Name, offset, err = parseDNSName(data, offset)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing question name: %v", err)
+			return DNSMessage{}, fmt.Errorf("error parsing question name: %v", err)
 		}
-
 		if offset+4 > len(data) {
-			return nil, errors.New("insufficient data for question type and class")
+			return DNSMessage{}, errors.New("insufficient data for question type and class")
 		}
-
 		question.Type = DNSType(binary.BigEndian.Uint16(data[offset : offset+2]))
 		offset += 2
 		question.Class = binary.BigEndian.Uint16(data[offset : offset+2])
 		offset += 2
-
 		dnsMessage.Questions = append(dnsMessage.Questions, question)
 	}
 
@@ -170,7 +218,7 @@ func ParseDNSMessage(data []byte) (*DNSMessage, error) {
 	for i := 0; i < int(anCount); i++ {
 		record, newOffset, err := parseResourceRecord(data, offset)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing answer record: %v", err)
+			return DNSMessage{}, fmt.Errorf("error parsing answer record: %v", err)
 		}
 		dnsMessage.Answers = append(dnsMessage.Answers, record)
 		offset = newOffset
@@ -181,7 +229,7 @@ func ParseDNSMessage(data []byte) (*DNSMessage, error) {
 	for i := 0; i < int(nsCount); i++ {
 		record, newOffset, err := parseResourceRecord(data, offset)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing authority record: %v", err)
+			return DNSMessage{}, fmt.Errorf("error parsing authority record: %v", err)
 		}
 		dnsMessage.Authorities = append(dnsMessage.Authorities, record)
 		offset = newOffset
@@ -192,13 +240,13 @@ func ParseDNSMessage(data []byte) (*DNSMessage, error) {
 	for i := 0; i < int(arCount); i++ {
 		record, newOffset, err := parseResourceRecord(data, offset)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing additional record: %v", err)
+			return DNSMessage{}, fmt.Errorf("error parsing additional record: %v", err)
 		}
 		dnsMessage.Additionals = append(dnsMessage.Additionals, record)
 		offset = newOffset
 	}
 
-	return &dnsMessage, nil
+	return dnsMessage, nil
 }
 
 // parseDNSName parses a DNS name from the packet, handling compression
@@ -365,4 +413,112 @@ func parseResourceRecord(data []byte, offset int) (DNSRecord, int, error) {
 	offset += int(dataLength)
 
 	return record, offset, nil
+}
+
+func MarshalDNSMessage(msg DNSMessage) ([]byte, error) {
+	var buf []byte
+
+	// Header (12 bytes)
+	header := make([]byte, 12)
+	binary.BigEndian.PutUint16(header[0:2], msg.Header.ID)
+	binary.BigEndian.PutUint16(header[2:4], msg.Header.Flags)
+	binary.BigEndian.PutUint16(header[4:6], uint16(len(msg.Questions)))
+	binary.BigEndian.PutUint16(header[6:8], uint16(len(msg.Answers)))
+	binary.BigEndian.PutUint16(header[8:10], uint16(len(msg.Authorities)))
+	binary.BigEndian.PutUint16(header[10:12], uint16(len(msg.Additionals)))
+	buf = append(buf, header...)
+
+	// Questions
+	for _, q := range msg.Questions {
+		nameBytes, err := marshalDNSName(q.Name)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling question name '%s': %v", q.Name, err)
+		}
+		buf = append(buf, nameBytes...)
+
+		// Type and Class (4 bytes)
+		typeClass := make([]byte, 4)
+		binary.BigEndian.PutUint16(typeClass[0:2], uint16(q.Type))
+		binary.BigEndian.PutUint16(typeClass[2:4], q.Class)
+		buf = append(buf, typeClass...)
+	}
+
+	// Answers
+	for _, r := range msg.Answers {
+		recordBytes, err := marshalResourceRecord(r)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling answer record: %v", err)
+		}
+		buf = append(buf, recordBytes...)
+	}
+
+	// Authorities
+	for _, r := range msg.Authorities {
+		recordBytes, err := marshalResourceRecord(r)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling authority record: %v", err)
+		}
+		buf = append(buf, recordBytes...)
+	}
+
+	// Additionals
+	for _, r := range msg.Additionals {
+		recordBytes, err := marshalResourceRecord(r)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling additional record: %v", err)
+		}
+		buf = append(buf, recordBytes...)
+	}
+
+	return buf, nil
+}
+
+// marshalDNSName converts a domain name string to DNS wire format
+func marshalDNSName(name string) ([]byte, error) {
+	if name == "" {
+		return []byte{0}, nil // Root domain
+	}
+
+	var buf []byte
+	labels := strings.Split(name, ".")
+
+	for _, label := range labels {
+		if len(label) > 63 {
+			return nil, fmt.Errorf("label '%s' too long (max 63 chars)", label)
+		}
+		if len(label) == 0 {
+			continue // Skip empty labels (e.g., trailing dot)
+		}
+
+		buf = append(buf, byte(len(label)))
+		buf = append(buf, []byte(label)...)
+	}
+
+	buf = append(buf, 0) // Null terminator
+	return buf, nil
+}
+
+// marshalResourceRecord converts a DNSRecord to bytes
+func marshalResourceRecord(record DNSRecord) ([]byte, error) {
+	var buf []byte
+
+	// Marshal name
+	nameBytes, err := marshalDNSName(record.Name)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling record name '%s': %v", record.Name, err)
+	}
+	buf = append(buf, nameBytes...)
+
+	// Type, Class, TTL, Data Length (10 bytes)
+	rrHeader := make([]byte, 10)
+	binary.BigEndian.PutUint16(rrHeader[0:2], uint16(record.Type))
+	binary.BigEndian.PutUint16(rrHeader[2:4], record.Class)
+	binary.BigEndian.PutUint32(rrHeader[4:8], record.TTL)
+	binary.BigEndian.PutUint16(rrHeader[8:10], uint16(len(record.RData)))
+	buf = append(buf, rrHeader...)
+
+	// RData
+	buf = append(buf, record.RData...)
+
+	return buf, nil
 }
