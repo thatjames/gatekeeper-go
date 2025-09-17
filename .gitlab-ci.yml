@@ -68,13 +68,13 @@ build_web:
 test-coverage:
   <<: *go_common
   stage: test
-  dependencies:
-    - build_web
   rules:
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH
   script:
     - go mod download
+    - mkdir -p internal/web/ui/dist
+    - touch internal/web/ui/dist/dummy.txt
     - go test -coverprofile=coverage.out -coverpkg=./... ./...
     - COVERAGE=$(go tool cover -func=coverage.out | tail -1 | awk '{print $3}' | sed 's/%//')
     - echo "Total project coverage:${COVERAGE}%"
