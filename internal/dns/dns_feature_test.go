@@ -2,15 +2,23 @@ package dns
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"net"
+	"os"
 	"testing"
 
 	"github.com/cucumber/godog"
+	"github.com/cucumber/godog/colors"
 )
 
 var (
-	outputFile string
+	reportFile = flag.String("report-file", "", "Output cucumber file for JSON report")
+
+	opts = godog.Options{
+		Output: colors.Colored(os.Stdout),
+		Format: "pretty",
+	}
 )
 
 const (
@@ -60,19 +68,47 @@ func (ts *DNSFeatureTestSuite) thatServerHasACacheForWithIP(domain string, ip st
 }
 
 func TestFeatures(t *testing.T) {
+	opts.TestingT = t
 	suite := godog.TestSuite{
 		ScenarioInitializer: InitializeScenario,
-		Options: &godog.Options{
-			Format:   "pretty",
-			Paths:    []string{"features"},
-			TestingT: t,
-		},
+		Options:             &opts,
 	}
 
 	if suite.Run() != 0 {
 		t.FailNow()
 	}
 
+}
+
+func TestFeaturesWithOutputFile(t *testing.T) {
+	flag.Parse()
+
+	if *reportFile != "" {
+		// Create output file for JSON
+		file, err := os.Create(*reportFile)
+		if err != nil {
+			t.Fatalf("Failed to create output file: %v", err)
+		}
+		defer file.Close()
+		opts.Output = file
+	}
+
+	opts.TestingT = t
+	opts.Format = "junit"
+
+	status := godog.TestSuite{
+		Name:                "DHCP Lease Management",
+		ScenarioInitializer: InitializeScenario,
+		Options:             &opts,
+	}.Run()
+
+	if status == 2 {
+		t.SkipNow()
+	}
+
+	if status != 0 {
+		t.Fatalf("zero status code expected, %d received", status)
+	}
 }
 
 func InitializeScenario(ctx *godog.ScenarioContext) {

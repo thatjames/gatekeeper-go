@@ -49,10 +49,12 @@ docker-multiarch: docker-binary-multiarch ## Builds and pushes multi-architectur
 ##@ Test
 test: generate-mocks ## Runs the golang unit tests
 	go test ./internal/dhcp -run TestFeatures -v
+	go test ./internal/dns -run TestFeatures -v
 	go test ./internal/dhcp/packet_test.go internal/dhcp/packet.go
 
 test-report: generate-mocks ## Runs the golang unit tests and generates a test report
-	go test ./internal/dhcp -run TestFeaturesWithOutputFile -report-file=${PWD}/test-report.xml
+	@go test ./internal/dhcp -run TestFeaturesWithOutputFile -report-file=${PWD}/dhcp-test-report.xml
+	@go test ./internal/dns -run TestFeaturesWithOutputFile -report-file=${PWD}/dns-test-report.xml
 
 ##@ Run
 docker-run: ## Runs the docker image
