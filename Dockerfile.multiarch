@@ -1,0 +1,23 @@
+FROM alpine:latest
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+# Copy the appropriate binary based on the target architecture
+ARG TARGETPLATFORM
+COPY --chmod=755 bin/gatekeeper-linux-* /tmp/binaries/
+
+# Select and copy the correct binary for the target platform
+RUN case "$TARGETPLATFORM" in \
+        "linux/amd64") cp /tmp/binaries/gatekeeper-linux-amd64 /app/gatekeeper ;; \
+        "linux/arm64") cp /tmp/binaries/gatekeeper-linux-arm64 /app/gatekeeper ;; \
+        "linux/arm/v7") cp /tmp/binaries/gatekeeper-linux-arm /app/gatekeeper ;; \
+        "linux/386") cp /tmp/binaries/gatekeeper-linux-386 /app/gatekeeper ;; \
+        *) echo "Unsupported platform: $TARGETPLATFORM" && exit 1 ;; \
+    esac && \
+    rm -rf /tmp/binaries
+
+ENV GIN_MODE=release
+
+ENTRYPOINT ["/app/gatekeeper"]

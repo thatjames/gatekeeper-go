@@ -1,5 +1,16 @@
-.PHONY: all build test docker version
+.PHONY: all build test docker version clean-binaries build-all-arch docker-multiarch
 VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo "dev")
+BIN_NAME ?= gatekeeper
+
+# Default architecture values
+GOOS ?= $(shell go env GOOS)
+GOARCH ?= $(shell go env GOARCH)
+
+# Set GOARM for ARM builds
+ifeq ($(GOARCH),arm)
+	GOARM ?= 7
+	export GOARM
+endif
 
 all: web test build
 
@@ -7,8 +18,10 @@ all: web test build
 build: test web ## Builds the native go binary
 	go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/$(BIN_NAME) -tags live ./cmd/gatekeeper/
 
-build-pipeline: ## Builds the binary for the pipeline
-	go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/$(BIN_NAME) -tags live ./cmd/gatekeeper/
+build-pipeline: ## Builds the binary for the pipeline (uses GOOS, GOARCH, BIN_NAME from environment)
+	@echo "Building $(BIN_NAME) for $(GOOS)/$(GOARCH)..."
+	@mkdir -p bin
+	env CGO_ENABLED=0 GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/$(BIN_NAME) -tags live ./cmd/gatekeeper/
 
 web: install ## Builds the web ui
 	$(MAKE) -C internal/web/ui build
@@ -16,8 +29,22 @@ web: install ## Builds the web ui
 docker-binary: web test ## Builds the docker binary
 	env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/gatekeeper cmd/gatekeeper/main.go
 
+docker-binary-multiarch: web test ## Builds docker binaries for all supported architectures
+	@echo "Building binaries for multi-arch docker..."
+	@mkdir -p bin
+	env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/gatekeeper-linux-amd64 ./cmd/gatekeeper/
+	env CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/gatekeeper-linux-arm64 ./cmd/gatekeeper/
+	env CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/gatekeeper-linux-arm ./cmd/gatekeeper/
+	env CGO_ENABLED=0 GOOS=linux GOARCH=386 go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/gatekeeper-linux-386 ./cmd/gatekeeper/
+
 docker: docker-binary ## Builds the docker binary, the web ui and the docker image
 	docker build -t smokeycircles/gatekeeper .
+
+docker-multiarch: docker-binary-multiarch ## Builds and pushes multi-architecture docker images
+	@echo "Building multi-architecture docker images..."
+	@echo "Make sure docker buildx is enabled and you're logged into Docker Hub"
+	docker buildx create --use --name multiarch-builder --driver docker-container 2>/dev/null || docker buildx use multiarch-builder
+	docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7,linux/386 --push -t smokeycircles/gatekeeper:$(VERSION) -t smokeycircles/gatekeeper:latest -f Dockerfile.multiarch .
 
 ##@ Test
 test: generate-mocks ## Runs the golang unit tests
@@ -46,6 +73,9 @@ clean: ## Cleans the build directories
 	rm -rf bin
 	rm -rf internal/datasource/mocks
 	$(MAKE) -C internal/web/ui clean
+
+clean-binaries: ## Cleans only the binary directory
+	rm -rf bin
 
 generate-mocks: install-mockgen ## Generates the test DB mocks
 	@rm -rf internal/datasource/mocks

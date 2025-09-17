@@ -14,6 +14,7 @@ stages:
   - test
   - build_web
   - build_go
+  - build_docker
   - distribute
 
 # YAML Templates
@@ -62,7 +63,7 @@ build_web:
   tags:
     - shell
 
-# Build matrix using templates
+# Build matrix using templates - Linux architectures
 build_amd64_linux:
   <<: *build_template
   variables:
@@ -77,30 +78,66 @@ build_amd64_windows:
     GOOS: windows
     BIN_NAME: $BASE_NAME-amd64.exe
 
-build_arm:
+build_arm_linux:
   <<: *build_template
   variables:
     GOARCH: arm
     GOOS: linux
+    GOARM: "7"
     BIN_NAME: $BASE_NAME-arm
 
-build_arm64:
+build_arm64_linux:
   <<: *build_template
   variables:
     GOARCH: arm64
     GOOS: linux
     BIN_NAME: $BASE_NAME-arm64
 
+build_386_linux:
+  <<: *build_template
+  variables:
+    GOARCH: "386"
+    GOOS: linux
+    BIN_NAME: $BASE_NAME-i386
+
+# Single architecture Docker build (existing)
 build_docker:
   variables:
     GOARCH: amd64
     GOOS: linux
     BIN_NAME: $BASE_NAME-amd64
-  stage: build_go
+  stage: build_docker
   rules:
     - if: $CI_COMMIT_TAG
   script:
     - make BIN_NAME=$BIN_NAME docker
+  tags:
+    - shell
+
+# Multi-architecture Docker build
+build_docker_multiarch:
+  stage: build_docker
+  rules:
+    - if: $CI_COMMIT_TAG
+  dependencies:
+    - build_web
+    - build_amd64_linux
+    - build_arm_linux
+    - build_arm64_linux
+    - build_386_linux
+  script:
+    # Enable docker buildx
+    - docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+    - docker buildx create --use --name multiarch-builder --driver docker-container || docker buildx use multiarch-builder
+    # Login to Docker Hub
+    - echo $DOCKER_HUB_PASSWORD | docker login -u $DOCKER_HUB_USERNAME --password-stdin
+    # Rename binaries to match expected naming convention for multiarch Dockerfile
+    - mv bin/$BASE_NAME-amd64 bin/$BASE_NAME-linux-amd64
+    - mv bin/$BASE_NAME-arm64 bin/$BASE_NAME-linux-arm64
+    - mv bin/$BASE_NAME-arm bin/$BASE_NAME-linux-arm
+    - mv bin/$BASE_NAME-i386 bin/$BASE_NAME-linux-386
+    # Build and push multi-arch image
+    - docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7,linux/386 --push -t $DOCKER_IMAGE:$CI_COMMIT_TAG -t $DOCKER_IMAGE:latest -f Dockerfile.multiarch .
   tags:
     - shell
 
