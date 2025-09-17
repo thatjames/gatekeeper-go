@@ -47,7 +47,9 @@ test:
   artifacts:
     when: always
     reports:
-      junit: *test-report.xml
+      junit:
+        - dhcp-test-report.xml
+        - dns-test-report.xml
     expire_in: 1year
 
 build_web:
