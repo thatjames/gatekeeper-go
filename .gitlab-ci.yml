@@ -44,23 +44,12 @@ test:
     - if: $CI_COMMIT_BRANCH
   script:
     - make test-report
-    - |
-      echo "## Test Results Summary" > test-summary.md
-      echo "" >> test-summary.md
-      echo "### Features Tested:" >> test-summary.md
-      echo "- ✅ DNS Packet Parsing" >> test-summary.md  
-      echo "- ✅ DNS Request Handling" >> test-summary.md
-      echo "- ✅ DHCP Lease Management" >> test-summary.md
-      echo "" >> test-summary.md
-      echo "All $(grep -c 'passed' dhcp-test-report.xml dns-test-report.xml) scenarios passed successfully!" >> test-summary.md
   artifacts:
     when: always
     reports:
       junit:
         - dhcp-test-report.xml
         - dns-test-report.xml
-    paths:
-      - test-summary.md
     expire_in: 1year
 
 build_web:
@@ -111,7 +100,7 @@ build_arm_linux:
   variables:
     GOARCH: arm
     GOOS: linux
-    GOARM: '7'
+    GOARM: "7"
     BIN_NAME: $BASE_NAME-arm
 
 build_arm64_linux:
@@ -124,7 +113,7 @@ build_arm64_linux:
 build_386_linux:
   <<: *build_template
   variables:
-    GOARCH: '386'
+    GOARCH: "386"
     GOOS: linux
     BIN_NAME: $BASE_NAME-i386
 
