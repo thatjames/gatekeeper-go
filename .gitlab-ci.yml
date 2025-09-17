@@ -100,7 +100,7 @@ build_arm_linux:
   variables:
     GOARCH: arm
     GOOS: linux
-    GOARM: "7"
+    GOARM: '7'
     BIN_NAME: $BASE_NAME-arm
 
 build_arm64_linux:
@@ -113,7 +113,7 @@ build_arm64_linux:
 build_386_linux:
   <<: *build_template
   variables:
-    GOARCH: "386"
+    GOARCH: '386'
     GOOS: linux
     BIN_NAME: $BASE_NAME-i386
 

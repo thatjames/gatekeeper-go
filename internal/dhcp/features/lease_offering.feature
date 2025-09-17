@@ -31,3 +31,12 @@ Feature: Lease Offering and Acceptance
     And the lease client ID should be "new-client"
 
 
+  Scenario: Update reserved lease for client
+    Given I have a lease pool with client "test-client" and reserved IP "10.0.0.1"
+    When I update client "test-client" ip to "10.0.0.2"
+    Then Client "test-client" should have IP "10.0.0.2"
+
+  Scenario: Update active lease for client
+    Given I have a lease pool with client "test-client" and IP "10.0.0.1"
+    When I update client "test-client" ip to "10.0.0.2"
+    Then Client "test-client" should have IP "10.0.0.2"
