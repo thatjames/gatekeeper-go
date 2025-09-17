@@ -47,7 +47,7 @@ test:
   artifacts:
     when: always
     reports:
-      junit: test-report.xml
+      junit: *test-report.xml
     expire_in: 1year
 
 build_web:
