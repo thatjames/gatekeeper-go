@@ -52,6 +52,11 @@ func GetService[T Service](stype ServiceKey) T {
 	return instance[stype].(T)
 }
 
+func IsRegistered(stype ServiceKey) bool {
+	_, ok := instance[stype]
+	return ok
+}
+
 func checkErrors(fns ...func() error) error {
 	for _, fn := range fns {
 		if err := fn(); err != nil {

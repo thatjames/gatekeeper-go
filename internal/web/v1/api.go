@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/tg123/go-htpasswd"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
 )
 
 func SetupV1Endpoints(r *gin.RouterGroup) {
@@ -18,7 +19,10 @@ func SetupV1Endpoints(r *gin.RouterGroup) {
 	v1Group.GET("/health", healthHandler)
 
 	protected := v1Group.Group("/", authMiddleware(), loggingMiddleware())
-	setupDHCPRoutes(protected)
+	if service.IsRegistered(service.DHCP) {
+		log.Info("Registering DHCP endpoints")
+		setupDHCPRoutes(protected)
+	}
 	setupSystemRoutes(protected)
 }
 
