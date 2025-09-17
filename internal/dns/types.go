@@ -20,6 +20,7 @@ const (
 	DNSTypeMX    DNSType = 15
 	DNSTypeNS    DNSType = 2
 	DNSTypeTXT   DNSType = 16
+	DNSTypeOPT   DNSType = 41
 )
 
 func (t DNSType) String() string {
@@ -36,6 +37,8 @@ func (t DNSType) String() string {
 		return "NS"
 	case DNSTypeTXT:
 		return "TXT"
+	case DNSTypeOPT:
+		return "OPT"
 	default:
 		return "unknown"
 	}
@@ -78,6 +81,10 @@ type DNSMessage struct {
 	Additionals []DNSRecord
 }
 
+func (m *DNSMessage) String() string {
+	return fmt.Sprintf("DNS Message: ID=%d, QR=%d, Opcode=%s, AA=%d, TC=%d, RD=%d, RA=%d, Z=%d, RCODE=%d", m.Header.ID, m.Header.QR, m.Header.Opcode, m.Header.AA, m.Header.TC, m.Header.RD, m.Header.RA, m.Header.Z, m.Header.RCODE)
+}
+
 type DNSHeader struct {
 	ID     uint16    // Identification: Identifier for the message
 	QR     uint8     // Query/Response: 0 for a query, 1 for a response
@@ -97,32 +104,32 @@ type DNSQuestion struct {
 }
 
 type DNSPacket struct {
-	DNSMessage
-	ResponseAddr net.IP
+	*DNSMessage
+	ResponseAddr net.Addr
 }
 
-func ParseDNSPacket(data []byte) (*DNSPacket, error) {
+func ParseDNSMessage(data []byte) (*DNSMessage, error) {
 	if len(data) < 12 {
 		return nil, ErrDNSPacketTooShort
 	}
 
-	var dnsPacket DNSPacket
+	var dnsMessage DNSMessage
 	offset := 0
 
 	// Parse header (12 bytes total)
-	dnsPacket.Header.ID = binary.BigEndian.Uint16(data[offset : offset+2])
+	dnsMessage.Header.ID = binary.BigEndian.Uint16(data[offset : offset+2])
 	offset += 2
 
 	// Parse flags (2 bytes combined)
 	flags := binary.BigEndian.Uint16(data[offset : offset+2])
-	dnsPacket.Header.QR = uint8((flags >> 15) & 0x1)
-	dnsPacket.Header.Opcode = DNSOpCode((flags >> 11) & 0xF)
-	dnsPacket.Header.AA = uint8((flags >> 10) & 0x1)
-	dnsPacket.Header.TC = uint8((flags >> 9) & 0x1)
-	dnsPacket.Header.RD = uint8((flags >> 8) & 0x1)
-	dnsPacket.Header.RA = uint8((flags >> 7) & 0x1)
-	dnsPacket.Header.Z = uint8((flags >> 4) & 0x7)
-	dnsPacket.Header.RCODE = uint8(flags & 0xF)
+	dnsMessage.Header.QR = uint8((flags >> 15) & 0x1)
+	dnsMessage.Header.Opcode = DNSOpCode((flags >> 11) & 0xF)
+	dnsMessage.Header.AA = uint8((flags >> 10) & 0x1)
+	dnsMessage.Header.TC = uint8((flags >> 9) & 0x1)
+	dnsMessage.Header.RD = uint8((flags >> 8) & 0x1)
+	dnsMessage.Header.RA = uint8((flags >> 7) & 0x1)
+	dnsMessage.Header.Z = uint8((flags >> 4) & 0x7)
+	dnsMessage.Header.RCODE = uint8(flags & 0xF)
 	offset += 2
 
 	// Parse counts
@@ -136,7 +143,7 @@ func ParseDNSPacket(data []byte) (*DNSPacket, error) {
 	offset += 2
 
 	// Parse questions
-	dnsPacket.Questions = make([]DNSQuestion, 0, qdCount)
+	dnsMessage.Questions = make([]DNSQuestion, 0, qdCount)
 	for i := 0; i < int(qdCount); i++ {
 		var question DNSQuestion
 		var err error
@@ -155,43 +162,43 @@ func ParseDNSPacket(data []byte) (*DNSPacket, error) {
 		question.Class = binary.BigEndian.Uint16(data[offset : offset+2])
 		offset += 2
 
-		dnsPacket.Questions = append(dnsPacket.Questions, question)
+		dnsMessage.Questions = append(dnsMessage.Questions, question)
 	}
 
 	// Parse answers
-	dnsPacket.Answers = make([]DNSRecord, 0, anCount)
+	dnsMessage.Answers = make([]DNSRecord, 0, anCount)
 	for i := 0; i < int(anCount); i++ {
 		record, newOffset, err := parseResourceRecord(data, offset)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing answer record: %v", err)
 		}
-		dnsPacket.Answers = append(dnsPacket.Answers, record)
+		dnsMessage.Answers = append(dnsMessage.Answers, record)
 		offset = newOffset
 	}
 
 	// Parse authorities
-	dnsPacket.Authorities = make([]DNSRecord, 0, nsCount)
+	dnsMessage.Authorities = make([]DNSRecord, 0, nsCount)
 	for i := 0; i < int(nsCount); i++ {
 		record, newOffset, err := parseResourceRecord(data, offset)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing authority record: %v", err)
 		}
-		dnsPacket.Authorities = append(dnsPacket.Authorities, record)
+		dnsMessage.Authorities = append(dnsMessage.Authorities, record)
 		offset = newOffset
 	}
 
 	// Parse additionals
-	dnsPacket.Additionals = make([]DNSRecord, 0, arCount)
+	dnsMessage.Additionals = make([]DNSRecord, 0, arCount)
 	for i := 0; i < int(arCount); i++ {
 		record, newOffset, err := parseResourceRecord(data, offset)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing additional record: %v", err)
 		}
-		dnsPacket.Additionals = append(dnsPacket.Additionals, record)
+		dnsMessage.Additionals = append(dnsMessage.Additionals, record)
 		offset = newOffset
 	}
 
-	return &dnsPacket, nil
+	return &dnsMessage, nil
 }
 
 // parseDNSName parses a DNS name from the packet, handling compression
@@ -293,21 +300,53 @@ func parseDNSName(data []byte, offset int) (string, int, error) {
 func parseResourceRecord(data []byte, offset int) (DNSRecord, int, error) {
 	var record DNSRecord
 	var err error
+	startOffset := offset
 
 	// Parse name
 	record.Name, offset, err = parseDNSName(data, offset)
 	if err != nil {
-		return record, offset, err
+		return record, offset, fmt.Errorf("error parsing RR name at offset %d: %v", startOffset, err)
 	}
 
 	// Check bounds for type, class, TTL, and data length
 	if offset+10 > len(data) {
-		return record, offset, errors.New("insufficient data for resource record")
+		return record, offset, fmt.Errorf("insufficient data for resource record at offset %d (need %d, have %d)", offset, offset+10, len(data))
 	}
 
-	// Parse type, class, TTL
+	// Parse type
 	record.Type = DNSType(binary.BigEndian.Uint16(data[offset : offset+2]))
 	offset += 2
+
+	// Special handling for EDNS OPT records (RFC 6891)
+	if record.Type == DNSType(41) { // OPT record
+		// For OPT records, the "class" field is the requestor's UDP payload size
+		udpPayloadSize := binary.BigEndian.Uint16(data[offset : offset+2])
+		offset += 2
+
+		// The TTL field contains extended RCODE, version, and flags
+		extendedInfo := binary.BigEndian.Uint32(data[offset : offset+4])
+		offset += 4
+
+		// Store the UDP payload size in the Class field for OPT records
+		record.Class = udpPayloadSize
+		record.TTL = extendedInfo
+
+		// Parse data length and data normally
+		dataLength := binary.BigEndian.Uint16(data[offset : offset+2])
+		offset += 2
+
+		if offset+int(dataLength) > len(data) {
+			return record, offset, fmt.Errorf("OPT record data extends beyond packet at offset %d (need %d, have %d, rdlength %d)", offset, offset+int(dataLength), len(data), dataLength)
+		}
+
+		record.RData = make([]byte, dataLength)
+		copy(record.RData, data[offset:offset+int(dataLength)])
+		offset += int(dataLength)
+
+		return record, offset, nil
+	}
+
+	// Regular resource record parsing
 	record.Class = binary.BigEndian.Uint16(data[offset : offset+2])
 	offset += 2
 	record.TTL = binary.BigEndian.Uint32(data[offset : offset+4])
@@ -318,7 +357,7 @@ func parseResourceRecord(data []byte, offset int) (DNSRecord, int, error) {
 	offset += 2
 
 	if offset+int(dataLength) > len(data) {
-		return record, offset, errors.New("resource record data extends beyond packet")
+		return record, offset, fmt.Errorf("resource record data extends beyond packet at offset %d (need %d, have %d, rdlength %d)", offset, offset+int(dataLength), len(data), dataLength)
 	}
 
 	record.RData = make([]byte, dataLength)

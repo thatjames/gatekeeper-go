@@ -24,20 +24,20 @@ type DNSServer struct {
 	resolver     *DNSResolver
 	packetConn   net.PacketConn
 	receiverChan chan *DNSPacket
+	exitChan     chan struct{}
 }
 
 func NewDNSServer() *DNSServer {
-	return &DNSServer{
-		resolver: NewDNSResolver(),
-		opts:     &defaultDNSServerOpts,
-	}
+	return NewDNSServerWithOpts(defaultDNSServerOpts)
 }
 
 func NewDNSServerWithOpts(opts DNSServerOpts) *DNSServer {
 	return &DNSServer{
-		resolver:   NewDNSResolver(),
-		opts:       &opts,
-		packetConn: nil,
+		resolver:     NewDNSResolver(),
+		opts:         &opts,
+		packetConn:   nil,
+		receiverChan: make(chan *DNSPacket, 10),
+		exitChan:     make(chan struct{}),
 	}
 }
 
@@ -47,6 +47,8 @@ func (d *DNSServer) Start() error {
 	if d.packetConn, err = net.ListenPacket("udp4", fmt.Sprintf(":%d", d.opts.Port)); err != nil {
 		return err
 	}
+	go d.listen()
+	go d.receiverWorker()
 	return nil
 }
 
@@ -55,6 +57,35 @@ func (d *DNSServer) Stop() error {
 	return nil
 }
 
-func (d *DNSServer) run() {
+func (d *DNSServer) listen() {
+	buff := make([]byte, 1500)
+	for {
+		select {
+		case <-d.exitChan:
+			return
+		default:
+			n, addr, err := d.packetConn.ReadFrom(buff)
+			if err != nil {
+				log.Error("unable to read datastream: ", err.Error())
+				continue
+			}
+			buff = buff[:n]
+			log.Debugf("received %d bytes from %s", n, d.packetConn.LocalAddr().String())
+			msg, err := ParseDNSMessage(buff)
+			if err != nil {
+				log.Error("unable to parse DNS message: ", err.Error())
+			} else {
+				d.receiverChan <- &DNSPacket{
+					DNSMessage:   msg,
+					ResponseAddr: addr,
+				}
+			}
+		}
+	}
+}
 
+func (d *DNSServer) receiverWorker() {
+	for packet := range d.receiverChan {
+		log.Debugf("received DNS packet %s from %s", packet, packet.ResponseAddr.String())
+	}
 }

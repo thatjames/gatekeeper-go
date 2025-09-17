@@ -366,73 +366,6 @@ func init() {
 
 func TestFeatures(t *testing.T) {
 	flag.Parse()
-	opts.TestingT = t
-
-	status := godog.TestSuite{
-		Name:                "DHCP Lease Management",
-		ScenarioInitializer: InitializeScenario,
-		Options:             &opts,
-	}.Run()
-
-	if status == 2 {
-		t.SkipNow()
-	}
-
-	if status != 0 {
-		t.Fatalf("zero status code expected, %d received", status)
-	}
-}
-
-func TestReservedLeases(t *testing.T) {
-	suite := godog.TestSuite{
-		Name:                "Reserved Leases",
-		ScenarioInitializer: InitializeScenario,
-		Options: &godog.Options{
-			Format:   "pretty",
-			Paths:    []string{"features/reserved_leases.feature"},
-			TestingT: t,
-		},
-	}
-
-	if suite.Run() != 0 {
-		t.Fatal("non-zero status returned, failed to run feature tests")
-	}
-}
-
-func TestLeaseInitialization(t *testing.T) {
-	suite := godog.TestSuite{
-		Name:                "Lease Initialization",
-		ScenarioInitializer: InitializeScenario,
-		Options: &godog.Options{
-			Format:   "pretty",
-			Paths:    []string{"features/lease_initialization.feature"},
-			TestingT: t,
-		},
-	}
-
-	if suite.Run() != 0 {
-		t.Fatal("non-zero status returned, failed to run feature tests")
-	}
-}
-
-func TestLeaseOffering(t *testing.T) {
-	suite := godog.TestSuite{
-		Name:                "Lease Offering",
-		ScenarioInitializer: InitializeScenario,
-		Options: &godog.Options{
-			Format:   "pretty",
-			Paths:    []string{"features/lease_offering.feature"},
-			TestingT: t,
-		},
-	}
-
-	if suite.Run() != 0 {
-		t.Fatal("non-zero status returned, failed to run feature tests")
-	}
-}
-
-func TestFeaturesWithOutputFile(t *testing.T) {
-	flag.Parse()
 
 	if *reportFile != "" {
 		file, err := os.OpenFile(*reportFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
@@ -441,10 +374,10 @@ func TestFeaturesWithOutputFile(t *testing.T) {
 		}
 		defer file.Close()
 		opts.Output = file
+		opts.Format = "junit"
 	}
 
 	opts.TestingT = t
-	opts.Format = "junit"
 
 	status := godog.TestSuite{
 		Name:                "DHCP Lease Management",

@@ -48,7 +48,7 @@ func (ts *DNSFeatureTestSuite) givenTheDNSPacket(ctx context.Context, packetBase
 }
 
 func (ts *DNSFeatureTestSuite) iParseTheDNSPacket(ctx context.Context) (context.Context, error) {
-	packet, err := ParseDNSPacket(ts.packetBytes)
+	packet, err := ParseDNSMessage(ts.packetBytes)
 	if err != nil {
 		return context.WithValue(ctx, DNSErrorContextKey, err), nil
 	}
@@ -56,7 +56,7 @@ func (ts *DNSFeatureTestSuite) iParseTheDNSPacket(ctx context.Context) (context.
 }
 
 func (ts *DNSFeatureTestSuite) iShouldReceiveADNSQueryFor(ctx context.Context, expectedDomain string) error {
-	packet := ctx.Value(DNSPacketContextKey).(*DNSPacket)
+	packet := ctx.Value(DNSPacketContextKey).(*DNSMessage)
 
 	if packet.Header.QR != 0 {
 		return fmt.Errorf("expected DNS query (QR=0), got QR=%d", packet.Header.QR)
@@ -79,7 +79,7 @@ func (ts *DNSFeatureTestSuite) iShouldReceiveADNSQueryFor(ctx context.Context, e
 }
 
 func (ts *DNSFeatureTestSuite) iShouldReceiveADNSPacketWithTheIP(ctx context.Context, expectedIP string) error {
-	packet := ctx.Value(DNSPacketContextKey).(*DNSPacket)
+	packet := ctx.Value(DNSPacketContextKey).(*DNSMessage)
 
 	if packet.Header.QR != 1 {
 		return fmt.Errorf("expected DNS response packet to contain IP, but got query packet (QR=%d)", packet.Header.QR)
@@ -163,19 +163,45 @@ func (ts *DNSFeatureTestSuite) thePacketShouldParse(ctx context.Context) error {
 	return nil
 }
 
-func TestFeatures(t *testing.T) {
-	opts.TestingT = t
-	suite := godog.TestSuite{
-		ScenarioInitializer: InitializeScenario,
-		Options:             &opts,
+func (ts *DNSFeatureTestSuite) thePacketShouldHaveAdditionalRecord(ctx context.Context, expectedCount int) error {
+	packet := ctx.Value(DNSPacketContextKey).(*DNSMessage)
+
+	actualCount := len(packet.Additionals)
+	if actualCount != expectedCount {
+		return fmt.Errorf("expected %d additional records, got %d", expectedCount, actualCount)
 	}
 
-	if suite.Run() != 0 {
-		t.FailNow()
-	}
+	return nil
 }
 
-func TestFeaturesWithOutputFile(t *testing.T) {
+func (ts *DNSFeatureTestSuite) theAdditionalRecordShouldBeAnEDNSOPTRecord(ctx context.Context) error {
+	packet := ctx.Value(DNSPacketContextKey).(*DNSMessage)
+
+	if len(packet.Additionals) == 0 {
+		return fmt.Errorf("no additional records found")
+	}
+
+	optRecord := packet.Additionals[0]
+
+	// Check if it's an OPT record
+	if optRecord.Type != DNSTypeOPT {
+		return fmt.Errorf("expected OPT record (type 41), got type %d (%s)", optRecord.Type, optRecord.Type)
+	}
+
+	// Check if name is root domain (empty string for OPT records)
+	if optRecord.Name != "" {
+		return fmt.Errorf("expected empty name for OPT record, got %s", optRecord.Name)
+	}
+
+	// Validate that class field contains UDP payload size (should be reasonable)
+	if optRecord.Class == 0 || optRecord.Class > 65535 {
+		return fmt.Errorf("invalid UDP payload size in OPT record: %d", optRecord.Class)
+	}
+
+	return nil
+}
+
+func TestFeatures(t *testing.T) {
 	flag.Parse()
 
 	if *reportFile != "" {
@@ -185,10 +211,10 @@ func TestFeaturesWithOutputFile(t *testing.T) {
 		}
 		defer file.Close()
 		opts.Output = file
+		opts.Format = "junit"
 	}
 
 	opts.TestingT = t
-	opts.Format = "junit"
 
 	status := godog.TestSuite{
 		Name:                "DNS Management",
@@ -228,4 +254,6 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Then(`^I should receive a valid DNS response with IP "([^"]*)"$`, ts.theDNSServerShouldRespondWith)
 	ctx.Then(`^I should receive the error "([^"]*)"$`, ts.iShouldReceiveTheError)
 	ctx.Step(`^The packet should parse`, ts.thePacketShouldParse)
+	ctx.Then(`^the packet should have (\d+) additional record$`, ts.thePacketShouldHaveAdditionalRecord)
+	ctx.Then(`^the additional record should be an EDNS OPT record$`, ts.theAdditionalRecordShouldBeAnEDNSOPTRecord)
 }

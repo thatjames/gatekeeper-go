@@ -28,3 +28,11 @@ Feature: DNS Packet Parsing
     When I parse the DNS packet
     Then The packet should parse
     Then I should receive a DNS packet with the IP "93.184.216.34"
+
+  Scenario: Parsing DNS query with EDNS OPT record
+    Given the DNS packet "n8oBIAABAAAAAAABBHRlc3QDY29tAAABAAEAACkE0AAAAAAADAAKAAjkbPIZw7kl8g=="
+    When I parse the DNS packet
+    Then The packet should parse
+    Then I should receive a DNS query for "test.com"
+    And the packet should have 1 additional record
+    And the additional record should be an EDNS OPT record
