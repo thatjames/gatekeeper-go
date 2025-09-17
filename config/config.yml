@@ -18,3 +18,8 @@ Web:
   Address: ":8085"
   HTPasswdFile: ".htpasswd"
   Prometheus: true
+
+DNS:
+  UpstreamServers:
+    - 8.8.8.8
+    - 1.1.1.1

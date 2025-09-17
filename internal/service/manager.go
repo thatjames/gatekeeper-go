@@ -11,6 +11,7 @@ type ServiceKey string
 var (
 	DHCP ServiceKey = "dchp"
 	Web  ServiceKey = "web"
+	DNS  ServiceKey = "dns"
 )
 
 type serviceManager map[ServiceKey]Service
