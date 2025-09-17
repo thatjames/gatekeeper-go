@@ -5,3 +5,4 @@ internal/web/ui/dist
 leases.db
 **/mocks
 *test-report.xml
+coverage.out

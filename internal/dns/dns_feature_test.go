@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/cucumber/godog"
 	"github.com/cucumber/godog/colors"
@@ -34,7 +35,7 @@ type DNSFeatureTestSuite struct {
 }
 
 func (ts *DNSFeatureTestSuite) reset() {
-	ts.resolver = NewDNSResolver()
+	ts.resolver = NewDNSResolverWithDefaultOpts()
 	ts.packetBytes = nil
 }
 
@@ -107,7 +108,15 @@ func (ts *DNSFeatureTestSuite) iShouldReceiveADNSPacketWithTheIP(ctx context.Con
 }
 
 func (ts *DNSFeatureTestSuite) thatServerHasACacheForWithIP(domain string, ip string) error {
-	ts.resolver.cache[domain] = net.ParseIP(ip).To4()
+	ts.resolver.cache[domain] = &DNSCacheItem{
+		record: &DNSRecord{
+			Type:  DNSTypeA,
+			Class: 1,
+			TTL:   300,
+			RData: net.ParseIP(ip).To4(),
+		},
+		ttl: time.Now().Add(time.Second * 300),
+	}
 	return nil
 }
 

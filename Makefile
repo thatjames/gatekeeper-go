@@ -53,8 +53,15 @@ test: generate-mocks ## Runs the golang unit tests
 	go test ./internal/dhcp/packet_test.go internal/dhcp/packet.go
 
 test-report: generate-mocks ## Runs the golang unit tests and generates a test report
+	@go mod download
+	@mkdir -p internal/web/ui/dist
+	@touch internal/web/ui/dist/dummy.txt
 	@go test ./internal/dhcp -report-file=${PWD}/dhcp-test-report.xml
 	@go test ./internal/dns -report-file=${PWD}/dns-test-report.xml
+	@go test -coverprofile=coverage.out -coverpkg=./... ./...
+	@COVERAGE=$$(go tool cover -func=coverage.out | tail -1 | awk '{print $$3}' | sed 's/%//'); \
+	echo "Total project coverage: $${COVERAGE}%"
+
 
 ##@ Run
 docker-run: ## Runs the docker image
