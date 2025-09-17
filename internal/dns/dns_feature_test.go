@@ -42,7 +42,7 @@ func (ts *DNSFeatureTestSuite) iSendADNSRequestAFor(ctx context.Context, domain 
 }
 
 func (ts *DNSFeatureTestSuite) theDNSServerShouldRespondWith(ctx context.Context, expectedResponse string) error {
-	dnsQuery := ctx.Value(DNSQueryContextKey).(*DNSPacket)
+	dnsQuery := ctx.Value(DNSQueryContextKey).(*DNSRecord)
 	if dnsQuery.Type != DNSTypeA {
 		return fmt.Errorf("expected DNS query type A, but got %s", dnsQuery.Type)
 	}
@@ -85,7 +85,7 @@ func TestFeaturesWithOutputFile(t *testing.T) {
 
 	if *reportFile != "" {
 		// Create output file for JSON
-		file, err := os.Create(*reportFile)
+		file, err := os.OpenFile(*reportFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 		if err != nil {
 			t.Fatalf("Failed to create output file: %v", err)
 		}

@@ -371,7 +371,7 @@ func TestFeaturesWithOutputFile(t *testing.T) {
 
 	if *reportFile != "" {
 		// Create output file for JSON
-		file, err := os.Create(*reportFile)
+		file, err := os.OpenFile(*reportFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 		if err != nil {
 			t.Fatalf("Failed to create output file: %v", err)
 		}

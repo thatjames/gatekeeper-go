@@ -16,11 +16,11 @@ func NewDNSResolver() *DNSResolver {
 	}
 }
 
-func (r *DNSResolver) Resolve(domain string) (*DNSPacket, error) {
+func (r *DNSResolver) Resolve(domain string) (*DNSRecord, error) {
 	log.Debugf("resolving %s", domain)
 	if ip, ok := r.cache[domain]; ok {
 		log.Debugf("found %s in cache", ip.String())
-		return &DNSPacket{
+		return &DNSRecord{
 			Name:  domain,
 			Type:  DNSTypeA,
 			Class: 1,

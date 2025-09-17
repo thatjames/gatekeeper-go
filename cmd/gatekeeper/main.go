@@ -47,6 +47,12 @@ func main() {
 
 	}
 
+	if config.Config.DNS != nil {
+		log.Info("Registering DNS server")
+		dnsServer := dns.NewDNSServer(dns.NewDNSResolverFromConfig(config.Config.DNS))
+		service.Register(dnsServer, service.DNS)
+	}
+
 	if config.Config.Web != nil {
 		log.Debug("Registering web server")
 		go func() {
@@ -55,6 +61,7 @@ func main() {
 			}
 		}()
 	}
+
 	// routingMan, err := routing.New()
 	// if err != nil {
 	// 	log.Fatal(err)

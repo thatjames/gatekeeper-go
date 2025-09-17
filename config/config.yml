@@ -23,3 +23,5 @@ DNS:
   UpstreamServers:
     - 8.8.8.8
     - 1.1.1.1
+  Interface: enp34s0
+  Port: 53
