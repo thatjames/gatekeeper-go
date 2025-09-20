@@ -82,7 +82,7 @@ func (r *DNSResolver) Resolve(domain string) (*DNSRecord, error) {
 		Type:  DNSTypeA,
 		Class: 1,
 		TTL:   300,
-		RData: net.ParseIP("10.0.0.1"),
+		RData: net.ParseIP("10.0.0.1").To4(),
 	}, nil
 }
 

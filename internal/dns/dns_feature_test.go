@@ -64,8 +64,8 @@ func (ts *DNSFeatureTestSuite) iShouldReceiveADNSQueryFor(ctx context.Context, e
 	}
 
 	question := packet.Questions[0]
-	if string(question.Name) != expectedDomain {
-		return fmt.Errorf("expected domain %s, got %s", expectedDomain, question.Name)
+	if question.ParsedName != expectedDomain {
+		return fmt.Errorf("expected domain %s, got %s", expectedDomain, question.ParsedName)
 	}
 
 	if len(packet.Answers) != 0 {
