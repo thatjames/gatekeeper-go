@@ -92,7 +92,7 @@ func (d *DNSServer) listen() {
 func (d *DNSServer) receiverWorker() {
 	for packet := range d.receiverChan {
 		log.Debugf("received DNS packet from %s", packet.ResponseAddr.String())
-		response, err := d.resolver.Resolve(packet.DNSMessage.Questions[0].Name)
+		response, err := d.resolver.Resolve(string(packet.DNSMessage.Questions[0].Name))
 		if err != nil {
 			if err == ErrNxDomain {
 				packet.DNSMessage.Header.SetRCODE(RCODENameFailure)
@@ -103,7 +103,8 @@ func (d *DNSServer) receiverWorker() {
 			continue
 		} else {
 			packet.DNSMessage.Header.SetRCODE(RCODESuccess)
-			packet.DNSMessage.Answers = append(make([]DNSRecord, 0), *response)
+			packet.DNSMessage.Header.SetQR(true)
+			packet.DNSMessage.Answers = append(make([]*DNSRecord, 0), response)
 		}
 		d.responseChan <- packet
 	}

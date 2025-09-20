@@ -57,14 +57,14 @@ func (ts *DNSFeatureTestSuite) iParseTheDNSPacket(ctx context.Context) (context.
 }
 
 func (ts *DNSFeatureTestSuite) iShouldReceiveADNSQueryFor(ctx context.Context, expectedDomain string) error {
-	packet := ctx.Value(DNSPacketContextKey).(DNSMessage)
+	packet := ctx.Value(DNSPacketContextKey).(*DNSMessage)
 
 	if len(packet.Questions) != 1 {
 		return fmt.Errorf("expected 1 question, got %d", len(packet.Questions))
 	}
 
 	question := packet.Questions[0]
-	if question.Name != expectedDomain {
+	if string(question.Name) != expectedDomain {
 		return fmt.Errorf("expected domain %s, got %s", expectedDomain, question.Name)
 	}
 
@@ -76,7 +76,7 @@ func (ts *DNSFeatureTestSuite) iShouldReceiveADNSQueryFor(ctx context.Context, e
 }
 
 func (ts *DNSFeatureTestSuite) iShouldReceiveADNSPacketWithTheIP(ctx context.Context, expectedIP string) error {
-	packet := ctx.Value(DNSPacketContextKey).(DNSMessage)
+	packet := ctx.Value(DNSPacketContextKey).(*DNSMessage)
 
 	if len(packet.Answers) == 0 {
 		return fmt.Errorf("expected at least 1 answer with IP, got %d", len(packet.Answers))
@@ -165,7 +165,7 @@ func (ts *DNSFeatureTestSuite) thePacketShouldParse(ctx context.Context) error {
 }
 
 func (ts *DNSFeatureTestSuite) thePacketShouldHaveAdditionalRecord(ctx context.Context, expectedCount int) error {
-	packet := ctx.Value(DNSPacketContextKey).(DNSMessage)
+	packet := ctx.Value(DNSPacketContextKey).(*DNSMessage)
 
 	actualCount := len(packet.Additionals)
 	if actualCount != expectedCount {
@@ -176,7 +176,7 @@ func (ts *DNSFeatureTestSuite) thePacketShouldHaveAdditionalRecord(ctx context.C
 }
 
 func (ts *DNSFeatureTestSuite) theAdditionalRecordShouldBeAnEDNSOPTRecord(ctx context.Context) error {
-	packet := ctx.Value(DNSPacketContextKey).(DNSMessage)
+	packet := ctx.Value(DNSPacketContextKey).(*DNSMessage)
 
 	if len(packet.Additionals) == 0 {
 		return fmt.Errorf("no additional records found")
@@ -190,8 +190,8 @@ func (ts *DNSFeatureTestSuite) theAdditionalRecordShouldBeAnEDNSOPTRecord(ctx co
 	}
 
 	// Check if name is root domain (empty string for OPT records)
-	if optRecord.Name != "" {
-		return fmt.Errorf("expected empty name for OPT record, got %s", optRecord.Name)
+	if optRecord.Name != nil && len(optRecord.Name) > 0 {
+		return fmt.Errorf("expected empty name for OPT record, got %v", optRecord.Name)
 	}
 
 	// Validate that class field contains UDP payload size (should be reasonable)

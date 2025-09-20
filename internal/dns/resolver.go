@@ -13,6 +13,10 @@ var (
 	ErrNxDomain = errors.New("domain unavailable/blocked")
 )
 
+var (
+	compressedDomainVal = []byte{0xc0, 0x0c}
+)
+
 type DNSResolver struct {
 	cache     map[string]*DNSCacheItem
 	upstream  []net.IP
@@ -74,7 +78,7 @@ func (r *DNSResolver) Resolve(domain string) (*DNSRecord, error) {
 	}
 	//TODO return NXDOMAIN
 	return &DNSRecord{
-		Name:  domain,
+		Name:  compressedDomainVal,
 		Type:  DNSTypeA,
 		Class: 1,
 		TTL:   300,

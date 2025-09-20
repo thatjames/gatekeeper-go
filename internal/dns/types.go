@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strings"
 )
 
 var (
@@ -68,7 +67,7 @@ func (o DNSOpCode) String() string {
 }
 
 type DNSRecord struct {
-	Name  string
+	Name  []byte
 	Type  DNSType
 	Class uint16
 	TTL   uint32
@@ -76,11 +75,11 @@ type DNSRecord struct {
 }
 
 type DNSMessage struct {
-	Header      DNSHeader
-	Questions   []DNSQuestion
-	Answers     []DNSRecord
-	Authorities []DNSRecord
-	Additionals []DNSRecord
+	Header      *DNSHeader
+	Questions   []*DNSQuestion
+	Answers     []*DNSRecord
+	Authorities []*DNSRecord
+	Additionals []*DNSRecord
 }
 
 type DNSHeader struct {
@@ -154,21 +153,27 @@ const (
 )
 
 type DNSQuestion struct {
-	Name  string
+	Name  []byte
 	Type  DNSType
 	Class uint16
 }
 
 type DNSPacket struct {
-	DNSMessage
+	*DNSMessage
 	ResponseAddr net.Addr
 }
 
-func ParseDNSMessage(data []byte) (DNSMessage, error) {
+func ParseDNSMessage(data []byte) (*DNSMessage, error) {
 	if len(data) < 12 {
-		return DNSMessage{}, ErrDNSPacketTooShort
+		return nil, ErrDNSPacketTooShort
 	}
-	var dnsMessage DNSMessage
+	dnsMessage := &DNSMessage{
+		Header:      &DNSHeader{},
+		Questions:   make([]*DNSQuestion, 0),
+		Answers:     make([]*DNSRecord, 0),
+		Authorities: make([]*DNSRecord, 0),
+		Additionals: make([]*DNSRecord, 0),
+	}
 	offset := 0
 
 	// Parse header (12 bytes total)
@@ -191,58 +196,58 @@ func ParseDNSMessage(data []byte) (DNSMessage, error) {
 
 	// 99% of real world traffic only uses 1 question, so we will FORMERR if we see more than 1
 	if qdCount > 1 {
-		return DNSMessage{}, ErrDNSTooManyQuestions
+		return nil, ErrDNSTooManyQuestions
 	}
 
 	// Parse questions
-	dnsMessage.Questions = make([]DNSQuestion, 0, qdCount)
+	dnsMessage.Questions = make([]*DNSQuestion, 0, qdCount)
 	for i := 0; i < int(qdCount); i++ {
 		var question DNSQuestion
 		var err error
 		question.Name, offset, err = parseDNSName(data, offset)
 		if err != nil {
-			return DNSMessage{}, fmt.Errorf("error parsing question name: %v", err)
+			return nil, fmt.Errorf("error parsing question name: %v", err)
 		}
 		if offset+4 > len(data) {
-			return DNSMessage{}, errors.New("insufficient data for question type and class")
+			return nil, errors.New("insufficient data for question type and class")
 		}
 		question.Type = DNSType(binary.BigEndian.Uint16(data[offset : offset+2]))
 		offset += 2
 		question.Class = binary.BigEndian.Uint16(data[offset : offset+2])
 		offset += 2
-		dnsMessage.Questions = append(dnsMessage.Questions, question)
+		dnsMessage.Questions = append(dnsMessage.Questions, &question)
 	}
 
 	// Parse answers
-	dnsMessage.Answers = make([]DNSRecord, 0, anCount)
+	dnsMessage.Answers = make([]*DNSRecord, 0, anCount)
 	for i := 0; i < int(anCount); i++ {
 		record, newOffset, err := parseResourceRecord(data, offset)
 		if err != nil {
-			return DNSMessage{}, fmt.Errorf("error parsing answer record: %v", err)
+			return nil, fmt.Errorf("error parsing answer record: %v", err)
 		}
-		dnsMessage.Answers = append(dnsMessage.Answers, record)
+		dnsMessage.Answers = append(dnsMessage.Answers, &record)
 		offset = newOffset
 	}
 
 	// Parse authorities
-	dnsMessage.Authorities = make([]DNSRecord, 0, nsCount)
+	dnsMessage.Authorities = make([]*DNSRecord, 0, nsCount)
 	for i := 0; i < int(nsCount); i++ {
 		record, newOffset, err := parseResourceRecord(data, offset)
 		if err != nil {
-			return DNSMessage{}, fmt.Errorf("error parsing authority record: %v", err)
+			return nil, fmt.Errorf("error parsing authority record: %v", err)
 		}
-		dnsMessage.Authorities = append(dnsMessage.Authorities, record)
+		dnsMessage.Authorities = append(dnsMessage.Authorities, &record)
 		offset = newOffset
 	}
 
 	// Parse additionals
-	dnsMessage.Additionals = make([]DNSRecord, 0, arCount)
+	dnsMessage.Additionals = make([]*DNSRecord, 0, arCount)
 	for i := 0; i < int(arCount); i++ {
 		record, newOffset, err := parseResourceRecord(data, offset)
 		if err != nil {
-			return DNSMessage{}, fmt.Errorf("error parsing additional record: %v", err)
+			return nil, fmt.Errorf("error parsing additional record: %v", err)
 		}
-		dnsMessage.Additionals = append(dnsMessage.Additionals, record)
+		dnsMessage.Additionals = append(dnsMessage.Additionals, &record)
 		offset = newOffset
 	}
 
@@ -250,7 +255,7 @@ func ParseDNSMessage(data []byte) (DNSMessage, error) {
 }
 
 // parseDNSName parses a DNS name from the packet, handling compression
-func parseDNSName(data []byte, offset int) (string, int, error) {
+func parseDNSName(data []byte, offset int) ([]byte, int, error) {
 	var name string
 	originalOffset := offset
 	jumped := false
@@ -260,7 +265,7 @@ func parseDNSName(data []byte, offset int) (string, int, error) {
 
 	for {
 		if offset >= len(data) {
-			return "", offset, errors.New("unexpected end of data while parsing name")
+			return nil, offset, errors.New("unexpected end of data while parsing name")
 		}
 
 		length := data[offset]
@@ -268,7 +273,7 @@ func parseDNSName(data []byte, offset int) (string, int, error) {
 		// Check for compression pointer (top 2 bits set)
 		if (length & 0xC0) == 0xC0 {
 			if offset+1 >= len(data) {
-				return "", offset, errors.New("incomplete compression pointer")
+				return nil, offset, errors.New("incomplete compression pointer")
 			}
 
 			// Extract 14-bit offset
@@ -276,19 +281,19 @@ func parseDNSName(data []byte, offset int) (string, int, error) {
 
 			// Validate pointer is within packet bounds
 			if pointer >= len(data) {
-				return "", offset, fmt.Errorf("compression pointer %d exceeds packet length %d", pointer, len(data))
+				return nil, offset, fmt.Errorf("compression pointer %d exceeds packet length %d", pointer, len(data))
 			}
 
 			// Prevent pointing to locations that would cause loops
 			if visited[pointer] {
-				return "", offset, errors.New("compression pointer loop detected")
+				return nil, offset, errors.New("compression pointer loop detected")
 			}
 			visited[pointer] = true
 
 			// Ensure we're not pointing to another compression pointer immediately
 			// (this would be valid but we need to be careful about infinite loops)
 			if pointer == offset {
-				return "", offset, errors.New("compression pointer points to itself")
+				return nil, offset, errors.New("compression pointer points to itself")
 			}
 
 			if !jumped {
@@ -299,7 +304,7 @@ func parseDNSName(data []byte, offset int) (string, int, error) {
 			jumps++
 
 			if jumps > maxJumps {
-				return "", offset, errors.New("too many compression jumps")
+				return nil, offset, errors.New("too many compression jumps")
 			}
 			continue
 		}
@@ -313,12 +318,12 @@ func parseDNSName(data []byte, offset int) (string, int, error) {
 
 		// Validate label length is reasonable (DNS labels max 63 bytes)
 		if length > 63 {
-			return "", offset, fmt.Errorf("invalid label length %d (max 63)", length)
+			return nil, offset, fmt.Errorf("invalid label length %d (max 63)", length)
 		}
 
 		// Check bounds for label
 		if offset+int(length) > len(data) {
-			return "", offset, errors.New("label extends beyond packet")
+			return nil, offset, errors.New("label extends beyond packet")
 		}
 
 		// Add dot separator if not first label
@@ -332,16 +337,16 @@ func parseDNSName(data []byte, offset int) (string, int, error) {
 
 		// Prevent excessively long domain names
 		if len(name) > 253 { // DNS name max length
-			return "", offset, errors.New("domain name too long")
+			return nil, offset, errors.New("domain name too long")
 		}
 	}
 
 	// If we jumped, return the saved offset
 	if jumped {
-		return name, originalOffset, nil
+		return []byte(name), originalOffset, nil
 	}
 
-	return name, offset, nil
+	return []byte(name), offset, nil
 }
 
 // parseResourceRecord parses a resource record from the packet
@@ -415,7 +420,7 @@ func parseResourceRecord(data []byte, offset int) (DNSRecord, int, error) {
 	return record, offset, nil
 }
 
-func MarshalDNSMessage(msg DNSMessage) ([]byte, error) {
+func MarshalDNSMessage(msg *DNSMessage) ([]byte, error) {
 	var buf []byte
 
 	// Header (12 bytes)
@@ -430,11 +435,7 @@ func MarshalDNSMessage(msg DNSMessage) ([]byte, error) {
 
 	// Questions
 	for _, q := range msg.Questions {
-		nameBytes, err := marshalDNSName(q.Name)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling question name '%s': %v", q.Name, err)
-		}
-		buf = append(buf, nameBytes...)
+		buf = append(buf, q.Name...)
 
 		// Type and Class (4 bytes)
 		typeClass := make([]byte, 4)
@@ -473,41 +474,12 @@ func MarshalDNSMessage(msg DNSMessage) ([]byte, error) {
 	return buf, nil
 }
 
-// marshalDNSName converts a domain name string to DNS wire format
-func marshalDNSName(name string) ([]byte, error) {
-	if name == "" {
-		return []byte{0}, nil // Root domain
-	}
-
-	var buf []byte
-	labels := strings.Split(name, ".")
-
-	for _, label := range labels {
-		if len(label) > 63 {
-			return nil, fmt.Errorf("label '%s' too long (max 63 chars)", label)
-		}
-		if len(label) == 0 {
-			continue // Skip empty labels (e.g., trailing dot)
-		}
-
-		buf = append(buf, byte(len(label)))
-		buf = append(buf, []byte(label)...)
-	}
-
-	buf = append(buf, 0) // Null terminator
-	return buf, nil
-}
-
 // marshalResourceRecord converts a DNSRecord to bytes
-func marshalResourceRecord(record DNSRecord) ([]byte, error) {
+func marshalResourceRecord(record *DNSRecord) ([]byte, error) {
 	var buf []byte
 
 	// Marshal name
-	nameBytes, err := marshalDNSName(record.Name)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling record name '%s': %v", record.Name, err)
-	}
-	buf = append(buf, nameBytes...)
+	buf = append(buf, record.Name...)
 
 	// Type, Class, TTL, Data Length (10 bytes)
 	rrHeader := make([]byte, 10)
