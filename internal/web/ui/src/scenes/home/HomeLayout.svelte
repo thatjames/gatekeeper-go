@@ -10,6 +10,7 @@
     HomeOutline,
     LinkOutline,
     ServerOutline,
+    BookOutline,
   } from "flowbite-svelte-icons";
   import { jwtDecode } from "jwt-decode";
   import Router from "svelte-spa-router";
@@ -19,11 +20,17 @@
     "/": wrap({
       asyncComponent: () => import("$scenes/home/HomeScreen.svelte"),
     }),
-    "/dhcp/leases": wrap({
-      asyncComponent: () => import("$scenes/dhcp/LeaseLayout.svelte"),
+    "/dhcp": wrap({
+      asyncComponent: () => import("$scenes/dhcp/DHCPLayout.svelte"),
     }),
-    "/dhcp/settings": wrap({
-      asyncComponent: () => import("$scenes/dhcp/OptionsLayout.svelte"),
+    "/dhcp/*": wrap({
+      asyncComponent: () => import("$scenes/dhcp/DHCPLayout.svelte"),
+    }),
+    "/dns": wrap({
+      asyncComponent: () => import("$scenes/dns/DNSLayout.svelte")
+    }),
+    "/dns/*": wrap({
+      asyncComponent: () => import("$scenes/dns/DNSLayout.svelte")
     }),
   };
 
@@ -38,8 +45,13 @@
           location: Routes.Leases,
           icon: ServerOutline,
         },
-        { label: "Settings", location: Routes.Settings, icon: CogOutline },
+        { label: "Settings", location: Routes.DHCPSettings, icon: CogOutline },
       ],
+    },
+    {
+      label: "DNS",
+      location: Routes.DNSSettings,
+      icon: BookOutline,
     },
   ];
 </script>

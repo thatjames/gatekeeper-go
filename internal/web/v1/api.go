@@ -23,6 +23,11 @@ func SetupV1Endpoints(r *gin.RouterGroup) {
 		log.Info("Registering DHCP endpoints")
 		setupDHCPRoutes(protected)
 	}
+
+	if service.IsRegistered(service.DNS) {
+		log.Info("Registering DNS endpoints")
+		setupDNSRoutes(protected)
+	}
 	setupSystemRoutes(protected)
 }
 
