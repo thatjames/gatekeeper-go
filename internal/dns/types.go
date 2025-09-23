@@ -67,6 +67,15 @@ func (o DNSOpCode) String() string {
 	}
 }
 
+// This is not a type because of OPT records
+const (
+	DNSClassIN   uint16 = 1
+	DNSClassCH   uint16 = 3
+	DNSClassHS   uint16 = 4
+	DNSClassNone uint16 = 254
+	DNSClassANY  uint16 = 255
+)
+
 type DNSRecord struct {
 	ParsedName string
 	Name       []byte
@@ -82,6 +91,16 @@ type DNSMessage struct {
 	Answers     []*DNSRecord
 	Authorities []*DNSRecord
 	Additionals []*DNSRecord
+}
+
+func NewDnsMessage() *DNSMessage {
+	return &DNSMessage{
+		Header:      &DNSHeader{},
+		Questions:   make([]*DNSQuestion, 0),
+		Answers:     make([]*DNSRecord, 0),
+		Authorities: make([]*DNSRecord, 0),
+		Additionals: make([]*DNSRecord, 0),
+	}
 }
 
 type DNSHeader struct {
@@ -166,14 +185,12 @@ type DNSPacket struct {
 	ResponseAddr net.Addr
 }
 
-// stringToDNSWireFormat converts a string domain name to DNS wire format
 func stringToDNSWireFormat(domain string) []byte {
 	if domain == "" || domain == "." {
 		return []byte{0}
 	}
 
 	var result []byte
-	// Remove trailing dot if present
 	if strings.HasSuffix(domain, ".") {
 		domain = domain[:len(domain)-1]
 	}
@@ -185,17 +202,15 @@ func stringToDNSWireFormat(domain string) []byte {
 			continue
 		}
 		if len(label) > 63 {
-			// Label too long, truncate (or handle error as needed)
 			label = label[:63]
 		}
 		result = append(result, byte(len(label)))
 		result = append(result, []byte(label)...)
 	}
-	result = append(result, 0) // null terminator
+	result = append(result, 0)
 	return result
 }
 
-// parseDNSNameWithWireFormat parses a DNS name and returns both the parsed string and original wire format
 func parseDNSNameWithWireFormat(data []byte, offset int) (string, []byte, int, error) {
 	startOffset := offset
 	parsedName, newOffset, err := parseDNSName(data, offset)
@@ -203,39 +218,29 @@ func parseDNSNameWithWireFormat(data []byte, offset int) (string, []byte, int, e
 		return "", nil, offset, err
 	}
 
-	// Extract the original wire format bytes from the packet
-	// This captures the actual bytes as they appeared, including compression pointers
 	var wireFormat []byte
 
-	// Special case: if the name is empty (root domain), it's just a single 0 byte
 	if startOffset < len(data) && data[startOffset] == 0 {
 		wireFormat = []byte{0}
 		return parsedName, wireFormat, newOffset, nil
 	}
 
-	// If compression was used, parseDNSName would have returned a different offset
-	// We need to capture the actual bytes from startOffset to the end of the name
 	currentPos := startOffset
 	for currentPos < len(data) {
 		length := data[currentPos]
 
-		// Check for compression pointer
 		if (length & 0xC0) == 0xC0 {
-			// Include the 2-byte compression pointer and stop
 			wireFormat = append(wireFormat, data[currentPos:currentPos+2]...)
 			break
 		}
 
-		// Include length byte
 		wireFormat = append(wireFormat, length)
 		currentPos++
 
-		// End of name
 		if length == 0 {
 			break
 		}
 
-		// Include label bytes
 		if currentPos+int(length) <= len(data) {
 			wireFormat = append(wireFormat, data[currentPos:currentPos+int(length)]...)
 			currentPos += int(length)
@@ -258,15 +263,12 @@ func ParseDNSMessage(data []byte) (*DNSMessage, error) {
 	}
 	offset := 0
 
-	// Parse header (12 bytes total)
 	dnsMessage.Header.ID = binary.BigEndian.Uint16(data[offset : offset+2])
 	offset += 2
 
-	// Parse flags (2 bytes combined) - store the raw flags
 	dnsMessage.Header.Flags = binary.BigEndian.Uint16(data[offset : offset+2])
 	offset += 2
 
-	// Parse counts
 	qdCount := binary.BigEndian.Uint16(data[offset : offset+2])
 	offset += 2
 	anCount := binary.BigEndian.Uint16(data[offset : offset+2])
@@ -281,7 +283,6 @@ func ParseDNSMessage(data []byte) (*DNSMessage, error) {
 		return nil, ErrDNSTooManyQuestions
 	}
 
-	// Parse questions
 	dnsMessage.Questions = make([]*DNSQuestion, 0, qdCount)
 	for i := 0; i < int(qdCount); i++ {
 		var question DNSQuestion
@@ -300,7 +301,6 @@ func ParseDNSMessage(data []byte) (*DNSMessage, error) {
 		dnsMessage.Questions = append(dnsMessage.Questions, &question)
 	}
 
-	// Parse answers
 	dnsMessage.Answers = make([]*DNSRecord, 0, anCount)
 	for i := 0; i < int(anCount); i++ {
 		record, newOffset, err := parseResourceRecord(data, offset)
@@ -311,7 +311,6 @@ func ParseDNSMessage(data []byte) (*DNSMessage, error) {
 		offset = newOffset
 	}
 
-	// Parse authorities
 	dnsMessage.Authorities = make([]*DNSRecord, 0, nsCount)
 	for i := 0; i < int(nsCount); i++ {
 		record, newOffset, err := parseResourceRecord(data, offset)
@@ -322,7 +321,6 @@ func ParseDNSMessage(data []byte) (*DNSMessage, error) {
 		offset = newOffset
 	}
 
-	// Parse additionals
 	dnsMessage.Additionals = make([]*DNSRecord, 0, arCount)
 	for i := 0; i < int(arCount); i++ {
 		record, newOffset, err := parseResourceRecord(data, offset)
@@ -336,7 +334,6 @@ func ParseDNSMessage(data []byte) (*DNSMessage, error) {
 	return dnsMessage, nil
 }
 
-// parseDNSName parses a DNS name from the packet, handling compression
 func parseDNSName(data []byte, offset int) (string, int, error) {
 	var name string
 	originalOffset := offset
@@ -352,34 +349,28 @@ func parseDNSName(data []byte, offset int) (string, int, error) {
 
 		length := data[offset]
 
-		// Check for compression pointer (top 2 bits set)
 		if (length & 0xC0) == 0xC0 {
 			if offset+1 >= len(data) {
 				return "", offset, errors.New("incomplete compression pointer")
 			}
 
-			// Extract 14-bit offset
 			pointer := int(binary.BigEndian.Uint16(data[offset:offset+2]) & 0x3FFF)
 
-			// Validate pointer is within packet bounds
 			if pointer >= len(data) {
 				return "", offset, fmt.Errorf("compression pointer %d exceeds packet length %d", pointer, len(data))
 			}
 
-			// Prevent pointing to locations that would cause loops
 			if visited[pointer] {
 				return "", offset, errors.New("compression pointer loop detected")
 			}
 			visited[pointer] = true
 
-			// Ensure we're not pointing to another compression pointer immediately
-			// (this would be valid but we need to be careful about infinite loops)
 			if pointer == offset {
 				return "", offset, errors.New("compression pointer points to itself")
 			}
 
 			if !jumped {
-				originalOffset = offset + 2 // Save position after pointer
+				originalOffset = offset + 2
 			}
 			offset = pointer
 			jumped = true
@@ -393,37 +384,30 @@ func parseDNSName(data []byte, offset int) (string, int, error) {
 
 		offset++
 
-		// End of name
 		if length == 0 {
 			break
 		}
 
-		// Validate label length is reasonable (DNS labels max 63 bytes)
 		if length > 63 {
 			return "", offset, fmt.Errorf("invalid label length %d (max 63)", length)
 		}
 
-		// Check bounds for label
 		if offset+int(length) > len(data) {
 			return "", offset, errors.New("label extends beyond packet")
 		}
 
-		// Add dot separator if not first label
 		if len(name) > 0 {
 			name += "."
 		}
 
-		// Extract label
 		name += string(data[offset : offset+int(length)])
 		offset += int(length)
 
-		// Prevent excessively long domain names
-		if len(name) > 253 { // DNS name max length
+		if len(name) > 253 {
 			return "", offset, errors.New("domain name too long")
 		}
 	}
 
-	// If we jumped, return the saved offset
 	if jumped {
 		return name, originalOffset, nil
 	}
@@ -431,46 +415,36 @@ func parseDNSName(data []byte, offset int) (string, int, error) {
 	return name, offset, nil
 }
 
-// parseResourceRecord parses a resource record from the packet
 func parseResourceRecord(data []byte, offset int) (*DNSRecord, int, error) {
 	var record DNSRecord
 	var err error
 	startOffset := offset
 
-	// Parse name and store both parsed and wire format
 	record.ParsedName, record.Name, offset, err = parseDNSNameWithWireFormat(data, offset)
 	if err != nil {
 		return nil, offset, fmt.Errorf("error parsing RR name at offset %d: %v", startOffset, err)
 	}
 
-	// Check bounds for type, class, TTL, and data length
 	if offset+10 > len(data) {
 		return nil, offset, fmt.Errorf("insufficient data for resource record at offset %d (need %d, have %d)", offset, offset+10, len(data))
 	}
 
-	// Parse type
 	record.Type = DNSType(binary.BigEndian.Uint16(data[offset : offset+2]))
 	offset += 2
 
-	// Special handling for EDNS OPT records (RFC 6891)
-	if record.Type == DNSType(41) { // OPT record
-		// OPT records should have empty names - override whatever was parsed
+	if record.Type == DNSTypeOPT {
 		record.ParsedName = ""
-		record.Name = nil // Test expects empty Name field for OPT records
+		record.Name = nil
 
-		// For OPT records, the "class" field is the requestor's UDP payload size
 		udpPayloadSize := binary.BigEndian.Uint16(data[offset : offset+2])
 		offset += 2
 
-		// The TTL field contains extended RCODE, version, and flags
 		extendedInfo := binary.BigEndian.Uint32(data[offset : offset+4])
 		offset += 4
 
-		// Store the UDP payload size in the Class field for OPT records
 		record.Class = udpPayloadSize
 		record.TTL = extendedInfo
 
-		// Parse data length and data normally
 		dataLength := binary.BigEndian.Uint16(data[offset : offset+2])
 		offset += 2
 
@@ -485,13 +459,11 @@ func parseResourceRecord(data []byte, offset int) (*DNSRecord, int, error) {
 		return &record, offset, nil
 	}
 
-	// Regular resource record parsing
 	record.Class = binary.BigEndian.Uint16(data[offset : offset+2])
 	offset += 2
 	record.TTL = binary.BigEndian.Uint32(data[offset : offset+4])
 	offset += 4
 
-	// Parse data length and data
 	dataLength := binary.BigEndian.Uint16(data[offset : offset+2])
 	offset += 2
 
@@ -509,7 +481,6 @@ func parseResourceRecord(data []byte, offset int) (*DNSRecord, int, error) {
 func MarshalDNSMessage(msg *DNSMessage) ([]byte, error) {
 	var buf []byte
 
-	// Header (12 bytes)
 	header := make([]byte, 12)
 	binary.BigEndian.PutUint16(header[0:2], msg.Header.ID)
 	binary.BigEndian.PutUint16(header[2:4], msg.Header.Flags)
@@ -519,18 +490,15 @@ func MarshalDNSMessage(msg *DNSMessage) ([]byte, error) {
 	binary.BigEndian.PutUint16(header[10:12], uint16(len(msg.Additionals)))
 	buf = append(buf, header...)
 
-	// Questions
 	for _, q := range msg.Questions {
 		buf = append(buf, q.Name...)
 
-		// Type and Class (4 bytes)
 		typeClass := make([]byte, 4)
 		binary.BigEndian.PutUint16(typeClass[0:2], uint16(q.Type))
 		binary.BigEndian.PutUint16(typeClass[2:4], q.Class)
 		buf = append(buf, typeClass...)
 	}
 
-	// Answers
 	for _, r := range msg.Answers {
 		recordBytes, err := marshalResourceRecord(r)
 		if err != nil {
@@ -539,7 +507,6 @@ func MarshalDNSMessage(msg *DNSMessage) ([]byte, error) {
 		buf = append(buf, recordBytes...)
 	}
 
-	// Authorities
 	for _, r := range msg.Authorities {
 		recordBytes, err := marshalResourceRecord(r)
 		if err != nil {
@@ -548,7 +515,6 @@ func MarshalDNSMessage(msg *DNSMessage) ([]byte, error) {
 		buf = append(buf, recordBytes...)
 	}
 
-	// Additionals
 	for _, r := range msg.Additionals {
 		recordBytes, err := marshalResourceRecord(r)
 		if err != nil {
@@ -560,23 +526,15 @@ func MarshalDNSMessage(msg *DNSMessage) ([]byte, error) {
 	return buf, nil
 }
 
-// marshalResourceRecord converts a DNSRecord to bytes
 func marshalResourceRecord(record *DNSRecord) ([]byte, error) {
 	var buf []byte
-
-	// Marshal name - use the stored wire format
 	buf = append(buf, record.Name...)
-
-	// Type, Class, TTL, Data Length (10 bytes)
 	rrHeader := make([]byte, 10)
 	binary.BigEndian.PutUint16(rrHeader[0:2], uint16(record.Type))
 	binary.BigEndian.PutUint16(rrHeader[2:4], record.Class)
 	binary.BigEndian.PutUint32(rrHeader[4:8], record.TTL)
 	binary.BigEndian.PutUint16(rrHeader[8:10], uint16(len(record.RData)))
 	buf = append(buf, rrHeader...)
-
-	// RData
 	buf = append(buf, record.RData...)
-
 	return buf, nil
 }

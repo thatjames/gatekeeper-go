@@ -113,7 +113,7 @@ func (ts *DNSFeatureTestSuite) thatServerHasACacheForWithIP(domain string, ip st
 }
 
 func (ts *DNSFeatureTestSuite) iSendADNSRequestAFor(ctx context.Context, domain string) (context.Context, error) {
-	dnsRecord, err := ts.resolver.Resolve(domain)
+	dnsRecord, err := ts.resolver.Resolve(domain, DNSTypeA)
 	if err != nil {
 		return nil, err
 	}
