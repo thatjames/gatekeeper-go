@@ -2,6 +2,7 @@ package dns
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"net"
 	"sort"
@@ -69,10 +70,13 @@ func (r *DNSResolver) Resolve(domain string, class DNSType) (*DNSRecord, error) 
 		log.Debugf("found %s in blacklist", domain)
 		return nil, ErrNxDomain
 	}
-	if cacheItem, ok := r.cache[domain]; ok {
+	if cacheItem, ok := r.cache[fmt.Sprintf("%s%s", domain, class)]; ok {
 		if cacheItem.ttl.After(time.Now()) {
-			log.Debugf("found %v in cache", cacheItem)
+			log.Debugf("found %s - %s in cache", cacheItem.record.ParsedName, cacheItem.record.Type)
 			return cacheItem.record, nil
+		} else {
+			log.Debugf("removing expired cache item for %s", domain)
+			delete(r.cache, domain)
 		}
 	}
 	for _, upstream := range r.upstream {
@@ -80,6 +84,11 @@ func (r *DNSResolver) Resolve(domain string, class DNSType) (*DNSRecord, error) 
 		if err != nil {
 			log.Error("unable to lookup: ", err.Error())
 			continue
+		}
+		log.Debugf("cache %s%s with value %s", domain, class, record.ParsedName)
+		r.cache[fmt.Sprintf("%s%s", domain, class)] = &DNSCacheItem{
+			record: record,
+			ttl:    time.Now().Add(time.Duration(record.TTL) * time.Second),
 		}
 		return record, nil
 	}
