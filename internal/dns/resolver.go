@@ -99,6 +99,7 @@ func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (*
 	log.Debugf("looking up %s in %s", domain, upstream.String())
 	message := NewDnsMessage()
 	message.Header.ID = uint16(rand.Intn(65535))
+	message.Header.SetRD(true)
 
 	question := new(DNSQuestion)
 	question.Name = stringToDNSWireFormat(domain)

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -32,6 +33,7 @@ func main() {
 	if err := config.LoadConfig(configFile); err != nil {
 		panic(err)
 	}
+	log.SetReportCaller(true)
 	log.SetFormatter(logFormatFunc(formatLogEntry))
 	if debug {
 		log.SetLevel(log.DebugLevel)
@@ -94,7 +96,11 @@ func (fn logFormatFunc) Format(e *log.Entry) ([]byte, error) {
 }
 
 func formatLogEntry(e *log.Entry) ([]byte, error) {
-	msg := bytes.NewBuffer([]byte(fmt.Sprintf("%s %s - %s", e.Time.Format("2006-01-02 15:04:05"), strings.ToUpper(e.Level.String()), e.Message)))
+	funcName := ""
+	if e.Caller != nil {
+		funcName = filepath.Base(e.Caller.Function)
+	}
+	msg := bytes.NewBuffer([]byte(fmt.Sprintf("%s %s %s - %s", e.Time.Format("2006-01-02 15:04:05"), funcName, strings.ToUpper(e.Level.String()), e.Message)))
 	for key, dataField := range e.Data {
 		msg.WriteString(fmt.Sprintf(" %s: %v", key, dataField))
 	}
