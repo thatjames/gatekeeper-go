@@ -1,6 +1,8 @@
 package dns
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -8,6 +10,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -70,9 +73,13 @@ func (r *DNSResolver) Resolve(domain string, class DNSType) (*DNSRecord, error) 
 		log.Debugf("found %s in blacklist", domain)
 		return nil, ErrNxDomain
 	}
-	if cacheItem, ok := r.cache[fmt.Sprintf("%s%s", domain, class)]; ok {
+	keyBuff := bytes.NewBufferString(domain)
+	binary.Write(keyBuff, binary.BigEndian, class)
+	cacheKey := fmt.Sprintf("%x", keyBuff.Bytes())
+	if cacheItem, ok := r.cache[cacheKey]; ok {
 		if cacheItem.ttl.After(time.Now()) {
 			log.Debugf("found %s - %s in cache", cacheItem.record.ParsedName, cacheItem.record.Type)
+			cacheHitCounter.With(prometheus.Labels{"domain": domain}).Inc()
 			return cacheItem.record, nil
 		} else {
 			log.Debugf("removing expired cache item for %s", domain)
@@ -83,10 +90,12 @@ func (r *DNSResolver) Resolve(domain string, class DNSType) (*DNSRecord, error) 
 		record, err := r.lookup(domain, class, upstream)
 		if err != nil {
 			log.Error("unable to lookup: ", err.Error())
+			queryCounter.With(prometheus.Labels{"domain": domain, "upstream": upstream.String(), "result": "failed"}).Inc()
 			continue
 		}
-		log.Debugf("cache %s%s with value %s", domain, class, record.ParsedName)
-		r.cache[fmt.Sprintf("%s%s", domain, class)] = &DNSCacheItem{
+		queryCounter.With(prometheus.Labels{"domain": domain, "upstream": upstream.String(), "result": "success"}).Inc()
+		log.Tracef("cache %s%s with value %s", domain, class, record.ParsedName)
+		r.cache[cacheKey] = &DNSCacheItem{
 			record: record,
 			ttl:    time.Now().Add(time.Duration(record.TTL) * time.Second),
 		}

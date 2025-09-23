@@ -3,6 +3,7 @@ package dns
 import (
 	"fmt"
 	"net"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -23,9 +24,15 @@ type DNSServer struct {
 	opts         *DNSServerOpts
 	resolver     *DNSResolver
 	packetConn   net.PacketConn
-	receiverChan chan *DNSPacket
-	responseChan chan *DNSPacket
+	receiverChan chan *dnsWorkItem
+	responseChan chan *dnsWorkItem
 	exitChan     chan struct{}
+}
+
+type dnsWorkItem struct {
+	*DNSPacket
+	err       error
+	startTime time.Time
 }
 
 func NewDNSServer() *DNSServer {
@@ -37,8 +44,8 @@ func NewDNSServerWithOpts(opts DNSServerOpts) *DNSServer {
 		resolver:     NewDNSResolverWithDefaultOpts(),
 		opts:         &opts,
 		packetConn:   nil,
-		receiverChan: make(chan *DNSPacket, 100),
-		responseChan: make(chan *DNSPacket, 100),
+		receiverChan: make(chan *dnsWorkItem, 100),
+		responseChan: make(chan *dnsWorkItem, 100),
 		exitChan:     make(chan struct{}),
 	}
 }
@@ -74,37 +81,44 @@ func (d *DNSServer) listen() {
 				log.Error("unable to read datastream: ", err.Error())
 				continue
 			}
+			workItem := &dnsWorkItem{
+				startTime: time.Now(),
+			}
 			buff = buff[:n]
-			log.Debugf("received %d bytes from %s", n, d.packetConn.LocalAddr().String())
+			log.Tracef("received %d bytes from %s", n, d.packetConn.LocalAddr().String())
 			msg, err := ParseDNSMessage(buff)
 			if err != nil {
 				log.Error("unable to parse DNS message: ", err.Error())
+				workItem.err = err
 			} else {
-				d.receiverChan <- &DNSPacket{
+				workItem.DNSPacket = &DNSPacket{
 					DNSMessage:   msg,
 					ResponseAddr: addr,
 				}
 			}
+			d.receiverChan <- workItem
 		}
 	}
 }
 
 func (d *DNSServer) receiverWorker() {
 	for packet := range d.receiverChan {
-		log.Debugf("received DNS packet from %s", packet.ResponseAddr.String())
-		response, err := d.resolver.Resolve(packet.DNSMessage.Questions[0].ParsedName, packet.DNSMessage.Questions[0].Type)
-		if err != nil {
-			if err == ErrNxDomain {
-				packet.DNSMessage.Header.SetRCODE(RCODENameFailure)
-			} else {
-				packet.DNSMessage.Header.SetRCODE(RCODEServerFailure)
-			}
-			log.Error("unable to resolve: ", err.Error())
-			continue
+		if packet.err != nil { //almost always because of a malformed packet
+			packet.DNSMessage.Header.SetRCODE(RCODEFormatError)
 		} else {
-			packet.DNSMessage.Header.SetRCODE(RCODESuccess)
-			packet.DNSMessage.Header.SetQR(true)
-			packet.DNSMessage.Answers = append(make([]*DNSRecord, 0), response)
+			log.Tracef("received DNS packet from %s", packet.ResponseAddr.String())
+			response, err := d.resolver.Resolve(packet.DNSMessage.Questions[0].ParsedName, packet.DNSMessage.Questions[0].Type)
+			if err != nil {
+				if err == ErrNxDomain {
+					packet.DNSMessage.Header.SetRCODE(RCODENameFailure)
+				} else {
+					packet.DNSMessage.Header.SetRCODE(RCODEServerFailure)
+				}
+			} else {
+				packet.DNSMessage.Header.SetRCODE(RCODESuccess)
+				packet.DNSMessage.Header.SetQR(true)
+				packet.DNSMessage.Answers = append(make([]*DNSRecord, 0), response)
+			}
 		}
 		d.responseChan <- packet
 	}
@@ -112,18 +126,18 @@ func (d *DNSServer) receiverWorker() {
 
 func (d *DNSServer) responseWorker() {
 	for packet := range d.responseChan {
-		log.Debugf("sending DNS packet to %s", packet.ResponseAddr.String())
+		log.Tracef("sending DNS response packet to %s", packet.ResponseAddr.String())
 		packet.Header.SetQR(true)
 		data, err := MarshalDNSMessage(packet.DNSMessage)
 		if err != nil {
 			log.Error("unable to marshal DNS packet: ", err.Error())
 			continue
 		}
-		n, err := d.packetConn.WriteTo(data, packet.ResponseAddr)
+		_, err = d.packetConn.WriteTo(data, packet.ResponseAddr)
+		timeElapsed := time.Since(packet.startTime).Round(time.Millisecond)
+		reqDuration.Observe(float64(timeElapsed.Milliseconds()))
 		if err != nil {
 			log.Error("unable to send DNS packet: ", err.Error())
-		} else {
-			log.Debugf("sent %d bytes to %s", n, packet.ResponseAddr.String())
 		}
 	}
 }

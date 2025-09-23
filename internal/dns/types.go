@@ -6,6 +6,27 @@ import (
 	"fmt"
 	"net"
 	"strings"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+)
+
+var (
+	reqDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:    "dns_req_time",
+		Help:    "dns request time in ms buckets",
+		Buckets: []float64{1, 10, 100, 250, 500, 1000, 2500, 5000, 10000},
+	})
+
+	queryCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "dns_query_counter",
+		Help: "Count by domain",
+	}, []string{"domain", "upstream", "result"})
+
+	cacheHitCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "dns_cache_hit_counter",
+		Help: "count of cache hits by domain",
+	}, []string{"domain"})
 )
 
 var (
