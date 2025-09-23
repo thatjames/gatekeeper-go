@@ -18,3 +18,10 @@ Web:
   TLS: null
   HTPasswdFile: .htpasswd
   Prometheus: true
+DNS:
+  UpstreamServers:
+    - 8.8.8.8
+    - 1.1.1.1
+  Interface: enp34s0
+  LocalDomains:
+    international-space-station: 10.0.0.2

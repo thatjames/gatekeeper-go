@@ -85,9 +85,9 @@ type TLSConfig struct {
 }
 
 type DNS struct {
-	UpstreamServers []string `yaml:"UpstreamServers"`
-	Port            int      `yaml:"Port"`
-	Interface       string   `yaml:"Interface"`
+	UpstreamServers []string          `yaml:"UpstreamServers"`
+	Interface       string            `yaml:"Interface"`
+	LocalDomains    map[string]string `yaml:"LocalDomains"`
 }
 
 func LoadConfig(filePath string) error {

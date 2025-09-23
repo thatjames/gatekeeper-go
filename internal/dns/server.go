@@ -9,10 +9,11 @@ import (
 )
 
 type DNSServerOpts struct {
-	Options   *DNSServerOpts
-	Interface string
-	Port      int
-	Upstream  []string
+	Options      *DNSServerOpts
+	Interface    string
+	Port         int
+	Upstream     []string
+	ResolverOpts *ResolverOpts
 }
 
 var defaultDNSServerOpts = DNSServerOpts{

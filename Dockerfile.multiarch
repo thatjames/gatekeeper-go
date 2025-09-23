@@ -18,6 +18,7 @@ RUN case "$TARGETPLATFORM" in \
     esac && \
     rm -rf /tmp/binaries
 
-ENV GIN_MODE=release
-
+EXPOSE 8085
+EXPOSE 53
+EXPOSE 67
 ENTRYPOINT ["/app/gatekeeper"]

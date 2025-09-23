@@ -23,21 +23,22 @@ var (
 )
 
 type DNSResolver struct {
-	cache     map[string]*DNSCacheItem
-	upstream  []net.IP
-	blacklist []string
+	cache        map[string]*DNSCacheItem
+	upstream     []net.IP
+	blacklist    []string
+	localDomains map[string]net.IP
 }
 
 type ResolverOpts struct {
-	Upstreams []string
-	Blacklist []string
-	TTL       time.Duration
+	Upstreams    []string
+	Blacklist    []string
+	LocalDomains map[string]net.IP
 }
 
 var defaultResolverOpts = ResolverOpts{
-	Upstreams: []string{"1.1.1.1", "9.9.9.9"},
-	Blacklist: []string{},
-	TTL:       300,
+	Upstreams:    []string{"1.1.1.1", "9.9.9.9"},
+	Blacklist:    []string{},
+	LocalDomains: make(map[string]net.IP),
 }
 
 type DNSCacheItem struct {
@@ -61,9 +62,10 @@ func NewDNSResolverWithOpts(options ResolverOpts) *DNSResolver {
 		upstreamAddrs = append(upstreamAddrs, ip)
 	}
 	return &DNSResolver{
-		cache:     make(map[string]*DNSCacheItem),
-		upstream:  upstreamAddrs,
-		blacklist: options.Blacklist,
+		cache:        make(map[string]*DNSCacheItem),
+		upstream:     upstreamAddrs,
+		blacklist:    options.Blacklist,
+		localDomains: options.LocalDomains,
 	}
 }
 

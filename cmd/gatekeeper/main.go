@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -21,14 +22,15 @@ import (
 
 // Flags
 var (
-	configFile string
-	debug      bool
-	version    = "development-build"
+	configFile   string
+	debug, trace bool
+	version      = "development-build"
 )
 
 func main() {
 	flag.StringVar(&configFile, "config", "config.yml", "config file")
 	flag.BoolVar(&debug, "debug", false, "verbose printout")
+	flag.BoolVar(&trace, "trace", false, "very verbose printout")
 	flag.Parse()
 	if err := config.LoadConfig(configFile); err != nil {
 		panic(err)
@@ -52,16 +54,22 @@ func main() {
 
 	if config.Config.DNS != nil {
 		log.Info("Registering DNS server")
+		localDomains := make(map[string]net.IP)
+		for domain, ip := range config.Config.DNS.LocalDomains {
+			localDomains[domain] = net.ParseIP(ip).To4()
+		}
 		dnsServer := dns.NewDNSServerWithOpts(dns.DNSServerOpts{
 			Interface: config.Config.DNS.Interface,
-			Port:      config.Config.DNS.Port,
-			Upstream:  config.Config.DNS.UpstreamServers,
+			ResolverOpts: &dns.ResolverOpts{
+				LocalDomains: localDomains,
+				Upstreams:    config.Config.DNS.UpstreamServers,
+			},
 		})
 		service.Register(dnsServer, service.DNS)
 	}
 
 	if config.Config.Web != nil {
-		log.Debug("Registering web server")
+		log.Info("Registering web server")
 		go func() {
 			if err := web.Init(version, config.Config.Web); err != nil {
 				log.Error("unable to start web server:", err)

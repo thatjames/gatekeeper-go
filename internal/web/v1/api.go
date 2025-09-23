@@ -36,6 +36,11 @@ func setupDHCPRoutes(g *gin.RouterGroup) {
 	dhcp.PUT("/options", updateDHCPOptions)
 }
 
+func setupDNSRoutes(g *gin.RouterGroup) {
+	dns := g.Group("/dns")
+	dns.GET("/config", getDNSConfig)
+}
+
 func setupSystemRoutes(g *gin.RouterGroup) {
 	system := g.Group("/system")
 	system.GET("/info", getSystemInfo)
