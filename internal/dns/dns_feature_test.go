@@ -1,8 +1,10 @@
 package dns
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/binary"
 	"flag"
 	"fmt"
 	"net"
@@ -100,7 +102,10 @@ func (ts *DNSFeatureTestSuite) iShouldReceiveADNSPacketWithTheIP(ctx context.Con
 }
 
 func (ts *DNSFeatureTestSuite) thatServerHasACacheForWithIP(domain string, ip string) error {
-	ts.resolver.cache[domain] = &DNSCacheItem{
+	keyBuff := bytes.NewBufferString(domain)
+	binary.Write(keyBuff, binary.BigEndian, DNSTypeA)
+	cacheKey := fmt.Sprintf("%x", keyBuff.Bytes())
+	ts.resolver.cache[cacheKey] = &DNSCacheItem{
 		record: &DNSRecord{
 			Type:  DNSTypeA,
 			Class: 1,
@@ -115,7 +120,7 @@ func (ts *DNSFeatureTestSuite) thatServerHasACacheForWithIP(domain string, ip st
 func (ts *DNSFeatureTestSuite) iSendADNSRequestAFor(ctx context.Context, domain string) (context.Context, error) {
 	dnsRecord, err := ts.resolver.Resolve(domain, DNSTypeA)
 	if err != nil {
-		return nil, err
+		return context.Background(), err
 	}
 
 	return context.WithValue(ctx, DNSQueryContextKey, dnsRecord), nil
