@@ -51,6 +51,7 @@ func setupSystemRoutes(g *gin.RouterGroup) {
 	system.GET("/info", getSystemInfo)
 	system.GET("/interfaces/dhcp", getDHCPInterfaces)
 	system.GET("/version", getVersion)
+	system.GET("/modules", getModules)
 }
 
 func loginHandler(c *gin.Context) {

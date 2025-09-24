@@ -16,3 +16,9 @@ api.get("/system/version").then((resp) => {
 export const getSystemInfo = () => {
   return api.get("/system/info");
 };
+
+export let modules = writable([]);
+
+api.get("/system/modules").then((resp) => {
+  modules.set(resp)
+})

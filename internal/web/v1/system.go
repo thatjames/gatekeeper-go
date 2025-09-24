@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/system"
 )
 
@@ -37,4 +38,9 @@ func getVersion(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"version": system.Version,
 	})
+}
+
+func getModules(c *gin.Context) {
+	services := service.GetActiveServices()
+	c.JSON(http.StatusOK, services)
 }

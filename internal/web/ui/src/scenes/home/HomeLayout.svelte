@@ -4,6 +4,7 @@
   import { MenuComponent } from "$lib/common/menu-types";
   import { Routes } from "$lib/common/routes";
   import { getLeases } from "$lib/dhcp/lease";
+  import { modules } from "$lib/system/system";
   import { Button, P } from "flowbite-svelte";
   import {
     CogOutline,
@@ -27,16 +28,15 @@
       asyncComponent: () => import("$scenes/dhcp/DHCPLayout.svelte"),
     }),
     "/dns": wrap({
-      asyncComponent: () => import("$scenes/dns/DNSLayout.svelte")
+      asyncComponent: () => import("$scenes/dns/DNSLayout.svelte"),
     }),
     "/dns/*": wrap({
-      asyncComponent: () => import("$scenes/dns/DNSLayout.svelte")
+      asyncComponent: () => import("$scenes/dns/DNSLayout.svelte"),
     }),
   };
 
-  const menuOptions = [
-    { label: "Home", location: Routes.Home, icon: HomeOutline },
-    {
+  const serviceConfig = {
+    dhcp: {
       label: "DHCP",
       type: MenuComponent.Dropdown,
       items: [
@@ -48,12 +48,36 @@
         { label: "Settings", location: Routes.DHCPSettings, icon: CogOutline },
       ],
     },
-    {
+    dns: {
       label: "DNS",
       location: Routes.DNSSettings,
       icon: BookOutline,
     },
-  ];
+  };
+
+  const generateMenuOptions = (modulesList) => {
+    const menuOptions = [
+      { label: "Home", location: Routes.Home, icon: HomeOutline },
+    ];
+
+    if (modulesList && Array.isArray(modulesList)) {
+      modulesList.forEach((module) => {
+        const moduleKey = module.toLowerCase();
+        if (serviceConfig[moduleKey]) {
+          menuOptions.push(serviceConfig[moduleKey]);
+        }
+      });
+    }
+    return menuOptions;
+  };
+
+  let menuOptions = $state([
+    { label: "Home", location: Routes.Home, icon: HomeOutline },
+  ]);
+
+  $effect(() => {
+    menuOptions = generateMenuOptions($modules);
+  });
 </script>
 
 <div class="flex flex-col gap-5">
