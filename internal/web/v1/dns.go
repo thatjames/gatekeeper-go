@@ -8,15 +8,17 @@ import (
 )
 
 type DNSConfigResponse struct {
-	Upstreams    string            `json:"upstreams"`
-	LocalDomains map[string]string `json:"localDomains"`
-	Interface    string            `json:"interface"`
+	Upstreams string `json:"upstreams"`
+	Interface string `json:"interface"`
 }
 
 func getDNSConfig(c *gin.Context) {
 	c.JSON(200, DNSConfigResponse{
-		Upstreams:    strings.Join(config.Config.DNS.UpstreamServers, ","),
-		LocalDomains: config.Config.DNS.LocalDomains,
-		Interface:    config.Config.DNS.Interface,
+		Upstreams: strings.Join(config.Config.DNS.UpstreamServers, ","),
+		Interface: config.Config.DNS.Interface,
 	})
+}
+
+func getLocalDomains(c *gin.Context) {
+	c.JSON(200, config.Config.DNS.LocalDomains)
 }

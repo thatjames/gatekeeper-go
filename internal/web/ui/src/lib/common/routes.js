@@ -5,4 +5,5 @@ export const Routes = {
   LeaseDetails: "/leases/details",
   DHCPSettings: "/dhcp/settings",
   DNSSettings: "/dns/settings",
+  DNSLocalDomains: "/dns/local-domains",
 };

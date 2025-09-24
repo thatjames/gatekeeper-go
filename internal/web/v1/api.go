@@ -44,6 +44,7 @@ func setupDHCPRoutes(g *gin.RouterGroup) {
 func setupDNSRoutes(g *gin.RouterGroup) {
 	dns := g.Group("/dns")
 	dns.GET("/config", getDNSConfig)
+	dns.GET("/local-domains", getLocalDomains)
 }
 
 func setupSystemRoutes(g *gin.RouterGroup) {

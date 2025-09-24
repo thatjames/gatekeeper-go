@@ -49,9 +49,20 @@
       ],
     },
     dns: {
+      type: MenuComponent.Dropdown,
       label: "DNS",
-      location: Routes.DNSSettings,
-      icon: BookOutline,
+      items: [
+        {
+          label: "Settings",
+          location: Routes.DNSSettings,
+          icon: CogOutline,
+        },
+        {
+          label: "Local Domains",
+          location: Routes.DNSLocalDomains,
+          icon: BookOutline,
+        },
+      ],
     },
   };
 
