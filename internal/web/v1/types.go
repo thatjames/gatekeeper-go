@@ -96,6 +96,49 @@ func (z *DhcpLeaseRequest) Validate() []ValidationError {
 	return nil
 }
 
+type DNSConfigResponse struct {
+	Upstreams string `json:"upstreams"`
+	Interface string `json:"interface"`
+}
+
+type LocalDomainRequest struct {
+	Domain string `json:"domain"`
+	IP     string `json:"ip"`
+}
+
+func (z *LocalDomainRequest) Validate() []ValidationError {
+	validationErrors := make([]ValidationError, 0)
+	if z.Domain == "" {
+		validationErrors = append(validationErrors, ValidationError{
+			Field:   "domain",
+			Message: "Domain is required",
+		})
+	}
+	if z.IP == "" {
+		validationErrors = append(validationErrors, ValidationError{
+			Field:   "ip",
+			Message: "IP address is required",
+		})
+	} else {
+		ipRegex := regexp.MustCompile(`^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$`)
+		if !ipRegex.MatchString(z.IP) {
+			validationErrors = append(validationErrors, ValidationError{
+				Field:   "ip",
+				Message: "IP address must be a valid IP address",
+			})
+		} else if net.ParseIP(z.IP).To4() == nil {
+			validationErrors = append(validationErrors, ValidationError{
+				Field:   "ip",
+				Message: "IP address must be a valid IPv4 address",
+			})
+		}
+	}
+	if len(validationErrors) > 0 {
+		return validationErrors
+	}
+	return nil
+}
+
 type Lease struct {
 	ClientId string `json:"clientId"`
 	Hostname string `json:"hostname"`

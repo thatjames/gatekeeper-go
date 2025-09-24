@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -27,6 +28,7 @@ type DNSResolver struct {
 	upstream     []net.IP
 	blacklist    []string
 	localDomains map[string]net.IP
+	domainLock   *sync.RWMutex
 }
 
 type ResolverOpts struct {
@@ -66,6 +68,7 @@ func NewDNSResolverWithOpts(options ResolverOpts) *DNSResolver {
 		upstream:     upstreamAddrs,
 		blacklist:    options.Blacklist,
 		localDomains: options.LocalDomains,
+		domainLock:   new(sync.RWMutex),
 	}
 }
 
@@ -104,6 +107,23 @@ func (r *DNSResolver) Resolve(domain string, class DNSType) (*DNSRecord, error) 
 		return record, nil
 	}
 	return nil, ErrNxDomain
+}
+
+func (r *DNSResolver) AddLocalDomain(domain string, ip net.IP) error {
+	defer r.domainLock.Unlock()
+	r.domainLock.Lock()
+	if localAddr := net.ParseIP(ip.String()).To4(); localAddr == nil || localAddr.Equal(net.IPv4zero) {
+		return errors.New("invalid IP address")
+	} else {
+		r.localDomains[domain] = localAddr
+	}
+	return nil
+}
+
+func (r *DNSResolver) DeleteLocalDomain(domain string) {
+	defer r.domainLock.Unlock()
+	r.domainLock.Lock()
+	delete(r.localDomains, domain)
 }
 
 func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (*DNSRecord, error) {

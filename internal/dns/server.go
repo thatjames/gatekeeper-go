@@ -69,6 +69,22 @@ func (d *DNSServer) Stop() error {
 	return nil
 }
 
+func (d *DNSServer) Options() *DNSServerOpts {
+	return d.opts
+}
+
+func (d *DNSServer) UpdateOptions(opts *DNSServerOpts) {
+	d.opts = opts
+}
+
+func (d *DNSServer) AddLocalDomain(domain string, ip string) error {
+	return d.resolver.AddLocalDomain(domain, net.ParseIP(ip).To4())
+}
+
+func (d *DNSServer) DeleteLocalDomain(domain string) {
+	d.resolver.DeleteLocalDomain(domain)
+}
+
 func (d *DNSServer) listen() {
 	buff := make([]byte, 1500)
 	defer d.packetConn.Close()

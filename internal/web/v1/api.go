@@ -45,6 +45,9 @@ func setupDNSRoutes(g *gin.RouterGroup) {
 	dns := g.Group("/dns")
 	dns.GET("/config", getDNSConfig)
 	dns.GET("/local-domains", getLocalDomains)
+	dns.POST("/local-domains", addLocalDomain)
+	dns.PUT("/local-domains/:domain", updateLocalDomain)
+	dns.DELETE("/local-domains/:domain", deleteLocalDomain)
 }
 
 func setupSystemRoutes(g *gin.RouterGroup) {

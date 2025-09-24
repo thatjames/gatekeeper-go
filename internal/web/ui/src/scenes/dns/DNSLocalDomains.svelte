@@ -1,5 +1,10 @@
 <script>
-  import { getLocalDomains } from "$lib/dns/dns";
+  import {
+    createLocalDomain,
+    deleteLocalDomain,
+    getLocalDomains,
+    updateLocalDomain,
+  } from "$lib/dns/dns";
   import {
     Heading,
     Table,
@@ -12,18 +17,75 @@
     Label,
     Input,
     Button,
+    Helper,
     Tooltip,
   } from "flowbite-svelte";
 
   let localDomains = $state({});
   let activeDomain = $state({});
+  let originalDomain = $state("");
   let showLocalDomain = $state(false);
   let fieldErrors = $state({});
   let generalError = $state("");
 
   const onAddClick = () => {
     activeDomain = {};
+    originalDomain = "";
     showLocalDomain = true;
+  };
+
+  const createDomainClick = () => {
+    createLocalDomain(activeDomain)
+      .then((resp) => {
+        localDomains = resp;
+        showLocalDomain = false;
+      })
+      .catch((err) => handleError(err));
+  };
+
+  const deleteDomainClick = () => {
+    const domainToDelete = originalDomain || activeDomain.domain;
+    deleteLocalDomain(domainToDelete).then((resp) => {
+      localDomains = resp;
+      showLocalDomain = false;
+    });
+  };
+
+  const updateLocalDomainClick = () => {
+    const updatePayload = {
+      ...activeDomain,
+      originalDomain: originalDomain,
+    };
+    updateLocalDomain(originalDomain, activeDomain).then((resp) => {
+      localDomains = resp;
+      showLocalDomain = false;
+    });
+  };
+
+  const handleError = (error) => {
+    console.log("handle error", error);
+    if (error.fields && Array.isArray(error.fields)) {
+      fieldErrors = error.fields.reduce((acc, fieldError) => {
+        acc[fieldError.field] = fieldError.message;
+        return acc;
+      }, {});
+
+      if (error.error) {
+        generalError = error.error;
+      }
+    }
+  };
+
+  const clearFieldError = (fieldName) => {
+    if (fieldErrors[fieldName]) {
+      const newFieldErrors = { ...fieldErrors };
+      delete newFieldErrors[fieldName];
+      fieldErrors = newFieldErrors;
+    }
+
+    if (generalError) {
+      generalError = "";
+    }
   };
 
   $effect(() => {
@@ -37,21 +99,27 @@
 <Modal
   bind:open={showLocalDomain}
   title={activeDomain.domain ? "Local Domain Details" : "Add New Local Domain"}
-  oncancel={() => (activeDomain = {})}
+  oncancel={() => {
+    activeDomain = {};
+    originalDomain = "";
+    fieldErrors = {};
+    generalError = "";
+  }}
 >
   <div class="flex flex-col gap-5 items-center justify-center">
     <form class="w-1/2 flex flex-col gap-4">
       <div>
         <Label for="domain" class="mb-2">Domain:</Label>
         <Input
-          id="clientId"
+          id="domain"
           placeholder="example.com"
-          color={fieldErrors.clientId ? "red" : "default"}
+          color={fieldErrors.domain ? "red" : "default"}
+          oninput={() => clearFieldError("domain")}
           bind:value={activeDomain.domain}
         />
-        {#if fieldErrors.clientId}
+        {#if fieldErrors.domain}
           <Helper class="mt-2" color="red">
-            {fieldErrors.clientId}
+            {fieldErrors.domain}
           </Helper>
         {/if}
       </div>
@@ -61,9 +129,9 @@
         <Input
           id="domain"
           placeholder="127.0.0.1"
-          oninput={() => clearFieldError("ip")}
+          oninput={() => clearFieldError("address")}
           color={fieldErrors.ip ? "red" : "default"}
-          bind:value={activeDomain.address}
+          bind:value={activeDomain.ip}
         />
         {#if fieldErrors.ip}
           <Helper class="mt-2" color="red">
@@ -72,21 +140,34 @@
         {/if}
       </div>
 
-      {#if activeDomain.domain}
+      {#if originalDomain}
         <div class="flex gap-3 mt-4 items-center justify-center">
-          <Button disabled={fieldErrors.ip} outline>Save</Button>
+          <Button
+            disabled={fieldErrors.domain}
+            outline
+            onclick={updateLocalDomainClick}>Save</Button
+          >
           <Tooltip>Updates the local domain</Tooltip>
 
-          <Button outline color="red">Delete</Button>
+          <Button outline color="red" onclick={deleteDomainClick}>Delete</Button
+          >
           <Tooltip>Deletes the local domain</Tooltip>
         </div>
       {:else}
         <div class="flex gap-3 mt-4 items-center justify-center">
-          <Button disabled={fieldErrors.ip} outline>Save</Button>
-          <Tooltip>Updates the local domain</Tooltip>
+          <Button
+            disabled={fieldErrors.domain}
+            outline
+            onclick={createDomainClick}>Create</Button
+          >
+          <Tooltip>Creates a new local domain</Tooltip>
 
-          <Button outline color="dark" onclick={() => (showLocalDomain = false)}
-            >Cancel</Button
+          <Button
+            outline
+            color="dark"
+            onclick={() => {
+              showLocalDomain = false;
+            }}>Cancel</Button
           >
           <Tooltip>Close this popup</Tooltip>
         </div>
@@ -109,16 +190,17 @@
     </TableHead>
     <TableBody>
       {#if Object.keys(localDomains).length > 0}
-        {#each Object.entries(localDomains) as [domain, address]}
+        {#each Object.entries(localDomains) as [domain, ip]}
           <TableBodyRow
             class="group hover:cursor-pointer"
             onclick={() => {
               showLocalDomain = true;
-              activeDomain = { domain, address };
+              activeDomain = { domain, ip };
+              originalDomain = domain;
             }}
           >
             <TableBodyCell>{domain}</TableBodyCell>
-            <TableBodyCell>{address}</TableBodyCell>
+            <TableBodyCell>{ip}</TableBodyCell>
           </TableBodyRow>
         {/each}
       {:else}
