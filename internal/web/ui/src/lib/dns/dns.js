@@ -22,3 +22,7 @@ export const updateLocalDomain = (originalName, localDomainRecord) => {
     ip: localDomainRecord.ip 
   });
 }
+
+export const updateDNSSettings = (settings) => {
+    return api.put("/dns/config", settings)
+}

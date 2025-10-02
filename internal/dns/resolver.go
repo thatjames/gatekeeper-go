@@ -72,14 +72,14 @@ func NewDNSResolverWithOpts(options ResolverOpts) *DNSResolver {
 	}
 }
 
-func (r *DNSResolver) Resolve(domain string, class DNSType) (*DNSRecord, error) {
+func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (*DNSRecord, error) {
 	log.Debugf("resolving %s", domain)
 	if index := sort.SearchStrings(r.blacklist, domain); index < len(r.blacklist) && r.blacklist[index] == domain {
 		log.Debugf("found %s in blacklist", domain)
 		return nil, ErrNxDomain
 	}
 	keyBuff := bytes.NewBufferString(domain)
-	binary.Write(keyBuff, binary.BigEndian, class)
+	binary.Write(keyBuff, binary.BigEndian, dnsType)
 	cacheKey := fmt.Sprintf("%x", keyBuff.Bytes())
 	if cacheItem, ok := r.cache[cacheKey]; ok {
 		if cacheItem.ttl.After(time.Now()) {
@@ -90,16 +90,29 @@ func (r *DNSResolver) Resolve(domain string, class DNSType) (*DNSRecord, error) 
 			log.Debugf("removing expired cache item for %s", domain)
 			delete(r.cache, domain)
 		}
+	} else if responseIP, ok := r.localDomains[domain]; ok {
+		log.Debugf("found %s in local domains", domain)
+		if dnsType != DNSTypeA {
+			return nil, nil
+		}
+		return &DNSRecord{
+			Name:       compressedDomainVal,
+			Type:       dnsType,
+			Class:      DNSClassIN,
+			TTL:        uint32((time.Second * 300).Seconds()),
+			ParsedName: domain,
+			RData:      responseIP.To4(),
+		}, nil
 	}
 	for _, upstream := range r.upstream {
-		record, err := r.lookup(domain, class, upstream)
+		record, err := r.lookup(domain, dnsType, upstream)
 		if err != nil {
 			log.Error("unable to lookup: ", err.Error())
 			queryCounter.With(prometheus.Labels{"domain": domain, "upstream": upstream.String(), "result": "failed"}).Inc()
 			continue
 		}
 		queryCounter.With(prometheus.Labels{"domain": domain, "upstream": upstream.String(), "result": "success"}).Inc()
-		log.Tracef("cache %s%s with value %s", domain, class, record.ParsedName)
+		log.Tracef("cache %s%s with value %s", domain, dnsType, record.ParsedName)
 		r.cache[cacheKey] = &DNSCacheItem{
 			record: record,
 			ttl:    time.Now().Add(time.Duration(record.TTL) * time.Second),

@@ -304,7 +304,7 @@ func (opts *DhcpOptions) Validate() []ValidationError {
 			if net.ParseIP(nameServer).To4() == nil {
 				validationErrors = append(validationErrors, ValidationError{
 					Field:   "nameServers",
-					Message: fmt.Sprintf("Name server %d must be a valid IPv4 address", i+1),
+					Message: fmt.Sprintf("Nameserver %d must be a valid IPv4 address", i+1),
 				})
 			}
 		}
@@ -314,6 +314,39 @@ func (opts *DhcpOptions) Validate() []ValidationError {
 		return validationErrors
 	}
 	return nil
+}
+
+type DNSConfigRequest struct {
+	Interface string `json:"interface"`
+	Upstreams string `json:"upstreams"`
+}
+
+func (z *DNSConfigRequest) Validate() []ValidationError {
+	validationErrors := make([]ValidationError, 0)
+	if z.Interface == "" {
+		validationErrors = append(validationErrors, ValidationError{
+			Field:   "interface",
+			Message: "Interface is required",
+		})
+	}
+	if z.Upstreams == "" {
+		validationErrors = append(validationErrors, ValidationError{
+			Field:   "upstreams",
+			Message: "Upstreams are required",
+		})
+	} else {
+		upstreams := strings.Split(z.Upstreams, ",")
+		for i, upstream := range upstreams {
+			if ip := net.ParseIP(upstream).To4(); ip == nil {
+				validationErrors = append(validationErrors, ValidationError{
+					Field:   "upstreams",
+					Message: fmt.Sprintf("Upstream %d must be a valid IP address", i+1),
+				})
+			}
+		}
+	}
+
+	return validationErrors
 }
 
 func MapLease(lease dhcp.Lease) Lease {

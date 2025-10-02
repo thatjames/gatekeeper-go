@@ -42,7 +42,7 @@ func NewDNSServer() *DNSServer {
 
 func NewDNSServerWithOpts(opts DNSServerOpts) *DNSServer {
 	return &DNSServer{
-		resolver:     NewDNSResolverWithDefaultOpts(),
+		resolver:     NewDNSResolverWithOpts(*opts.ResolverOpts),
 		opts:         &opts,
 		packetConn:   nil,
 		receiverChan: make(chan *dnsWorkItem, 100),
@@ -53,13 +53,16 @@ func NewDNSServerWithOpts(opts DNSServerOpts) *DNSServer {
 
 func (d *DNSServer) Start() error {
 	log.Info("starting DNS server")
+	log.Tracef("starting DNS server on port %d", d.opts.Port)
 	var err error
 	if d.packetConn, err = net.ListenPacket("udp4", fmt.Sprintf(":%d", d.opts.Port)); err != nil {
+		log.Error("unable to start DNS server: ", err.Error())
 		return err
 	}
 	go d.listen()
 	go d.receiverWorker()
 	go d.responseWorker()
+	log.Info("DNS server started")
 	return nil
 }
 
@@ -102,7 +105,7 @@ func (d *DNSServer) listen() {
 				startTime: time.Now(),
 			}
 			buff = buff[:n]
-			log.Tracef("received %d bytes from %s", n, d.packetConn.LocalAddr().String())
+			log.Tracef("received %d bytes from %s", n, addr.String())
 			msg, err := ParseDNSMessage(buff)
 			if err != nil {
 				log.Error("unable to parse DNS message: ", err.Error())
@@ -120,21 +123,26 @@ func (d *DNSServer) listen() {
 
 func (d *DNSServer) receiverWorker() {
 	for packet := range d.receiverChan {
-		if packet.err != nil { //almost always because of a malformed packet
+		if packet.err != nil {
 			packet.DNSMessage.Header.SetRCODE(RCODEFormatError)
+			packet.DNSMessage.Header.SetQR(true)
 		} else {
 			log.Tracef("received DNS packet from %s", packet.ResponseAddr.String())
 			response, err := d.resolver.Resolve(packet.DNSMessage.Questions[0].ParsedName, packet.DNSMessage.Questions[0].Type)
+
+			packet.DNSMessage.Header.SetQR(true)
+
 			if err != nil {
 				if err == ErrNxDomain {
 					packet.DNSMessage.Header.SetRCODE(RCODENameFailure)
 				} else {
 					packet.DNSMessage.Header.SetRCODE(RCODEServerFailure)
 				}
+			} else if response == nil {
+				packet.DNSMessage.Header.SetRCODE(RCODESuccess)
 			} else {
 				packet.DNSMessage.Header.SetRCODE(RCODESuccess)
-				packet.DNSMessage.Header.SetQR(true)
-				packet.DNSMessage.Answers = append(make([]*DNSRecord, 0), response)
+				packet.DNSMessage.Answers = append(packet.DNSMessage.Answers, response)
 			}
 		}
 		d.responseChan <- packet

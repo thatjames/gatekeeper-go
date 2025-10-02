@@ -18,6 +18,49 @@ func getDNSConfig(c *gin.Context) {
 	})
 }
 
+func updateDNSConfig(c *gin.Context) {
+	var req DNSConfigRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		return
+	}
+	if validationErrors := req.Validate(); validationErrors != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:  "Unable to update DNS config",
+			Fields: validationErrors,
+		})
+		return
+	}
+	log.Info("Updating DNS config: ", req)
+	dnsService := service.GetService[*dns.DNSServer](service.DNS)
+	oldOpts := new(dns.DNSServerOpts)
+	*oldOpts = *dnsService.Options()
+	dnsService.Options().Interface = req.Interface
+	dnsService.Options().ResolverOpts.Upstreams = strings.Split(req.Upstreams, ",")
+	if err := dnsService.Stop(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		dnsService.Options().Interface = oldOpts.Interface
+		dnsService.Options().ResolverOpts.Upstreams = oldOpts.ResolverOpts.Upstreams
+		return
+	} else if err = dnsService.Start(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		dnsService.Options().Interface = oldOpts.Interface
+		dnsService.Options().ResolverOpts.Upstreams = oldOpts.ResolverOpts.Upstreams
+		dnsService.Start()
+		return
+	}
+	config.Config.DNS.Interface = req.Interface
+	config.Config.DNS.UpstreamServers = strings.Split(req.Upstreams, ",")
+	if err := config.UpdateConfig(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(200, DNSConfigResponse{
+		Upstreams: strings.Join(config.Config.DNS.UpstreamServers, ","),
+		Interface: config.Config.DNS.Interface,
+	})
+}
+
 func getLocalDomains(c *gin.Context) {
 	c.JSON(200, config.Config.DNS.LocalDomains)
 }

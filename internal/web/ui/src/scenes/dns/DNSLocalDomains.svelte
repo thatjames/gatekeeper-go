@@ -63,7 +63,6 @@
   };
 
   const handleError = (error) => {
-    console.log("handle error", error);
     if (error.fields && Array.isArray(error.fields)) {
       fieldErrors = error.fields.reduce((acc, fieldError) => {
         acc[fieldError.field] = fieldError.message;

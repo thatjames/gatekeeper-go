@@ -88,6 +88,7 @@ type DNS struct {
 	UpstreamServers []string          `yaml:"UpstreamServers"`
 	Interface       string            `yaml:"Interface"`
 	LocalDomains    map[string]string `yaml:"LocalDomains"`
+	Port            int               `yaml:"Port"`
 }
 
 func LoadConfig(filePath string) error {

@@ -4,8 +4,9 @@
   import { createEventDispatcher } from "svelte";
 
   const dispatch = createEventDispatcher();
-  let { settings, externalErrors } = $props();
-  let fieldErrors = $state({});
+
+  let { settings, externalErrors, generalError } = $props();
+
   let interfaceItems = $state(
     $dhcpInterfaces.map((interfaceItem) => {
       return {
@@ -15,20 +16,10 @@
     }),
   );
 
-  $effect(() => {
-    fieldErrors =
-      externalErrors?.fields?.reduce((acc, error) => {
-        acc[error.field] = error.message;
-        return acc;
-      }, {}) || {};
-  });
-
   function handleFormInput(event) {
     const fieldName = event.target.id;
-    if (fieldName && fieldErrors[fieldName]) {
-      fieldErrors = { ...fieldErrors, [fieldName]: null };
-
-      dispatch("errorsCleared", { fieldName });
+    if (fieldName && externalErrors[fieldName]) {
+      dispatch("errorsCleared", fieldName); // Just pass the field name
     }
   }
 </script>
@@ -45,10 +36,10 @@
         items={interfaceItems}
         bind:value={settings.interface}
       />
-      {#if fieldErrors.interface}
-        <Helper class="mt-2 text-primary-500 dark:text-primary-500"
-          >{fieldErrors.interface}</Helper
-        >
+      {#if externalErrors.interface}
+        <Helper class="mt-2 text-primary-500 dark:text-primary-500">
+          {externalErrors.interface}
+        </Helper>
       {/if}
     </div>
 
@@ -61,10 +52,10 @@
         required
         bind:value={settings.upstreams}
       />
-      {#if fieldErrors.startAddr}
-        <Helper class="mt-2 text-primary-500 dark:text-primary-500"
-          >{fieldErrors.startAddr}</Helper
-        >
+      {#if externalErrors.upstreams}
+        <Helper class="mt-2 text-primary-500 dark:text-primary-500">
+          {externalErrors.upstreams}
+        </Helper>
       {/if}
     </div>
   </div>

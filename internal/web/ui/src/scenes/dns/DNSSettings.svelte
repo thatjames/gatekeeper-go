@@ -1,6 +1,6 @@
 <script>
   import SimpleCard from "$components/SimpleCard.svelte";
-  import { getDNSSettings } from "$lib/dns/dns";
+  import { getDNSSettings, updateDNSSettings } from "$lib/dns/dns";
   import {
     Button,
     Heading,
@@ -30,7 +30,39 @@
   };
 
   const onSaveClick = () => {
-    edit = false;
+    updateDNSSettings(settings)
+      .then((resp) => {
+        settings = resp;
+        edit = false;
+        // Clear errors on successful save
+        fieldErrors = {};
+        generalError = "";
+      })
+      .catch((err) => handleError(err));
+  };
+
+  const handleError = (error) => {
+    if (error.fields && Array.isArray(error.fields)) {
+      fieldErrors = error.fields.reduce((acc, fieldError) => {
+        acc[fieldError.field] = fieldError.message;
+        return acc;
+      }, {});
+    }
+    if (error.error) {
+      generalError = error.error;
+    }
+  };
+
+  // Simplified error clearing - just clear the specific field
+  const clearFieldError = (fieldName) => {
+    if (fieldErrors[fieldName]) {
+      const newFieldErrors = { ...fieldErrors };
+      delete newFieldErrors[fieldName];
+      fieldErrors = newFieldErrors;
+    }
+    if (generalError) {
+      generalError = "";
+    }
   };
 </script>
 
@@ -38,7 +70,12 @@
   {#if edit}
     <Heading tag="h4">Edit DNS Settings</Heading>
     <div class="w-4/5 mx-auto flex flex-col gap-5">
-      <DNSSettingsForm {settings} />
+      <DNSSettingsForm
+        {settings}
+        externalErrors={fieldErrors}
+        {generalError}
+        onerrorscleared={clearFieldError}
+      />
       <div class="grid grid-cols-2 gap-5">
         <Button
           outline
@@ -49,12 +86,18 @@
         <Button
           outline
           color="alternative"
-          onclick={() => (edit = false)}
+          onclick={() => {
+            edit = false;
+            fieldErrors = {};
+            generalError = "";
+          }}
           class="w-full mx-auto">Cancel</Button
         >
-        <P class="text-primary-600 dark:text-primary-600 col-span-2 text-center"
-          >{errors?.error}</P
+        <P
+          class="text-primary-600 dark:text-primary-600 col-span-2 text-center"
         >
+          {errors?.error}
+        </P>
       </div>
     </div>
   {:else}

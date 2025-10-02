@@ -39,6 +39,8 @@ func main() {
 	log.SetFormatter(logFormatFunc(formatLogEntry))
 	if debug {
 		log.SetLevel(log.DebugLevel)
+	} else if trace {
+		log.SetLevel(log.TraceLevel)
 	}
 	log.Info("Starting gatekeeper")
 	log.Info("Version ", version)
@@ -64,6 +66,7 @@ func main() {
 				LocalDomains: localDomains,
 				Upstreams:    config.Config.DNS.UpstreamServers,
 			},
+			Port: config.Config.DNS.Port,
 		})
 		service.Register(dnsServer, service.DNS)
 	}

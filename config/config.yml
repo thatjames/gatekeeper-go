@@ -24,5 +24,6 @@ DNS:
     - 8.8.8.8
     - 1.1.1.1
   Interface: enp34s0
+  Port: 53
   LocalDomains:
     international-space-station: 10.0.0.2
