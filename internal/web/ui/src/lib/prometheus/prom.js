@@ -18,23 +18,28 @@ class PrometheusMetricsService {
    * Parses Prometheus text format into structured data
    */
   parseMetrics(metricsText) {
-    const lines = metricsText.split('\n');
+    const lines = metricsText.split("\n");
     const metrics = {};
     let currentMetric = null;
 
     for (const line of lines) {
       // Skip empty lines and comments that aren't HELP or TYPE
-      if (!line.trim() || (line.startsWith('#') && !line.startsWith('# HELP') && !line.startsWith('# TYPE'))) {
+      if (
+        !line.trim() ||
+        (line.startsWith("#") &&
+          !line.startsWith("# HELP") &&
+          !line.startsWith("# TYPE"))
+      ) {
         continue;
       }
 
       // Parse HELP lines
-      if (line.startsWith('# HELP')) {
+      if (line.startsWith("# HELP")) {
         const match = line.match(/# HELP (\S+) (.+)/);
         if (match) {
           currentMetric = match[1];
           if (!metrics[currentMetric]) {
-            metrics[currentMetric] = { help: '', type: '', values: [] };
+            metrics[currentMetric] = { help: "", type: "", values: [] };
           }
           metrics[currentMetric].help = match[2];
         }
@@ -42,12 +47,12 @@ class PrometheusMetricsService {
       }
 
       // Parse TYPE lines
-      if (line.startsWith('# TYPE')) {
+      if (line.startsWith("# TYPE")) {
         const match = line.match(/# TYPE (\S+) (\S+)/);
         if (match) {
           currentMetric = match[1];
           if (!metrics[currentMetric]) {
-            metrics[currentMetric] = { help: '', type: '', values: [] };
+            metrics[currentMetric] = { help: "", type: "", values: [] };
           }
           metrics[currentMetric].type = match[2];
         }
@@ -55,19 +60,21 @@ class PrometheusMetricsService {
       }
 
       // Parse metric values
-      const metricMatch = line.match(/^([a-zA-Z_:][a-zA-Z0-9_:]*?)(\{.*?\})?\s+(.+?)(\s+\d+)?$/);
+      const metricMatch = line.match(
+        /^([a-zA-Z_:][a-zA-Z0-9_:]*?)(\{.*?\})?\s+(.+?)(\s+\d+)?$/
+      );
       if (metricMatch) {
         const metricName = metricMatch[1];
         const labels = metricMatch[2] ? this.parseLabels(metricMatch[2]) : {};
         const value = metricMatch[3];
 
         if (!metrics[metricName]) {
-          metrics[metricName] = { help: '', type: '', values: [] };
+          metrics[metricName] = { help: "", type: "", values: [] };
         }
 
         metrics[metricName].values.push({
           labels,
-          value: value === 'NaN' ? NaN : parseFloat(value)
+          value: value === "NaN" ? NaN : parseFloat(value),
         });
       }
     }
@@ -101,13 +108,14 @@ class PrometheusMetricsService {
 
     const bucketMetric = allMetrics[`${metricName}_bucket`] || { values: [] };
     const sumMetric = allMetrics[`${metricName}_sum`]?.values[0]?.value || 0;
-    const countMetric = allMetrics[`${metricName}_count`]?.values[0]?.value || 0;
+    const countMetric =
+      allMetrics[`${metricName}_count`]?.values[0]?.value || 0;
 
     const buckets = bucketMetric.values
-      .filter(v => v.labels.le !== '+Inf')
-      .map(v => ({
+      .filter((v) => v.labels.le !== "+Inf")
+      .map((v) => ({
         upperBound: parseFloat(v.labels.le),
-        count: v.value
+        count: v.value,
       }))
       .sort((a, b) => a.upperBound - b.upperBound);
 
@@ -117,7 +125,7 @@ class PrometheusMetricsService {
       buckets,
       sum: sumMetric,
       count: countMetric,
-      average
+      average,
     };
   }
 
@@ -169,9 +177,9 @@ class PrometheusMetricsService {
       return [];
     }
 
-    return metric.values.map(v => ({
+    return metric.values.map((v) => ({
       labels: v.labels,
-      value: v.value
+      value: v.value,
     }));
   }
 

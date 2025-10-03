@@ -86,6 +86,7 @@
         theme: themeMode,
         ...options.tooltip,
       },
+      labels: options.labels || [],
       series,
     };
   });

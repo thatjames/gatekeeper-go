@@ -16,7 +16,7 @@
 
   const metricsService = new PrometheusMetricsService(PROMETHEUS_URL);
 
-  async function fetchDNSMetrics() {
+  const fetchDNSMetrics = async () => {
     try {
       loading = true;
       error = null;
@@ -35,7 +35,7 @@
     } finally {
       loading = false;
     }
-  }
+  };
 
   onMount(() => {
     fetchDNSMetrics();
@@ -95,6 +95,22 @@
       .slice(0, 10); // Top 10 domains
   });
 
+  const countByUpstream = $derived.by(() => {
+    if (!queryCounters || queryCounters.length === 0) return [];
+
+    const upstreamMap = new Map();
+    for (const counter of queryCounters) {
+      const upstream = counter.labels.upstream || "unknown";
+      const current = upstreamMap.get(upstream) || 0;
+      upstreamMap.set(upstream, current + counter.value);
+    }
+
+    return Array.from(upstreamMap.entries()).map(([upstream, count]) => ({
+      upstream,
+      count,
+    }));
+  });
+
   // Prepare top domains chart
   const topDomainsChartData = $derived.by(() => {
     if (!queryByDomain || queryByDomain.length === 0) {
@@ -121,6 +137,21 @@
       ? ((totalCacheHits / dnsRequestTime.count) * 100).toFixed(1)
       : "0.0",
   );
+
+  const upstreamRate = $derived.by(() => {
+    let data = {
+      series: [],
+      labels: [],
+    };
+    if (!countByUpstream || countByUpstream.length === 0) return data;
+
+    for (const counter of countByUpstream) {
+      data.series.push(counter.count);
+      data.labels.push(counter.upstream);
+    }
+    console.log(data);
+    return data;
+  });
 </script>
 
 <div class="flex flex-col gap-5">
@@ -223,6 +254,7 @@
         <ApexChart
           type="bar"
           series={topDomainsChartData.series}
+          labels={topDomainsChartData.labels}
           options={{
             plotOptions: {
               bar: {
@@ -247,6 +279,21 @@
                 formatter: (value) => `${value} queries`,
               },
             },
+          }}
+          height={400}
+        />
+      </div>
+    </div>
+    <div
+      class="flex flex-col gap-2 p-4 border shadow-lg rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800"
+    >
+      <div class="space-y-4">
+        <ApexChart
+          type="donut"
+          series={upstreamRate.series}
+          options={{
+            title: "Queries by Upstream",
+            labels: upstreamRate.labels,
           }}
           height={400}
         />
