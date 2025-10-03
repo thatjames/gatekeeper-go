@@ -112,18 +112,13 @@
     };
   });
 
-  // Calculate total queries and cache hits
-  const totalQueries = $derived(
-    queryCounters.reduce((sum, counter) => sum + counter.value, 0),
-  );
-
   const totalCacheHits = $derived(
     cacheHitCounters.reduce((sum, counter) => sum + counter.value, 0),
   );
 
   const cacheHitRate = $derived(
-    totalQueries > 0
-      ? ((totalCacheHits / totalQueries) * 100).toFixed(1)
+    dnsRequestTime.count > 0
+      ? ((totalCacheHits / dnsRequestTime.count) * 100).toFixed(1)
       : "0.0",
   );
 </script>
@@ -143,9 +138,9 @@
         Error loading DNS metrics: {error}
       </p>
     </Card>
-  {:else if dnsRequestTime}
+  {:else if dnsRequestTime?.count > 0}
     <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <!-- Total Requests -->
       <Card class="p-4">
         <div class="space-y-2">
@@ -168,16 +163,6 @@
         </div>
       </Card>
 
-      <!-- Total Queries -->
-      <Card class="p-4">
-        <div class="space-y-2">
-          <p class="text-sm text-gray-500 dark:text-gray-400">Total Queries</p>
-          <p class="text-3xl font-bold text-gray-900 dark:text-white">
-            {totalQueries.toLocaleString()}
-          </p>
-        </div>
-      </Card>
-
       <!-- Cache Hit Rate -->
       <Card class="p-4">
         <div class="space-y-2">
@@ -194,45 +179,39 @@
       class="flex flex-col gap-2 p-4 border shadow-lg rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800"
     >
       <div class="space-y-4">
-        {#if histogramChartData.series[0]?.data.length > 0}
-          <ApexChart
-            type="bar"
-            series={histogramChartData.series}
-            options={{
-              plotOptions: {
-                bar: {
-                  borderRadius: 4,
-                },
+        <ApexChart
+          type="bar"
+          series={histogramChartData.series}
+          options={{
+            plotOptions: {
+              bar: {
+                borderRadius: 4,
               },
-              dataLabels: {
-                enabled: false,
+            },
+            dataLabels: {
+              enabled: false,
+            },
+            xaxis: {
+              categories: histogramChartData.categories,
+              labels: {
+                rotate: -45,
               },
-              xaxis: {
-                categories: histogramChartData.categories,
-                labels: {
-                  rotate: -45,
-                },
+            },
+            title: "DNS Request Time Distribution",
+            yaxis: {
+              title: {
+                text: "Number of Requests",
               },
-              title: "DNS Request Time Distribution",
-              yaxis: {
-                title: {
-                  text: "Number of Requests",
-                },
+            },
+            colors: ["#3b82f6"],
+            tooltip: {
+              y: {
+                formatter: (value) => `${value} requests`,
               },
-              colors: ["#3b82f6"],
-              tooltip: {
-                y: {
-                  formatter: (value) => `${value} requests`,
-                },
-              },
-            }}
-            height={350}
-          />
-        {:else}
-          <p class="text-gray-500 dark:text-gray-400 text-center py-8">
-            No DNS request data available yet
-          </p>
-        {/if}
+            },
+          }}
+          height={350}
+        />
       </div>
     </div>
 
@@ -241,43 +220,41 @@
       class="flex flex-col gap-2 p-4 border shadow-lg rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800"
     >
       <div class="space-y-4">
-        {#if topDomainsChartData.series[0]?.data.length > 0}
-          <ApexChart
-            type="bar"
-            series={topDomainsChartData.series}
-            options={{
-              plotOptions: {
-                bar: {
-                  borderRadius: 4,
-                },
+        <ApexChart
+          type="bar"
+          series={topDomainsChartData.series}
+          options={{
+            plotOptions: {
+              bar: {
+                borderRadius: 4,
               },
-              dataLabels: {
-                enabled: false,
+            },
+            dataLabels: {
+              enabled: false,
+            },
+            xaxis: {
+              categories: topDomainsChartData.categories,
+            },
+            yaxis: {
+              labels: {
+                maxWidth: 200,
               },
-              xaxis: {
-                categories: topDomainsChartData.categories,
+            },
+            title: "Top Queried Domains",
+            colors: ["#10b981"],
+            tooltip: {
+              y: {
+                formatter: (value) => `${value} queries`,
               },
-              yaxis: {
-                labels: {
-                  maxWidth: 200,
-                },
-              },
-              title: "Top Queried Domains",
-              colors: ["#10b981"],
-              tooltip: {
-                y: {
-                  formatter: (value) => `${value} queries`,
-                },
-              },
-            }}
-            height={400}
-          />
-        {:else}
-          <p class="text-gray-500 dark:text-gray-400 text-center py-8">
-            No query data available yet
-          </p>
-        {/if}
+            },
+          }}
+          height={400}
+        />
       </div>
     </div>
+  {:else}
+    <p class="text-gray-500 dark:text-gray-400 text-center py-8">
+      No DNS request data available yet
+    </p>
   {/if}
 </div>

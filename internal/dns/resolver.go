@@ -157,9 +157,16 @@ func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (*
 		return nil, err
 	}
 
-	conn, err := net.DialUDP("udp4", nil, &net.UDPAddr{IP: upstream,
-		Port: 53,
-	})
+	dialer := net.Dialer{
+		Timeout: time.Second * 2,
+	}
+
+	raddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", upstream, 53))
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := dialer.Dial("udp", raddr.String())
 	if err != nil {
 		return nil, err
 	}

@@ -65,7 +65,7 @@ test-report: generate-mocks ## Runs the golang unit tests and generates a test r
 
 ##@ Run
 docker-run: ## Runs the docker image
-	docker run --name gatekeeper --rm -ti -v $(PWD)/config/docker-config.yml:/app/config.yml -v /tmp/leases:/var/lib/gatekeeper -p 8085:8085 smokeycircles/gatekeeper -debug
+	docker run --name gatekeeper --rm -ti -v $(PWD)/config/docker-config.yml:/app/config.yml -v /tmp/leases:/var/lib/gatekeeper -p 8085:8085 -p 53:53 -p 67:67 smokeycircles/gatekeeper -debug
 
 ##@ Web
 install: ## Installs the web ui
