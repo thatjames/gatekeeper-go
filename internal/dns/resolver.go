@@ -95,6 +95,7 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (*DNSRecord, error
 		if dnsType != DNSTypeA {
 			return nil, nil
 		}
+		queryCounter.With(prometheus.Labels{"domain": domain, "upstream": "local-domain", "result": "success"}).Inc()
 		return &DNSRecord{
 			Name:       compressedDomainVal,
 			Type:       dnsType,

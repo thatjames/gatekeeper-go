@@ -4,10 +4,13 @@
 
   const routes = {
     "/settings": wrap({
-      asyncComponent: () => import("$scenes/dns/DNSSettings.svelte"),
+      asyncComponent: () => import("./DNSSettings.svelte"),
     }),
     "/local-domains": wrap({
-      asyncComponent: () => import("$scenes/dns/DNSLocalDomains.svelte"),
+      asyncComponent: () => import("./DNSLocalDomains.svelte"),
+    }),
+    "/statistics": wrap({
+      asyncComponent: () => import("./DNSStatistics.svelte"),
     }),
   };
 </script>

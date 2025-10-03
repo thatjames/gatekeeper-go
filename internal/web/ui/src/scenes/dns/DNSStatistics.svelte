@@ -1,0 +1,279 @@
+<script>
+  import { onMount } from "svelte";
+  import { Heading, Card, Spinner } from "flowbite-svelte";
+  import ApexChart from "$components/ApexChart.svelte";
+  import PrometheusMetricsService from "$lib/prometheus/prom.js";
+
+  let loading = $state(true);
+  let error = $state(null);
+  let dnsRequestTime = $state(null);
+  let queryCounters = $state([]);
+  let cacheHitCounters = $state([]);
+  let refreshInterval = null;
+
+  const PROMETHEUS_URL = "http://localhost:8085"; // Update with your Prometheus URL
+  const REFRESH_RATE = 30000; // Refresh every 30 seconds
+
+  const metricsService = new PrometheusMetricsService(PROMETHEUS_URL);
+
+  async function fetchDNSMetrics() {
+    try {
+      loading = true;
+      error = null;
+
+      // Fetch histogram for DNS request time
+      dnsRequestTime = await metricsService.getHistogram("dns_req_time");
+
+      // Fetch counter vectors
+      queryCounters = await metricsService.getCounterVec("dns_query_counter");
+      cacheHitCounters = await metricsService.getCounterVec(
+        "dns_cache_hit_counter",
+      );
+    } catch (err) {
+      error = err.message;
+      console.error("Failed to fetch DNS metrics:", err);
+    } finally {
+      loading = false;
+    }
+  }
+
+  onMount(() => {
+    fetchDNSMetrics();
+
+    // Set up automatic refresh
+    refreshInterval = setInterval(fetchDNSMetrics, REFRESH_RATE);
+
+    return () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+    };
+  });
+
+  // Prepare histogram chart data
+  const histogramChartData = $derived.by(() => {
+    if (!dnsRequestTime?.buckets) {
+      return { series: [], categories: [] };
+    }
+
+    const buckets = dnsRequestTime.buckets;
+
+    // Calculate incremental counts for each bucket
+    const incrementalCounts = [];
+    for (let i = 0; i < buckets.length; i++) {
+      const current = buckets[i].count;
+      const previous = i > 0 ? buckets[i - 1].count : 0;
+      incrementalCounts.push(current - previous);
+    }
+
+    return {
+      series: [
+        {
+          name: "Request Count",
+          data: incrementalCounts,
+        },
+      ],
+      categories: buckets.map((b) => `≤${b.upperBound}ms`),
+    };
+  });
+
+  // Aggregate query counters by domain (summing across upstreams and results)
+  const queryByDomain = $derived.by(() => {
+    if (!queryCounters || queryCounters.length === 0) return [];
+
+    const domainMap = new Map();
+
+    for (const counter of queryCounters) {
+      const domain = counter.labels.domain || "unknown";
+      const current = domainMap.get(domain) || 0;
+      domainMap.set(domain, current + counter.value);
+    }
+
+    return Array.from(domainMap.entries())
+      .map(([domain, count]) => ({ domain, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10); // Top 10 domains
+  });
+
+  // Prepare top domains chart
+  const topDomainsChartData = $derived.by(() => {
+    if (!queryByDomain || queryByDomain.length === 0) {
+      return { series: [], categories: [] };
+    }
+
+    return {
+      series: [
+        {
+          name: "Queries",
+          data: queryByDomain.map((d) => d.count),
+        },
+      ],
+      categories: queryByDomain.map((d) => d.domain),
+    };
+  });
+
+  // Calculate total queries and cache hits
+  const totalQueries = $derived(
+    queryCounters.reduce((sum, counter) => sum + counter.value, 0),
+  );
+
+  const totalCacheHits = $derived(
+    cacheHitCounters.reduce((sum, counter) => sum + counter.value, 0),
+  );
+
+  const cacheHitRate = $derived(
+    totalQueries > 0
+      ? ((totalCacheHits / totalQueries) * 100).toFixed(1)
+      : "0.0",
+  );
+</script>
+
+<div class="flex flex-col gap-5">
+  <Heading tag="h3">DNS Statistics</Heading>
+
+  {#if loading && !dnsRequestTime}
+    <div class="flex items-center justify-center p-12">
+      <Spinner size="12" />
+    </div>
+  {:else if error}
+    <Card
+      class="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
+    >
+      <p class="text-red-800 dark:text-red-200">
+        Error loading DNS metrics: {error}
+      </p>
+    </Card>
+  {:else if dnsRequestTime}
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <!-- Total Requests -->
+      <Card class="p-4">
+        <div class="space-y-2">
+          <p class="text-sm text-gray-500 dark:text-gray-400">Total Requests</p>
+          <p class="text-3xl font-bold text-gray-900 dark:text-white">
+            {dnsRequestTime.count.toLocaleString()}
+          </p>
+        </div>
+      </Card>
+
+      <!-- Average Response Time -->
+      <Card class="p-4">
+        <div class="space-y-2">
+          <p class="text-sm text-gray-500 dark:text-gray-400">
+            Avg Response Time
+          </p>
+          <p class="text-3xl font-bold text-gray-900 dark:text-white">
+            {dnsRequestTime.average.toFixed(2)} ms
+          </p>
+        </div>
+      </Card>
+
+      <!-- Total Queries -->
+      <Card class="p-4">
+        <div class="space-y-2">
+          <p class="text-sm text-gray-500 dark:text-gray-400">Total Queries</p>
+          <p class="text-3xl font-bold text-gray-900 dark:text-white">
+            {totalQueries.toLocaleString()}
+          </p>
+        </div>
+      </Card>
+
+      <!-- Cache Hit Rate -->
+      <Card class="p-4">
+        <div class="space-y-2">
+          <p class="text-sm text-gray-500 dark:text-gray-400">Cache Hit Rate</p>
+          <p class="text-3xl font-bold text-gray-900 dark:text-white">
+            {cacheHitRate}%
+          </p>
+        </div>
+      </Card>
+    </div>
+
+    <!-- Request Time Distribution Chart -->
+    <Card class="p-4">
+      <div class="space-y-4">
+        <Heading tag="h5">DNS Request Time Distribution</Heading>
+        {#if histogramChartData.series[0]?.data.length > 0}
+          <ApexChart
+            type="bar"
+            series={histogramChartData.series}
+            options={{
+              plotOptions: {
+                bar: {
+                  borderRadius: 4,
+                },
+              },
+              dataLabels: {
+                enabled: false,
+              },
+              xaxis: {
+                categories: histogramChartData.categories,
+                labels: {
+                  rotate: -45,
+                },
+              },
+              yaxis: {
+                title: {
+                  text: "Number of Requests",
+                },
+              },
+              colors: ["#3b82f6"],
+              tooltip: {
+                y: {
+                  formatter: (value) => `${value} requests`,
+                },
+              },
+            }}
+            height={350}
+          />
+        {:else}
+          <p class="text-gray-500 dark:text-gray-400 text-center py-8">
+            No DNS request data available yet
+          </p>
+        {/if}
+      </div>
+    </Card>
+
+    <!-- Top Queried Domains Chart -->
+    <Card class="p-4 w-100">
+      <div class="space-y-4">
+        <Heading tag="h5">Top Queried Domains</Heading>
+        {#if topDomainsChartData.series[0]?.data.length > 0}
+          <ApexChart
+            type="bar"
+            series={topDomainsChartData.series}
+            options={{
+              plotOptions: {
+                bar: {
+                  borderRadius: 4,
+                },
+              },
+              dataLabels: {
+                enabled: false,
+              },
+              xaxis: {
+                categories: topDomainsChartData.categories,
+              },
+              yaxis: {
+                labels: {
+                  maxWidth: 200,
+                },
+              },
+              colors: ["#10b981"],
+              tooltip: {
+                y: {
+                  formatter: (value) => `${value} queries`,
+                },
+              },
+            }}
+            height={400}
+          />
+        {:else}
+          <p class="text-gray-500 dark:text-gray-400 text-center py-8">
+            No query data available yet
+          </p>
+        {/if}
+      </div>
+    </Card>
+  {/if}
+</div>

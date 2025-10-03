@@ -12,6 +12,7 @@
     LinkOutline,
     ServerOutline,
     BookOutline,
+    ChartLineUpOutline,
   } from "flowbite-svelte-icons";
   import { jwtDecode } from "jwt-decode";
   import Router from "svelte-spa-router";
@@ -53,14 +54,19 @@
       label: "DNS",
       items: [
         {
-          label: "Settings",
-          location: Routes.DNSSettings,
-          icon: CogOutline,
-        },
-        {
           label: "Local Domains",
           location: Routes.DNSLocalDomains,
           icon: BookOutline,
+        },
+        {
+          label: "Statistics",
+          location: Routes.DNSStatistics,
+          icon: ChartLineUpOutline,
+        },
+        {
+          label: "Settings",
+          location: Routes.DNSSettings,
+          icon: CogOutline,
         },
       ],
     },
