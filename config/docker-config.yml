@@ -25,3 +25,4 @@ DNS:
   Interface: eth0
   LocalDomains:
     international-space-station: 10.0.0.2
+  Port: 53

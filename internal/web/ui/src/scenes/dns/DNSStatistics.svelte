@@ -190,9 +190,10 @@
     </div>
 
     <!-- Request Time Distribution Chart -->
-    <Card class="p-4">
+    <div
+      class="flex flex-col gap-2 p-4 border shadow-lg rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800"
+    >
       <div class="space-y-4">
-        <Heading tag="h5">DNS Request Time Distribution</Heading>
         {#if histogramChartData.series[0]?.data.length > 0}
           <ApexChart
             type="bar"
@@ -212,6 +213,7 @@
                   rotate: -45,
                 },
               },
+              title: "DNS Request Time Distribution",
               yaxis: {
                 title: {
                   text: "Number of Requests",
@@ -232,12 +234,13 @@
           </p>
         {/if}
       </div>
-    </Card>
+    </div>
 
     <!-- Top Queried Domains Chart -->
-    <Card class="p-4 w-100">
+    <div
+      class="flex flex-col gap-2 p-4 border shadow-lg rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800"
+    >
       <div class="space-y-4">
-        <Heading tag="h5">Top Queried Domains</Heading>
         {#if topDomainsChartData.series[0]?.data.length > 0}
           <ApexChart
             type="bar"
@@ -259,6 +262,7 @@
                   maxWidth: 200,
                 },
               },
+              title: "Top Queried Domains",
               colors: ["#10b981"],
               tooltip: {
                 y: {
@@ -274,6 +278,6 @@
           </p>
         {/if}
       </div>
-    </Card>
+    </div>
   {/if}
 </div>

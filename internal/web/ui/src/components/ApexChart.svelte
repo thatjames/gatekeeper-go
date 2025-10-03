@@ -32,6 +32,13 @@
           ...options.chart?.animations,
         },
         foreColor: textColor,
+        background: "transparent",
+      },
+      title: {
+        text: options.title,
+        style: {
+          fontSize: "22px",
+        },
       },
       theme: {
         mode: themeMode,
