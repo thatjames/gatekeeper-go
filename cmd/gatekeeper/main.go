@@ -4,14 +4,20 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"net"
+	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/dns"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/system"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/web"
@@ -19,21 +25,25 @@ import (
 
 // Flags
 var (
-	configFile string
-	debug      bool
-	version    = "development-build"
+	configFile   string
+	debug, trace bool
+	version      = "development-build"
 )
 
 func main() {
 	flag.StringVar(&configFile, "config", "config.yml", "config file")
 	flag.BoolVar(&debug, "debug", false, "verbose printout")
+	flag.BoolVar(&trace, "trace", false, "very verbose printout")
 	flag.Parse()
 	if err := config.LoadConfig(configFile); err != nil {
 		panic(err)
 	}
+	log.SetReportCaller(true)
 	log.SetFormatter(logFormatFunc(formatLogEntry))
 	if debug {
 		log.SetLevel(log.DebugLevel)
+	} else if trace {
+		log.SetLevel(log.TraceLevel)
 	}
 	log.Info("Starting gatekeeper")
 	log.Info("Version ", version)
@@ -45,16 +55,82 @@ func main() {
 		dhcpServer := dhcp.NewDHCPServerFromConfig(config.Config.DHCP)
 		service.Register(dhcpServer, service.DHCP)
 
-		if config.Config.Web != nil {
-			log.Debug("Registering web server")
-			go func() {
-				if err := web.Init(version, config.Config.Web, dhcpServer.LeaseDB()); err != nil {
-					log.Error("unable to start web server:", err)
-				}
-			}()
+	}
+
+	if config.Config.DNS != nil {
+		log.Info("Registering DNS server")
+		localDomains := make(map[string]net.IP)
+		for domain, ip := range config.Config.DNS.LocalDomains {
+			localDomains[domain] = net.ParseIP(ip).To4()
 		}
 
+		var blockedDomains []string
+		if config.Config.DNS.BlockLists != nil && len(config.Config.DNS.BlockLists) > 0 {
+			blockedDomains = make([]string, 0)
+			http.DefaultClient.Timeout = time.Second * 2
+			resultChan := make(chan string, len(config.Config.DNS.BlockLists))
+			signalChan := make(chan interface{}, len(config.Config.DNS.BlockLists))
+			var workerCount = len(config.Config.DNS.BlockLists)
+			for _, host := range config.Config.DNS.BlockLists {
+				go func() {
+					defer func() {
+						log.Debugf("worker %s finished", host)
+						signalChan <- nil
+					}()
+					log.Debugf("Fetch hosts from %s", host)
+					resp, err := http.DefaultClient.Get(host)
+					if err != nil {
+						log.Warnf("unable to fetch blocklist %s: %s", host, err.Error())
+						return
+					}
+					defer resp.Body.Close()
+					dat, err := ioutil.ReadAll(resp.Body)
+					if err != nil {
+						log.Warnf("unable to read blocklist %s: %s", host, err.Error())
+						return
+					}
+					for _, line := range strings.Split(string(dat), "\n") {
+						if line != "" && !strings.HasPrefix(line, "#") {
+							blockedHost := strings.Split(line, " ")[1]
+							resultChan <- blockedHost
+						}
+					}
+				}()
+			}
+			for workerCount > 0 {
+				select {
+				case <-signalChan:
+					workerCount--
+
+				case results := <-resultChan:
+					blockedDomains = append(blockedDomains, results)
+				}
+			}
+			close(signalChan)
+			close(resultChan)
+			log.Infof("loaded %d blocked domains", len(blockedDomains))
+		}
+		dnsServer := dns.NewDNSServerWithOpts(dns.DNSServerOpts{
+			Interface: config.Config.DNS.Interface,
+			ResolverOpts: &dns.ResolverOpts{
+				LocalDomains: localDomains,
+				Upstreams:    config.Config.DNS.UpstreamServers,
+				Blacklist:    blockedDomains,
+			},
+			Port: config.Config.DNS.Port,
+		})
+		service.Register(dnsServer, service.DNS)
 	}
+
+	if config.Config.Web != nil {
+		log.Info("Registering web server")
+		go func() {
+			if err := web.Init(version, config.Config.Web); err != nil {
+				log.Error("unable to start web server:", err)
+			}
+		}()
+	}
+
 	// routingMan, err := routing.New()
 	// if err != nil {
 	// 	log.Fatal(err)
@@ -82,7 +158,11 @@ func (fn logFormatFunc) Format(e *log.Entry) ([]byte, error) {
 }
 
 func formatLogEntry(e *log.Entry) ([]byte, error) {
-	msg := bytes.NewBuffer([]byte(fmt.Sprintf("%s %s - %s", e.Time.Format("2006-01-02 15:04:05"), strings.ToUpper(e.Level.String()), e.Message)))
+	funcName := ""
+	if e.Caller != nil {
+		funcName = filepath.Base(e.Caller.Function)
+	}
+	msg := bytes.NewBuffer([]byte(fmt.Sprintf("%s %s %s - %s", e.Time.Format("2006-01-02 15:04:05"), funcName, strings.ToUpper(e.Level.String()), e.Message)))
 	for key, dataField := range e.Data {
 		msg.WriteString(fmt.Sprintf(" %s: %v", key, dataField))
 	}

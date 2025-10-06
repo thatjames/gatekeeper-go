@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"regexp"
-	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
@@ -96,6 +95,49 @@ func (z *DhcpLeaseRequest) Validate() []ValidationError {
 	return nil
 }
 
+type DNSConfigResponse struct {
+	Upstreams []string `json:"upstreams"`
+	Interface string   `json:"interface"`
+}
+
+type LocalDomainRequest struct {
+	Domain string `json:"domain"`
+	IP     string `json:"ip"`
+}
+
+func (z *LocalDomainRequest) Validate() []ValidationError {
+	validationErrors := make([]ValidationError, 0)
+	if z.Domain == "" {
+		validationErrors = append(validationErrors, ValidationError{
+			Field:   "domain",
+			Message: "Domain is required",
+		})
+	}
+	if z.IP == "" {
+		validationErrors = append(validationErrors, ValidationError{
+			Field:   "ip",
+			Message: "IP address is required",
+		})
+	} else {
+		ipRegex := regexp.MustCompile(`^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$`)
+		if !ipRegex.MatchString(z.IP) {
+			validationErrors = append(validationErrors, ValidationError{
+				Field:   "ip",
+				Message: "IP address must be a valid IP address",
+			})
+		} else if net.ParseIP(z.IP).To4() == nil {
+			validationErrors = append(validationErrors, ValidationError{
+				Field:   "ip",
+				Message: "IP address must be a valid IPv4 address",
+			})
+		}
+	}
+	if len(validationErrors) > 0 {
+		return validationErrors
+	}
+	return nil
+}
+
 type Lease struct {
 	ClientId string `json:"clientId"`
 	Hostname string `json:"hostname"`
@@ -105,15 +147,15 @@ type Lease struct {
 }
 
 type DhcpOptions struct {
-	Interface   string `json:"interface"`
-	StartAddr   string `json:"startAddr"`
-	EndAddr     string `json:"endAddr"`
-	LeaseTTL    int    `json:"leaseTTL"`
-	Gateway     string `json:"gateway"`
-	SubnetMask  string `json:"subnetMask"`
-	DomainName  string `json:"domainName"`
-	LeaseFile   string `json:"leaseFile"`
-	NameServers string `json:"nameServers"`
+	Interface   string   `json:"interface"`
+	StartAddr   string   `json:"startAddr"`
+	EndAddr     string   `json:"endAddr"`
+	LeaseTTL    int      `json:"leaseTTL"`
+	Gateway     string   `json:"gateway"`
+	SubnetMask  string   `json:"subnetMask"`
+	DomainName  string   `json:"domainName"`
+	LeaseFile   string   `json:"leaseFile"`
+	NameServers []string `json:"nameServers"`
 }
 
 func (opts *DhcpOptions) Validate() []ValidationError {
@@ -256,17 +298,51 @@ func (opts *DhcpOptions) Validate() []ValidationError {
 		}
 	}
 
-	if nameServers := strings.Split(opts.NameServers, ","); len(nameServers) > 0 {
-		for i, nameServer := range nameServers {
+	if len(opts.NameServers) > 0 {
+		for i, nameServer := range opts.NameServers {
 			if net.ParseIP(nameServer).To4() == nil {
 				validationErrors = append(validationErrors, ValidationError{
 					Field:   "nameServers",
-					Message: fmt.Sprintf("Name server %d must be a valid IPv4 address", i+1),
+					Message: fmt.Sprintf("Nameserver %d must be a valid IPv4 address", i+1),
 				})
 			}
 		}
 	}
 
+	if len(validationErrors) > 0 {
+		return validationErrors
+	}
+	return nil
+}
+
+type DNSConfigRequest struct {
+	Interface string   `json:"interface"`
+	Upstreams []string `json:"upstreams"`
+}
+
+func (z *DNSConfigRequest) Validate() []ValidationError {
+	validationErrors := make([]ValidationError, 0)
+	if z.Interface == "" {
+		validationErrors = append(validationErrors, ValidationError{
+			Field:   "interface",
+			Message: "Interface is required",
+		})
+	}
+	if z.Upstreams == nil || len(z.Upstreams) == 0 {
+		validationErrors = append(validationErrors, ValidationError{
+			Field:   "upstreams",
+			Message: "Upstreams are required",
+		})
+	} else {
+		for i, upstream := range z.Upstreams {
+			if ip := net.ParseIP(upstream).To4(); ip == nil {
+				validationErrors = append(validationErrors, ValidationError{
+					Field:   "upstreams",
+					Message: fmt.Sprintf("Upstream %d must be a valid IP address", i+1),
+				})
+			}
+		}
+	}
 	if len(validationErrors) > 0 {
 		return validationErrors
 	}

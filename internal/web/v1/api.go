@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/tg123/go-htpasswd"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
 )
 
 func SetupV1Endpoints(r *gin.RouterGroup) {
@@ -16,9 +17,18 @@ func SetupV1Endpoints(r *gin.RouterGroup) {
 	v1Group := r.Group("/v1")
 	v1Group.POST("/login", loginHandler)
 	v1Group.GET("/health", healthHandler)
+	v1Group.GET("/version", getVersion)
 
 	protected := v1Group.Group("/", authMiddleware(), loggingMiddleware())
-	setupDHCPRoutes(protected)
+	if service.IsRegistered(service.DHCP) {
+		log.Info("Registering DHCP endpoints")
+		setupDHCPRoutes(protected)
+	}
+
+	if service.IsRegistered(service.DNS) {
+		log.Info("Registering DNS endpoints")
+		setupDNSRoutes(protected)
+	}
 	setupSystemRoutes(protected)
 }
 
@@ -32,11 +42,21 @@ func setupDHCPRoutes(g *gin.RouterGroup) {
 	dhcp.PUT("/options", updateDHCPOptions)
 }
 
+func setupDNSRoutes(g *gin.RouterGroup) {
+	dns := g.Group("/dns")
+	dns.GET("/config", getDNSConfig)
+	dns.PUT("/config", updateDNSConfig)
+	dns.GET("/local-domains", getLocalDomains)
+	dns.POST("/local-domains", addLocalDomain)
+	dns.PUT("/local-domains/:domain", updateLocalDomain)
+	dns.DELETE("/local-domains/:domain", deleteLocalDomain)
+}
+
 func setupSystemRoutes(g *gin.RouterGroup) {
 	system := g.Group("/system")
 	system.GET("/info", getSystemInfo)
-	system.GET("/interfaces/dhcp", getDHCPInterfaces)
-	system.GET("/version", getVersion)
+	system.GET("/interfaces", getInterfaces)
+	system.GET("/modules", getModules)
 }
 
 func loginHandler(c *gin.Context) {

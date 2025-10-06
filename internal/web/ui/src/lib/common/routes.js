@@ -3,6 +3,9 @@ export const Routes = {
   Login: "/auth/login",
   Leases: "/dhcp/leases",
   LeaseDetails: "/leases/details",
-  Settings: "/dhcp/settings",
-  DNS: "/dns",
+  DHCPStatistics: "/dhcp/statistics",
+  DHCPSettings: "/dhcp/settings",
+  DNSSettings: "/dns/settings",
+  DNSLocalDomains: "/dns/local-domains",
+  DNSStatistics: "/dns/statistics",
 };

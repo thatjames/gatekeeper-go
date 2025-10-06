@@ -9,8 +9,9 @@ import (
 type ServiceKey string
 
 var (
-	DHCP ServiceKey = "dchp"
+	DHCP ServiceKey = "dhcp"
 	Web  ServiceKey = "web"
+	DNS  ServiceKey = "dns"
 )
 
 type serviceManager map[ServiceKey]Service
@@ -50,6 +51,19 @@ func GetService[T Service](stype ServiceKey) T {
 	lock.Lock()
 	defer lock.Unlock()
 	return instance[stype].(T)
+}
+
+func IsRegistered(stype ServiceKey) bool {
+	_, ok := instance[stype]
+	return ok
+}
+
+func GetActiveServices() []string {
+	services := make([]string, 0)
+	for name := range instance {
+		services = append(services, string(name))
+	}
+	return services
 }
 
 func checkErrors(fns ...func() error) error {

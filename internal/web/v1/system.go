@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/system"
 )
 
@@ -24,8 +25,8 @@ func getSystemInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, sysInfo)
 }
 
-func getDHCPInterfaces(c *gin.Context) {
-	interfaces, err := system.GetDHCPInterfaces()
+func getInterfaces(c *gin.Context) {
+	interfaces, err := system.GetNetworkInterfaces()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -37,4 +38,9 @@ func getVersion(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"version": system.Version,
 	})
+}
+
+func getModules(c *gin.Context) {
+	services := service.GetActiveServices()
+	c.JSON(http.StatusOK, services)
 }

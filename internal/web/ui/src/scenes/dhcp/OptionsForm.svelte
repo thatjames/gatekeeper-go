@@ -1,19 +1,32 @@
 <script>
-  import { dhcpInterfaces } from "$lib/system/system";
-  import { Helper, Input, Label, Select } from "flowbite-svelte";
+  import { networkInterfaces } from "$lib/system/system";
+  import {
+    Button,
+    ButtonGroup,
+    Helper,
+    Input,
+    Label,
+    Modal,
+    Select,
+    Tooltip,
+  } from "flowbite-svelte";
+  import { EditOutline, TrashBinOutline } from "flowbite-svelte-icons";
   import { createEventDispatcher } from "svelte";
 
   const dispatch = createEventDispatcher();
   let { settings, externalErrors } = $props();
   let fieldErrors = $state({});
   let interfaceItems = $state(
-    $dhcpInterfaces.map((interfaceItem) => {
+    $networkInterfaces.map((interfaceItem) => {
       return {
         value: interfaceItem,
         name: interfaceItem,
       };
     }),
   );
+
+  let showModal = $state(false);
+  let newDomainNameServer = $state("");
 
   $effect(() => {
     fieldErrors =
@@ -23,16 +36,69 @@
       }, {}) || {};
   });
 
-  function handleFormInput(event) {
+  const handleFormInput = (event) => {
     const fieldName = event.target.id;
     if (fieldName && fieldErrors[fieldName]) {
       fieldErrors = { ...fieldErrors, [fieldName]: null };
 
       dispatch("errorsCleared", { fieldName });
     }
-  }
+  };
+
+  const onEditNameServerClick = () => {
+    showModal = true;
+  };
+
+  const addDomainNameServer = () => {
+    settings.nameServers.push(newDomainNameServer);
+    newDomainNameServer = "";
+  };
+
+  const closeModal = () => {
+    showModal = false;
+    dispatch("errorsCleared", "nameServers");
+  };
 </script>
 
+<Modal bind:open={showModal} title="Add Upstream">
+  <div class="flex flex-col justify-center gap-5">
+    <div class="flex flex-col gap-2">
+      <Label>Existing Domain Name Servers</Label>
+      {#each settings?.nameServers as nameserver, index}
+        <ButtonGroup>
+          <Input
+            type="text"
+            bind:value={settings.nameServers[index]}
+            tabindex="-1"
+            autofocus={false}
+          />
+          <Button outline onclick={() => settings.nameServers.splice(index, 1)}>
+            <TrashBinOutline />
+          </Button>
+        </ButtonGroup>
+      {/each}
+    </div>
+    <div class="flex flex-col gap-2">
+      <Label for="upstream">New Domain Name Server</Label>
+      <Input
+        type="text"
+        id="upstream"
+        placeholder="1.1.1.1"
+        bind:value={newDomainNameServer}
+        autofocus
+        tabindex="0"
+      />
+    </div>
+    <div class="grid grid-cols-2 gap-2">
+      <Button
+        outline
+        disabled={!newDomainNameServer}
+        onclick={addDomainNameServer}>Add</Button
+      >
+      <Button outline color="dark" onclick={closeModal}>Close</Button>
+    </div>
+  </div>
+</Modal>
 <form class="m:w-1/2" oninput={handleFormInput}>
   <div class="flex flex-col gap-2 md:grid md:grid-cols-2 md:gap-4">
     <Label for="interface" class="mb-2">Interface</Label>
@@ -164,12 +230,22 @@
     </div>
     <Label for="nameServers" class="mb-2">Domain Name Servers</Label>
     <div class="flex flex-col">
-      <Input
-        type="text"
-        id="nameServers"
-        placeholder="/etc/gatekeeper/leases.json"
-        bind:value={settings.nameServers}
-      />
+      <ButtonGroup>
+        <Input
+          type="text"
+          id="nameServers"
+          placeholder="1.1.1.1,9.9.9.9"
+          required
+          disabled
+          bind:value={settings.nameServers}
+        />
+        <Button
+          color="primary"
+          class="!rounded-r-lg"
+          onclick={onEditNameServerClick}><EditOutline /></Button
+        >
+        <Tooltip>Edit Upstreams</Tooltip>
+      </ButtonGroup>
       {#if fieldErrors.nameServers}
         <Helper class="mt-2 text-primary-500 dark:text-primary-500"
           >{fieldErrors.nameServers}</Helper

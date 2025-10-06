@@ -19,6 +19,7 @@
     "vite": "^7.1.2"
   },
   "dependencies": {
+    "apexcharts": "^5.3.5",
     "jwt-decode": "^4.0.0",
     "svelte-spa-router": "^4.0.1"
   }

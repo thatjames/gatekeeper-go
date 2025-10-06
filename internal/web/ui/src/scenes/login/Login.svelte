@@ -1,7 +1,14 @@
 <script>
   import { login } from "$lib/auth/auth.svelte";
   import { Routes } from "$lib/common/routes";
-  import { Button, Heading, Input, Label, P } from "flowbite-svelte";
+  import {
+    Button,
+    FloatingLabelInput,
+    Heading,
+    Input,
+    Label,
+    P,
+  } from "flowbite-svelte";
   import { push } from "svelte-spa-router";
   let loginData = {};
   let errorText = $state("");
@@ -30,24 +37,28 @@
       >Gate<span class="text-primary-500">Keeper</span></Heading
     >
   </div>
+  <div
+    id="exampleWrapper"
+    class="grid w-full items-end gap-6 md:grid-cols-3"
+  ></div>
+
   <form class="md:w-1/2 mx-auto" onsubmit={doLogin}>
     <div class="flex flex-col gap-2">
-      <Label for="username" class="mb-2">Username</Label>
-      <Input
-        type="text"
+      <FloatingLabelInput
+        variant="outlined"
         id="username"
-        placeholder="username"
-        required
+        name="username"
+        type="text"
         bind:value={loginData.username}
-      />
-      <Label for="password" class="mb-2">Password</Label>
-      <Input
-        type="password"
+        >Username
+      </FloatingLabelInput>
+      <FloatingLabelInput
+        variant="outlined"
         id="password"
-        placeholder="password"
-        required
-        bind:value={loginData.password}
-      />
+        name="password"
+        type="password"
+        bind:value={loginData.password}>Password</FloatingLabelInput
+      >
       <Button type="submit">Login</Button>
     </div>
   </form>
