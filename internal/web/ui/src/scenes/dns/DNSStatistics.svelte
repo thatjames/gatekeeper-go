@@ -308,6 +308,7 @@
             plotOptions: {
               bar: {
                 borderRadius: 4,
+                horizontal: true,
               },
             },
             dataLabels: {
@@ -347,6 +348,9 @@
             options={{
               title: "Queries by Upstream",
               labels: upstreamRate.labels,
+              legend: {
+                position: "bottom",
+              },
             }}
             height={400}
           />

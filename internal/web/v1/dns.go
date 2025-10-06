@@ -2,7 +2,6 @@ package v1
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -13,7 +12,7 @@ import (
 
 func getDNSConfig(c *gin.Context) {
 	c.JSON(200, DNSConfigResponse{
-		Upstreams: strings.Join(config.Config.DNS.UpstreamServers, ","),
+		Upstreams: config.Config.DNS.UpstreamServers,
 		Interface: config.Config.DNS.Interface,
 	})
 }
@@ -36,7 +35,7 @@ func updateDNSConfig(c *gin.Context) {
 	oldOpts := new(dns.DNSServerOpts)
 	*oldOpts = *dnsService.Options()
 	dnsService.Options().Interface = req.Interface
-	dnsService.Options().ResolverOpts.Upstreams = strings.Split(req.Upstreams, ",")
+	dnsService.Options().ResolverOpts.Upstreams = req.Upstreams
 	if err := dnsService.Stop(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		dnsService.Options().Interface = oldOpts.Interface
@@ -50,13 +49,13 @@ func updateDNSConfig(c *gin.Context) {
 		return
 	}
 	config.Config.DNS.Interface = req.Interface
-	config.Config.DNS.UpstreamServers = strings.Split(req.Upstreams, ",")
+	config.Config.DNS.UpstreamServers = req.Upstreams
 	if err := config.UpdateConfig(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(200, DNSConfigResponse{
-		Upstreams: strings.Join(config.Config.DNS.UpstreamServers, ","),
+		Upstreams: config.Config.DNS.UpstreamServers,
 		Interface: config.Config.DNS.Interface,
 	})
 }

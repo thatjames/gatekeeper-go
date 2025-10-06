@@ -1,9 +1,23 @@
 <script>
   import { networkInterfaces } from "$lib/system/system";
-  import { Helper, Input, Label, Select } from "flowbite-svelte";
+  import {
+    Button,
+    ButtonGroup,
+    FloatingLabelInput,
+    Heading,
+    Helper,
+    Input,
+    Label,
+    Modal,
+    Select,
+    Tooltip,
+  } from "flowbite-svelte";
+  import { EditOutline, TrashBinOutline } from "flowbite-svelte-icons";
   import { createEventDispatcher } from "svelte";
 
   const dispatch = createEventDispatcher();
+  let showModal = $state(false);
+  let newUpstreamIP = $state("");
 
   let { settings, externalErrors, generalError } = $props();
 
@@ -16,14 +30,61 @@
     }),
   );
 
-  function handleFormInput(event) {
+  const handleFormInput = (event) => {
     const fieldName = event.target.id;
     if (fieldName && externalErrors[fieldName]) {
       dispatch("errorsCleared", fieldName); // Just pass the field name
     }
-  }
+  };
+
+  const onAddButtonClick = () => {
+    showModal = true;
+  };
+
+  const addUpstream = () => {
+    settings.upstreams.push(newUpstreamIP);
+  };
+
+  const closeModal = () => {
+    showModal = false;
+  };
 </script>
 
+<Modal bind:open={showModal} title="Add Upstream">
+  <div class="flex flex-col justify-center gap-5">
+    <div class="flex flex-col gap-2">
+      <Label>Existing Upstreams</Label>
+      {#each settings?.upstreams as upstream, index}
+        <ButtonGroup>
+          <Input
+            type="text"
+            bind:value={settings.upstreams[index]}
+            tabindex="-1"
+            autofocus={false}
+          />
+          <Button outline onclick={() => settings.upstreams.splice(index, 1)}>
+            <TrashBinOutline />
+          </Button>
+        </ButtonGroup>
+      {/each}
+    </div>
+    <div class="flex flex-col gap-2">
+      <Label for="upstream">New Upstream</Label>
+      <Input
+        type="text"
+        id="upstream"
+        placeholder="1.1.1.1"
+        bind:value={newUpstreamIP}
+        autofocus
+        tabindex="0"
+      />
+    </div>
+    <div class="grid grid-cols-2 gap-2">
+      <Button outline onclick={addUpstream}>Add</Button>
+      <Button outline color="dark" onclick={closeModal}>Close</Button>
+    </div>
+  </div>
+</Modal>
 <form class="m:w-1/2" oninput={handleFormInput}>
   <div class="flex flex-col gap-2 md:grid md:grid-cols-2 md:gap-4">
     <Label for="interface" class="mb-2">Interface</Label>
@@ -45,13 +106,20 @@
 
     <Label for="upstreams" class="mb-2">Upstreams</Label>
     <div class="flex flex-col">
-      <Input
-        type="text"
-        id="upstreams"
-        placeholder="1.1.1.1,9.9.9.9"
-        required
-        bind:value={settings.upstreams}
-      />
+      <ButtonGroup>
+        <Input
+          type="text"
+          id="upstreams"
+          placeholder="1.1.1.1,9.9.9.9"
+          required
+          disabled
+          bind:value={settings.upstreams}
+        />
+        <Button color="primary" class="!rounded-r-lg" onclick={onAddButtonClick}
+          ><EditOutline /></Button
+        >
+        <Tooltip>Edit Upstreams</Tooltip>
+      </ButtonGroup>
       {#if externalErrors.upstreams}
         <Helper class="mt-2 text-primary-500 dark:text-primary-500">
           {externalErrors.upstreams}

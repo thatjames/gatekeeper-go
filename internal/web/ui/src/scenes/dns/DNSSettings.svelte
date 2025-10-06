@@ -10,6 +10,8 @@
     Label,
     Input,
     Card,
+    Badge,
+    Spinner,
   } from "flowbite-svelte";
   import { EditOutline } from "flowbite-svelte-icons";
   import DNSSettingsForm from "./DNSSettingsForm.svelte";
@@ -21,6 +23,7 @@
   let showLocalDomain = $state(false);
   let generalError = $state("");
   let activeDomain = $state({});
+  let loading = $state(false);
 
   getDNSSettings().then((resp) => {
     settings = resp;
@@ -31,6 +34,7 @@
   };
 
   const onSaveClick = () => {
+    loading = true;
     updateDNSSettings(settings)
       .then((resp) => {
         settings = resp;
@@ -39,7 +43,8 @@
         fieldErrors = {};
         generalError = "";
       })
-      .catch((err) => handleError(err));
+      .catch((err) => handleError(err))
+      .finally(() => (loading = false));
   };
 
   const handleError = (error) => {
@@ -82,11 +87,13 @@
           outline
           onclick={onSaveClick}
           class="w-full mx-auto"
-          disabled={errors !== null}>Save</Button
+          disabled={errors !== null || loading}
+          >{#if loading}<Spinner class="me-3" size="4" /> Saving{:else}Save{/if}</Button
         >
         <Button
           outline
           color="alternative"
+          disabled={loading}
           onclick={() => {
             edit = false;
             fieldErrors = {};
@@ -121,15 +128,30 @@
           {settings?.interface}
         </p>
       </Card>
+
       <Card class="p-5 min-w-full">
         <h5
           class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white"
         >
           Upstreams
         </h5>
-        <p class="leading-tight font-normal text-gray-700 dark:text-gray-400">
-          {settings?.upstreams?.replaceAll(",", " ")}
-        </p>
+        <div class="flex flex-wrap gap-2">
+          {#if settings?.upstreams?.length}
+            {#each settings.upstreams as upstream}
+              <Badge
+                color="none"
+                class="bg-primary-700 text-gray-900 dark:text-white"
+                large>{upstream}</Badge
+              >
+            {/each}
+          {:else}
+            <p
+              class="leading-tight font-normal text-gray-500 dark:text-gray-500 italic"
+            >
+              None configured
+            </p>
+          {/if}
+        </div>
       </Card>
     </div>
   {/if}

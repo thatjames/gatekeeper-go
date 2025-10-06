@@ -1,5 +1,5 @@
 <script>
-  import { Card, Heading } from "flowbite-svelte";
+  import { Badge, Card, Heading } from "flowbite-svelte";
   import SimpleCard from "../../components/SimpleCard.svelte";
 
   export let settings = {};
@@ -87,15 +87,30 @@
         {settings.leaseFile}
       </p>
     </Card>
-    <Card class="min-w-full p-5">
+
+    <Card class="p-5 min-w-full">
       <h5
         class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white"
       >
         Domain Name Servers
       </h5>
-      <p class="leading-tight font-normal text-gray-700 dark:text-gray-400">
-        {settings.nameServers?.replaceAll(",", " ")}
-      </p>
+      <div class="flex flex-wrap gap-2">
+        {#if settings?.nameServers?.length}
+          {#each settings.nameServers as nameServer}
+            <Badge
+              color="none"
+              class="bg-primary-700 text-gray-900 dark:text-white"
+              large>{nameServer}</Badge
+            >
+          {/each}
+        {:else}
+          <p
+            class="leading-tight font-normal text-gray-500 dark:text-gray-500 italic"
+          >
+            None configured
+          </p>
+        {/if}
+      </div>
     </Card>
   </div>
 </div>

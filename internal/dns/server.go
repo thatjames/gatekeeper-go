@@ -3,6 +3,7 @@ package dns
 import (
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -28,6 +29,7 @@ type DNSServer struct {
 	receiverChan chan *dnsWorkItem
 	responseChan chan *dnsWorkItem
 	exitChan     chan struct{}
+	lock         sync.Mutex
 }
 
 type dnsWorkItem struct {
@@ -47,7 +49,7 @@ func NewDNSServerWithOpts(opts DNSServerOpts) *DNSServer {
 		packetConn:   nil,
 		receiverChan: make(chan *dnsWorkItem, 100),
 		responseChan: make(chan *dnsWorkItem, 100),
-		exitChan:     make(chan struct{}),
+		lock:         sync.Mutex{},
 	}
 }
 
@@ -59,6 +61,7 @@ func (d *DNSServer) Start() error {
 		log.Error("unable to start DNS server: ", err.Error())
 		return err
 	}
+	d.exitChan = make(chan struct{})
 	go d.listen()
 	go d.receiverWorker()
 	go d.responseWorker()
@@ -67,8 +70,10 @@ func (d *DNSServer) Start() error {
 }
 
 func (d *DNSServer) Stop() error {
-	log.Info("stopping DNS server")
 	close(d.exitChan)
+	log.Info("stopping DNS server")
+	d.lock.Lock() //wait for the goroutines to finish
+	defer d.lock.Unlock()
 	return nil
 }
 
@@ -89,15 +94,25 @@ func (d *DNSServer) DeleteLocalDomain(domain string) {
 }
 
 func (d *DNSServer) listen() {
-	defer d.packetConn.Close()
+	d.lock.Lock()
+	defer func() {
+		log.Tracef("closing DNS server")
+		d.packetConn.Close()
+		d.lock.Unlock()
+	}()
 	for {
 		select {
 		case <-d.exitChan:
 			return
 		default:
 			buff := make([]byte, 1500)
+			d.packetConn.SetReadDeadline(time.Now().Add(time.Second * 2))
 			n, addr, err := d.packetConn.ReadFrom(buff)
 			if err != nil {
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					// This is a timeout error, don't log it
+					continue
+				}
 				log.Error("unable to read datastream: ", err.Error())
 				continue
 			}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"regexp"
-	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
@@ -97,8 +96,8 @@ func (z *DhcpLeaseRequest) Validate() []ValidationError {
 }
 
 type DNSConfigResponse struct {
-	Upstreams string `json:"upstreams"`
-	Interface string `json:"interface"`
+	Upstreams []string `json:"upstreams"`
+	Interface string   `json:"interface"`
 }
 
 type LocalDomainRequest struct {
@@ -148,15 +147,15 @@ type Lease struct {
 }
 
 type DhcpOptions struct {
-	Interface   string `json:"interface"`
-	StartAddr   string `json:"startAddr"`
-	EndAddr     string `json:"endAddr"`
-	LeaseTTL    int    `json:"leaseTTL"`
-	Gateway     string `json:"gateway"`
-	SubnetMask  string `json:"subnetMask"`
-	DomainName  string `json:"domainName"`
-	LeaseFile   string `json:"leaseFile"`
-	NameServers string `json:"nameServers"`
+	Interface   string   `json:"interface"`
+	StartAddr   string   `json:"startAddr"`
+	EndAddr     string   `json:"endAddr"`
+	LeaseTTL    int      `json:"leaseTTL"`
+	Gateway     string   `json:"gateway"`
+	SubnetMask  string   `json:"subnetMask"`
+	DomainName  string   `json:"domainName"`
+	LeaseFile   string   `json:"leaseFile"`
+	NameServers []string `json:"nameServers"`
 }
 
 func (opts *DhcpOptions) Validate() []ValidationError {
@@ -299,8 +298,8 @@ func (opts *DhcpOptions) Validate() []ValidationError {
 		}
 	}
 
-	if nameServers := strings.Split(opts.NameServers, ","); len(nameServers) > 0 {
-		for i, nameServer := range nameServers {
+	if len(opts.NameServers) > 0 {
+		for i, nameServer := range opts.NameServers {
 			if net.ParseIP(nameServer).To4() == nil {
 				validationErrors = append(validationErrors, ValidationError{
 					Field:   "nameServers",
@@ -317,8 +316,8 @@ func (opts *DhcpOptions) Validate() []ValidationError {
 }
 
 type DNSConfigRequest struct {
-	Interface string `json:"interface"`
-	Upstreams string `json:"upstreams"`
+	Interface string   `json:"interface"`
+	Upstreams []string `json:"upstreams"`
 }
 
 func (z *DNSConfigRequest) Validate() []ValidationError {
@@ -329,14 +328,13 @@ func (z *DNSConfigRequest) Validate() []ValidationError {
 			Message: "Interface is required",
 		})
 	}
-	if z.Upstreams == "" {
+	if z.Upstreams == nil || len(z.Upstreams) == 0 {
 		validationErrors = append(validationErrors, ValidationError{
 			Field:   "upstreams",
 			Message: "Upstreams are required",
 		})
 	} else {
-		upstreams := strings.Split(z.Upstreams, ",")
-		for i, upstream := range upstreams {
+		for i, upstream := range z.Upstreams {
 			if ip := net.ParseIP(upstream).To4(); ip == nil {
 				validationErrors = append(validationErrors, ValidationError{
 					Field:   "upstreams",
@@ -345,8 +343,10 @@ func (z *DNSConfigRequest) Validate() []ValidationError {
 			}
 		}
 	}
-
-	return validationErrors
+	if len(validationErrors) > 0 {
+		return validationErrors
+	}
+	return nil
 }
 
 func MapLease(lease dhcp.Lease) Lease {
