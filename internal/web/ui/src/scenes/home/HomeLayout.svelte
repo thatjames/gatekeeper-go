@@ -34,6 +34,9 @@
     "/dns/*": wrap({
       asyncComponent: () => import("$scenes/dns/DNSLayout.svelte"),
     }),
+    "/error": wrap({
+      asyncComponent: () => import("$scenes/error/ErrorScreen.svelte"),
+    }),
   };
 
   const serviceConfig = {

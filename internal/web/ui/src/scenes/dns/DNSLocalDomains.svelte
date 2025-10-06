@@ -90,7 +90,6 @@
   $effect(() => {
     getLocalDomains().then((resp) => {
       localDomains = resp;
-      console.log(localDomains);
     });
   });
 </script>
