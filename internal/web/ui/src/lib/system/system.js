@@ -3,13 +3,15 @@ import { writable } from "svelte/store";
 
 export let dhcpInterfaces = writable([]);
 
-api.get("/system/interfaces/dhcp").then((resp) => {
-  dhcpInterfaces.set(resp);
-});
+export const getInterface = (moduleName) => {
+  api.get(`/system/interfaces/${moduleName}`).then((resp) => {
+    dhcpInterfaces.set(resp);
+  });
+};
 
 export let version = writable("1.0.0");
 
-api.get("/system/version").then((resp) => {
+api.get("/version").then((resp) => {
   version.set(resp.version);
 });
 
@@ -19,6 +21,8 @@ export const getSystemInfo = () => {
 
 export let modules = writable([]);
 
-api.get("/system/modules").then((resp) => {
-  modules.set(resp)
-})
+export const loadModules = () => {
+  api.get("/system/modules").then((resp) => {
+    modules.set(resp);
+  });
+};

@@ -17,6 +17,7 @@ func SetupV1Endpoints(r *gin.RouterGroup) {
 	v1Group := r.Group("/v1")
 	v1Group.POST("/login", loginHandler)
 	v1Group.GET("/health", healthHandler)
+	v1Group.GET("/version", getVersion)
 
 	protected := v1Group.Group("/", authMiddleware(), loggingMiddleware())
 	if service.IsRegistered(service.DHCP) {
@@ -55,7 +56,6 @@ func setupSystemRoutes(g *gin.RouterGroup) {
 	system := g.Group("/system")
 	system.GET("/info", getSystemInfo)
 	system.GET("/interfaces/dhcp", getDHCPInterfaces)
-	system.GET("/version", getVersion)
 	system.GET("/modules", getModules)
 }
 
