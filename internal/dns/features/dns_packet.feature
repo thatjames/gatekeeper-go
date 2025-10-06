@@ -36,3 +36,11 @@ Feature: DNS Packet Parsing
     Then I should receive a DNS query for "test.com"
     And the packet should have 1 additional record
     And the additional record should be an EDNS OPT record
+
+  Scenario: Parsing a DNS Response with no answers and an authority section
+    Given the DNS packet "u82BgAABAAAAAQAABG1haWwEem9obwNjb20AABwAAcARAAYAAQAAAOAANQNuczEIem9ob2NvcnDAFghkbnNhZG1pbgZ2dGl0YW7AFni0lNkAABwgAAAHCAASdQAAAA4Q"
+    When I parse the DNS packet
+    Then The packet should parse
+    Then I should receive a DNS packet with an authority count of 1
+    And the packet should have 0 answers
+    And the packet should have 1 authority

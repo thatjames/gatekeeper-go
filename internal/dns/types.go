@@ -9,6 +9,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -109,6 +110,10 @@ type DNSRecord struct {
 	Class      uint16
 	TTL        uint32
 	RData      []byte
+}
+
+func (r *DNSRecord) String() string {
+	return fmt.Sprintf("%s %s %d %d", r.ParsedName, r.Type, r.Class, r.TTL)
 }
 
 type DNSMessage struct {
@@ -303,6 +308,8 @@ func ParseDNSMessage(data []byte) (*DNSMessage, error) {
 	offset += 2
 	arCount := binary.BigEndian.Uint16(data[offset : offset+2])
 	offset += 2
+
+	log.Tracef("parsing %d questions, %d answers, %d authorities, %d additionals", qdCount, anCount, nsCount, arCount)
 
 	// 99% of real world traffic only uses 1 question, so we will FORMERR if we see more than 1
 	if qdCount > 1 {
@@ -534,6 +541,7 @@ func MarshalDNSMessage(msg *DNSMessage) ([]byte, error) {
 	}
 
 	for _, r := range msg.Authorities {
+		log.Tracef("marshaling authority record %v", r)
 		recordBytes, err := marshalResourceRecord(r)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling authority record: %v", err)
@@ -554,7 +562,9 @@ func MarshalDNSMessage(msg *DNSMessage) ([]byte, error) {
 
 func marshalResourceRecord(record *DNSRecord) ([]byte, error) {
 	var buf []byte
-	buf = append(buf, record.Name...)
+	if record.Name != nil {
+		buf = append(buf, record.Name...)
+	}
 	rrHeader := make([]byte, 10)
 	binary.BigEndian.PutUint16(rrHeader[0:2], uint16(record.Type))
 	binary.BigEndian.PutUint16(rrHeader[2:4], record.Class)

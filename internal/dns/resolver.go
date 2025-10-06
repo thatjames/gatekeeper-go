@@ -72,7 +72,7 @@ func NewDNSResolverWithOpts(options ResolverOpts) *DNSResolver {
 	}
 }
 
-func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (*DNSRecord, error) {
+func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answer, authority *DNSRecord, err error) {
 	log.Debugf("resolving %s", domain)
 	if index := sort.SearchStrings(r.blacklist, domain); index < len(r.blacklist) && r.blacklist[index] == domain {
 		log.Debugf("found %s in blacklist", domain)
@@ -90,7 +90,7 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (*DNSRecord, error
 			TTL:        uint32((time.Second * 300).Seconds()),
 			ParsedName: domain,
 			RData:      result,
-		}, nil
+		}, nil, nil
 	}
 	keyBuff := bytes.NewBufferString(domain)
 	binary.Write(keyBuff, binary.BigEndian, dnsType)
@@ -99,7 +99,7 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (*DNSRecord, error
 		if cacheItem.ttl.After(time.Now()) {
 			log.Debugf("found %s - %s in cache", cacheItem.record.ParsedName, cacheItem.record.Type)
 			cacheHitCounter.With(prometheus.Labels{"domain": domain}).Inc()
-			return cacheItem.record, nil
+			return cacheItem.record, nil, nil
 		} else {
 			log.Debugf("removing expired cache item for %s", domain)
 			delete(r.cache, domain)
@@ -107,7 +107,7 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (*DNSRecord, error
 	} else if responseIP, ok := r.localDomains[domain]; ok {
 		log.Debugf("found %s in local domains", domain)
 		if dnsType != DNSTypeA {
-			return nil, nil
+			return nil, nil, nil
 		}
 		queryCounter.With(prometheus.Labels{"domain": domain, "upstream": "local-domain", "result": "success"}).Inc()
 		return &DNSRecord{
@@ -117,24 +117,26 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (*DNSRecord, error
 			TTL:        uint32((time.Second * 300).Seconds()),
 			ParsedName: domain,
 			RData:      responseIP.To4(),
-		}, nil
+		}, nil, nil
 	}
 	for _, upstream := range r.upstream {
-		record, err := r.lookup(domain, dnsType, upstream)
+		answer, authority, err = r.lookup(domain, dnsType, upstream)
 		if err != nil {
 			log.Error("unable to lookup: ", err.Error())
 			queryCounter.With(prometheus.Labels{"domain": domain, "upstream": upstream.String(), "result": "failed"}).Inc()
 			continue
 		}
-		queryCounter.With(prometheus.Labels{"domain": domain, "upstream": upstream.String(), "result": "success"}).Inc()
-		log.Tracef("cache %s%s with value %s", domain, dnsType, record.ParsedName)
-		r.cache[cacheKey] = &DNSCacheItem{
-			record: record,
-			ttl:    time.Now().Add(time.Duration(record.TTL) * time.Second),
+		if answer != nil {
+			queryCounter.With(prometheus.Labels{"domain": domain, "upstream": upstream.String(), "result": "success"}).Inc()
+			log.Tracef("cache %s%s with value %s", domain, dnsType, answer.ParsedName)
+			r.cache[cacheKey] = &DNSCacheItem{
+				record: answer,
+				ttl:    time.Now().Add(time.Duration(answer.TTL) * time.Second),
+			}
 		}
-		return record, nil
+		return answer, authority, nil
 	}
-	return nil, ErrNxDomain
+	return nil, nil, ErrNxDomain
 }
 
 func (r *DNSResolver) AddLocalDomain(domain string, ip net.IP) error {
@@ -154,7 +156,7 @@ func (r *DNSResolver) DeleteLocalDomain(domain string) {
 	delete(r.localDomains, domain)
 }
 
-func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (*DNSRecord, error) {
+func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (answer, authority *DNSRecord, err error) {
 	log.Debugf("looking up %s in %s", domain, upstream.String())
 	message := NewDnsMessage()
 	message.Header.ID = uint16(rand.Intn(65535))
@@ -168,7 +170,7 @@ func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (*
 
 	dat, err := MarshalDNSMessage(message)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	dialer := net.Dialer{
@@ -177,34 +179,40 @@ func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (*
 
 	raddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", upstream, 53))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	conn, err := dialer.Dial("udp", raddr.String())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer conn.Close()
 
 	_, err = conn.Write(dat)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	buff := make([]byte, 1500)
 	n, err := conn.Read(buff)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	msg, err := ParseDNSMessage(buff[:n])
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	if len(msg.Answers) == 0 {
-		return nil, ErrNxDomain
+	if msg.Answers != nil && len(msg.Answers) > 0 {
+		log.Tracef("found answer %v", msg.Answers[0])
+		answer = msg.Answers[0]
 	}
 
-	return msg.Answers[0], nil
+	if msg.Authorities != nil && len(msg.Authorities) > 0 {
+		log.Tracef("found authority %v", msg.Authorities[0])
+		authority = msg.Authorities[0]
+	}
+
+	return
 }

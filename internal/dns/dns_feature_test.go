@@ -207,6 +207,39 @@ func (ts *DNSFeatureTestSuite) theAdditionalRecordShouldBeAnEDNSOPTRecord(ctx co
 	return nil
 }
 
+func (ts *DNSFeatureTestSuite) thenIShouldReceiveADNSPacketWithAnAuthorityCountOf(ctx context.Context, expectedCount int) error {
+	packet := ctx.Value(DNSPacketContextKey).(*DNSMessage)
+
+	actualCount := len(packet.Authorities)
+	if actualCount != expectedCount {
+		return fmt.Errorf("expected %d authority records, got %d", expectedCount, actualCount)
+	}
+
+	return nil
+}
+
+func (ts *DNSFeatureTestSuite) andThePacketShouldHaveAnswers(ctx context.Context, expectedCount int) error {
+	packet := ctx.Value(DNSPacketContextKey).(*DNSMessage)
+
+	actualCount := len(packet.Answers)
+	if actualCount != expectedCount {
+		return fmt.Errorf("expected %d answers, got %d", expectedCount, actualCount)
+	}
+
+	return nil
+}
+
+func (ts *DNSFeatureTestSuite) andThePacketShouldHaveAuthority(ctx context.Context, expectedCount int) error {
+	packet := ctx.Value(DNSPacketContextKey).(*DNSMessage)
+
+	actualCount := len(packet.Authorities)
+	if actualCount != expectedCount {
+		return fmt.Errorf("expected %d authority records, got %d", expectedCount, actualCount)
+	}
+
+	return nil
+}
+
 func TestFeatures(t *testing.T) {
 	flag.Parse()
 
@@ -262,4 +295,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^The packet should parse`, ts.thePacketShouldParse)
 	ctx.Then(`^the packet should have (\d+) additional record$`, ts.thePacketShouldHaveAdditionalRecord)
 	ctx.Then(`^the additional record should be an EDNS OPT record$`, ts.theAdditionalRecordShouldBeAnEDNSOPTRecord)
+	ctx.Then(`^I should receive a DNS packet with an authority count of (\d+)$`, ts.thenIShouldReceiveADNSPacketWithAnAuthorityCountOf)
+	ctx.Step(`^the packet should have (\d+) answers$`, ts.andThePacketShouldHaveAnswers)
+	ctx.Step(`^the packet should have (\d+) authority$`, ts.andThePacketShouldHaveAuthority)
 }
