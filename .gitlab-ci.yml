@@ -47,8 +47,11 @@ test:
   artifacts:
     when: always
     reports:
-      junit: test-report.xml
+      junit:
+        - dhcp-test-report.xml
+        - dns-test-report.xml
     expire_in: 1year
+  coverage: '/Total project coverage:\s*(\d+(?:\.\d+)?)%/'
 
 build_web:
   stage: build_web

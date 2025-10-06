@@ -18,3 +18,13 @@ Web:
   TLS: null
   HTPasswdFile: .htpasswd
   Prometheus: true
+DNS:
+  UpstreamServers:
+    - 8.8.8.8
+    - 1.1.1.1
+  Interface: eth0
+  LocalDomains:
+    international-space-station: 10.0.0.2
+  Port: 53
+  BlockLists:
+    - https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts

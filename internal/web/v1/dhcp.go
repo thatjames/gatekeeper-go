@@ -3,7 +3,6 @@ package v1
 import (
 	"net"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
@@ -53,7 +52,7 @@ func getDHCPOptions(c *gin.Context) {
 		SubnetMask:  opts.SubnetMask.String(),
 		DomainName:  opts.DomainName,
 		LeaseFile:   opts.LeaseFile,
-		NameServers: strings.Join(nameServers, ","),
+		NameServers: nameServers,
 	})
 }
 
@@ -73,7 +72,7 @@ func updateDHCPOptions(c *gin.Context) {
 	var oldOpts = new(dhcp.DHCPServerOpts)
 	*oldOpts = *dhcpService.Options()
 	nameServers := make([]net.IP, 0)
-	for _, nameServer := range strings.Split(opts.NameServers, ",") {
+	for _, nameServer := range opts.NameServers {
 		nameServers = append(nameServers, net.ParseIP(nameServer).To4())
 	}
 	dhcpService.UpdateOptions(&dhcp.DHCPServerOpts{
@@ -109,7 +108,7 @@ func updateDHCPOptions(c *gin.Context) {
 		SubnetMask:        opts.SubnetMask,
 		DomainName:        opts.DomainName,
 		LeaseFile:         opts.LeaseFile,
-		NameServers:       strings.Split(opts.NameServers, ","),
+		NameServers:       opts.NameServers,
 		ReservedAddresses: dhcpService.Options().ReservedLeases,
 	}
 	if err := config.UpdateConfig(); err != nil {

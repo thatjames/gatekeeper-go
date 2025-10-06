@@ -49,14 +49,23 @@ docker-multiarch: docker-binary-multiarch ## Builds and pushes multi-architectur
 ##@ Test
 test: generate-mocks ## Runs the golang unit tests
 	go test ./internal/dhcp -run TestFeatures -v
+	go test ./internal/dns -run TestFeatures -v
 	go test ./internal/dhcp/packet_test.go internal/dhcp/packet.go
 
 test-report: generate-mocks ## Runs the golang unit tests and generates a test report
-	go test ./internal/dhcp -run TestFeaturesWithOutputFile -report-file=${PWD}/test-report.xml
+	@go mod download
+	@mkdir -p internal/web/ui/dist
+	@touch internal/web/ui/dist/dummy.txt
+	@go test ./internal/dhcp -report-file=${PWD}/dhcp-test-report.xml
+	@go test ./internal/dns -report-file=${PWD}/dns-test-report.xml
+	@go test -coverprofile=coverage.out -coverpkg=./... ./...
+	@COVERAGE=$$(go tool cover -func=coverage.out | tail -1 | awk '{print $$3}' | sed 's/%//'); \
+	echo "Total project coverage: $${COVERAGE}%"
+
 
 ##@ Run
 docker-run: ## Runs the docker image
-	docker run --name gatekeeper --rm -ti -v $(PWD)/config/docker-config.yml:/app/config.yml -v /tmp/leases:/var/lib/gatekeeper -p 8085:8085 smokeycircles/gatekeeper -debug
+	docker run --name gatekeeper --rm -ti -v $(PWD)/config/docker-config.yml:/app/config.yml -v /tmp/leases:/var/lib/gatekeeper -p 8085:8085 -p 53:53 -p 67:67 smokeycircles/gatekeeper -debug
 
 ##@ Web
 install: ## Installs the web ui

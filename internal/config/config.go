@@ -17,6 +17,7 @@ var Config *ConfigInstance
 type ConfigInstance struct {
 	DHCP *DHCP `yaml:"DHCP"`
 	Web  *Web  `yaml:"Web"`
+	DNS  *DNS  `yaml:"DNS"`
 }
 
 func (c ConfigInstance) String() string {
@@ -81,6 +82,14 @@ type Web struct {
 type TLSConfig struct {
 	PublicKey  string `yaml:"PublicKey"`
 	PrivateKey string `yaml:"PrivateKey"`
+}
+
+type DNS struct {
+	UpstreamServers []string          `yaml:"UpstreamServers"`
+	Interface       string            `yaml:"Interface"`
+	LocalDomains    map[string]string `yaml:"LocalDomains"`
+	Port            int               `yaml:"Port"`
+	BlockLists      []string          `yaml:"BlockLists"`
 }
 
 func LoadConfig(filePath string) error {

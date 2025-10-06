@@ -15,10 +15,6 @@ import (
 	"github.com/golang/mock/gomock"
 )
 
-// ============================================================================
-// BDD Test Suite and Step Definitions
-// ============================================================================
-
 type TestSuite struct {
 	leasePool    *LeasePool
 	ctrl         *gomock.Controller
@@ -44,7 +40,6 @@ func (ts *TestSuite) reset() {
 	ts.leaseFile = ""
 }
 
-// Mock testing.T for gomock
 type mockTestingT struct{}
 
 func (m *mockTestingT) Errorf(format string, args ...interface{}) {
@@ -57,7 +52,6 @@ func (m *mockTestingT) Fatalf(format string, args ...interface{}) {
 
 func (m *mockTestingT) Helper() {}
 
-// Step definitions for lease pool initialization
 func (ts *TestSuite) iHaveALeasePoolWithIPRange(startIP, endIP string) error {
 	start := net.ParseIP(startIP)
 	end := net.ParseIP(endIP)
@@ -76,7 +70,6 @@ func (ts *TestSuite) theLeasePoolShouldHaveNLeases(expectedCount int) error {
 	return nil
 }
 
-// Step definitions for reserved leases
 func (ts *TestSuite) iReserveAnIPAddressForClient(ipAddress, clientID string) error {
 	ip := net.ParseIP(ipAddress)
 	if ip == nil {
@@ -129,7 +122,6 @@ func (ts *TestSuite) theLeaseStateShouldBe(expectedState string) error {
 	return nil
 }
 
-// Step definitions for lease offering and acceptance
 func (ts *TestSuite) iRequestTheNextAvailableLeaseForClient(clientID string) error {
 	ts.clientID = clientID
 	ts.currentLease = ts.leasePool.NextAvailableLease(clientID)
@@ -167,7 +159,6 @@ func (ts *TestSuite) theLeaseClientIDShouldBe(expectedClientID string) error {
 	return nil
 }
 
-// Step definitions for lease expiry
 func (ts *TestSuite) theLeaseForClientExpiresInThePast(clientID string) error {
 	for _, lease := range ts.leasePool.leases {
 		if lease.ClientId == clientID {
@@ -211,10 +202,7 @@ func (ts *TestSuite) theLeasePoolShouldContainNActiveLeases(expectedCount int) e
 	return nil
 }
 
-// Step definitions for lease pool validation
 func (ts *TestSuite) allLeasesShouldInitiallyBeAvailable() error {
-	// For this test, we'll just verify that we can get leases
-	// In the actual implementation, this would check internal state
 	return nil
 }
 
@@ -223,14 +211,12 @@ func (ts *TestSuite) iRequestNLeasesForDifferentClients(count int) error {
 		clientID := fmt.Sprintf("client%d", i)
 		lease := ts.leasePool.NextAvailableLease(clientID)
 		if lease == nil {
-			// Debug info to understand why this failed
 			activeLeases := ts.leasePool.ActiveLeases()
 			reservedLeases := ts.leasePool.ReservedLeases()
 			return fmt.Errorf("failed to get lease for client %s (iteration %d/%d, active: %d, reserved: %d)",
 				clientID, i+1, count, len(activeLeases), len(reservedLeases))
 		}
 
-		// Debug: check the lease we got
 		if lease.IP.String() == "0.0.0.0" || lease.IP.String() == "<nil>" {
 			return fmt.Errorf("client %s got lease with invalid IP: %s", clientID, lease.IP.String())
 		}
@@ -240,51 +226,132 @@ func (ts *TestSuite) iRequestNLeasesForDifferentClients(count int) error {
 	return nil
 }
 
-// Initialize scenario with all step definitions
+func (ts *TestSuite) iUpdateClientIP(clientID, ipAddress string) error {
+	ip := net.ParseIP(ipAddress)
+	if ip == nil {
+		return fmt.Errorf("invalid IP address: %s", ipAddress)
+	}
+	ts.leasePool.UpdateLease(clientID, ip)
+	return nil
+}
+
+func (ts *TestSuite) iHaveALeasePoolWithClientAndReservedIP(clientID, ipAddress string) error {
+	ts.clientID = clientID
+	ip := net.ParseIP(ipAddress)
+	if ip == nil {
+		return fmt.Errorf("invalid IP address: %s", ipAddress)
+	}
+	ts.leasePool = NewLeasePool(net.ParseIP("10.0.0.1").To4(), net.ParseIP("10.0.0.2").To4())
+	ts.leasePool.ReserveLease(clientID, ip)
+	return nil
+}
+
+func (ts *TestSuite) iHaveALeasePoolWithClientAndIP(clientID, ipAddress string) error {
+	ts.clientID = clientID
+	ip := net.ParseIP(ipAddress)
+	if ip == nil {
+		return fmt.Errorf("invalid IP address: %s", ipAddress)
+	}
+	ts.leasePool = NewLeasePool(net.ParseIP("10.0.0.1").To4(), net.ParseIP("10.0.0.2").To4())
+	for _, lease := range ts.leasePool.leases {
+		if lease.IP.Equal(net.ParseIP(ipAddress).To4()) {
+			lease.ClientId = clientID
+			lease.State = LeaseActive
+			lease.Expiry = time.Now().Add(time.Hour)
+			break
+		}
+	}
+	return nil
+}
+
+func (ts *TestSuite) thereIsAnExpiredLeaseForClientWithIP(clientID, ipAddress string) error {
+	ip := net.ParseIP(ipAddress)
+	if ip == nil {
+		return fmt.Errorf("invalid IP address: %s", ipAddress)
+	}
+	ts.leasePool.leases[0] = &Lease{
+		ClientId: clientID,
+		IP:       ip,
+		State:    LeaseActive,
+		Expiry:   time.Now().Add(-time.Hour),
+	}
+	return nil
+}
+
+func (ts *TestSuite) iRequestTheFirstExpiredLeaseForClient(clientID string) error {
+	lease := ts.leasePool.NextAvailableLease(clientID)
+	if lease == nil {
+		return fmt.Errorf("no lease found for client %s", clientID)
+	}
+	ts.currentLease = lease
+	return nil
+}
+
+func (ts *TestSuite) clientShouldHaveIP(clientID, ipAddress string) error {
+	lease := ts.leasePool.GetLease(clientID)
+	if lease == nil {
+		return fmt.Errorf("client %s does not have a lease", clientID)
+	}
+	if lease.IP.String() != ipAddress {
+		return fmt.Errorf("client %s has lease with IP %s, expected %s", clientID, lease.IP.String(), ipAddress)
+	}
+	return nil
+}
+
+func (ts *TestSuite) theIPAddressShouldBe(expectedIP string) error {
+	if ts.currentLease == nil {
+		return fmt.Errorf("no current lease to check IP address")
+	}
+	if ts.currentLease.IP.String() != expectedIP {
+		return fmt.Errorf("expected IP %s, but got %s", expectedIP, ts.currentLease.IP.String())
+	}
+	return nil
+}
+
 func InitializeScenario(ctx *godog.ScenarioContext) {
 	ts := &TestSuite{}
 
-	// Before each scenario
 	ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
 		ts.reset()
 		return ctx, nil
 	})
 
-	// After each scenario
 	ctx.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
 		ts.reset()
 		return ctx, nil
 	})
 
-	// Lease pool setup
+	/*
+	   And the IP address should be "10.0.0.1"
+	*/
+
+	ctx.Step(`^there is an expired lease for client "([^"]*)" with IP "([^"]*)"$`, ts.thereIsAnExpiredLeaseForClientWithIP)
+	ctx.When(`^I request the first expired lease for client "([^"]*)"$`, ts.iRequestTheFirstExpiredLeaseForClient)
+	ctx.Given(`^I have a lease pool with client "([^"]*)" and reserved IP "([^"]*)"$`, ts.iHaveALeasePoolWithClientAndReservedIP)
+	ctx.Given(`^I have a lease pool with client "([^"]*)" and IP "([^"]*)"$`, ts.iHaveALeasePoolWithClientAndIP)
 	ctx.Step(`^I have a lease pool with IP range "([^"]*)" to "([^"]*)"$`, ts.iHaveALeasePoolWithIPRange)
 	ctx.Step(`^the lease pool should have (\d+) leases$`, ts.theLeasePoolShouldHaveNLeases)
 	ctx.Step(`^all leases should initially be available$`, ts.allLeasesShouldInitiallyBeAvailable)
+	ctx.Step(`^the IP address should be "([^"]*)"$`, ts.theIPAddressShouldBe)
 
-	// Reserved leases
+	ctx.Step(`^I update client "([^"]*)" ip to "([^"]*)"`, ts.iUpdateClientIP)
 	ctx.Step(`^I reserve IP address "([^"]*)" for client "([^"]*)"$`, ts.iReserveAnIPAddressForClient)
 	ctx.Step(`^I request a lease for client "([^"]*)"$`, ts.iRequestALeaseForClient)
 	ctx.Step(`^I should receive a lease with IP "([^"]*)"$`, ts.iShouldReceiveALeaseWithIP)
 	ctx.Step(`^the lease state should be "([^"]*)"$`, ts.theLeaseStateShouldBe)
 	ctx.Step(`^the lease client ID should be "([^"]*)"$`, ts.theLeaseClientIDShouldBe)
 
-	// Lease offering and acceptance
 	ctx.Step(`^I request the next available lease for client "([^"]*)"$`, ts.iRequestTheNextAvailableLeaseForClient)
 	ctx.Step(`^I should receive a lease$`, ts.iShouldReceiveALease)
 	ctx.Step(`^I should receive no lease$`, ts.iShouldReceiveNoLease)
 	ctx.Step(`^I accept the lease for "([^"]*)"$`, ts.iAcceptTheLeaseForDuration)
 
-	// Lease expiry
+	ctx.Step(`^Client "([^"]*)" should have IP "([^"]*)"$`, ts.clientShouldHaveIP)
 	ctx.Step(`^the lease for client "([^"]*)" expires in the past$`, ts.theLeaseForClientExpiresInThePast)
 
-	// Multiple leases
 	ctx.Step(`^I request (\d+) leases for different clients$`, ts.iRequestNLeasesForDifferentClients)
 	ctx.Step(`^the lease pool should contain (\d+) active leases$`, ts.theLeasePoolShouldContainNActiveLeases)
 }
-
-// ============================================================================
-// BDD Test Runners
-// ============================================================================
 
 var opts = godog.Options{
 	Output: colors.Colored(os.Stdout),
@@ -299,88 +366,18 @@ func init() {
 
 func TestFeatures(t *testing.T) {
 	flag.Parse()
-	opts.TestingT = t
-
-	status := godog.TestSuite{
-		Name:                "DHCP Lease Management",
-		ScenarioInitializer: InitializeScenario,
-		Options:             &opts,
-	}.Run()
-
-	if status == 2 {
-		t.SkipNow()
-	}
-
-	if status != 0 {
-		t.Fatalf("zero status code expected, %d received", status)
-	}
-}
-
-// Alternative: Run specific feature files
-func TestReservedLeases(t *testing.T) {
-	suite := godog.TestSuite{
-		Name:                "Reserved Leases",
-		ScenarioInitializer: InitializeScenario,
-		Options: &godog.Options{
-			Format:   "pretty",
-			Paths:    []string{"features/reserved_leases.feature"},
-			TestingT: t,
-		},
-	}
-
-	if suite.Run() != 0 {
-		t.Fatal("non-zero status returned, failed to run feature tests")
-	}
-}
-
-func TestLeaseInitialization(t *testing.T) {
-	suite := godog.TestSuite{
-		Name:                "Lease Initialization",
-		ScenarioInitializer: InitializeScenario,
-		Options: &godog.Options{
-			Format:   "pretty",
-			Paths:    []string{"features/lease_initialization.feature"},
-			TestingT: t,
-		},
-	}
-
-	if suite.Run() != 0 {
-		t.Fatal("non-zero status returned, failed to run feature tests")
-	}
-}
-
-func TestLeaseOffering(t *testing.T) {
-	suite := godog.TestSuite{
-		Name:                "Lease Offering",
-		ScenarioInitializer: InitializeScenario,
-		Options: &godog.Options{
-			Format:   "pretty",
-			Paths:    []string{"features/lease_offering.feature"},
-			TestingT: t,
-		},
-	}
-
-	if suite.Run() != 0 {
-		t.Fatal("non-zero status returned, failed to run feature tests")
-	}
-}
-
-// Example of running with different formats
-func TestFeaturesWithOutputFile(t *testing.T) {
-	flag.Parse()
 
 	if *reportFile != "" {
-		// Create output file for JSON
-		file, err := os.Create(*reportFile)
+		file, err := os.OpenFile(*reportFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 		if err != nil {
 			t.Fatalf("Failed to create output file: %v", err)
 		}
 		defer file.Close()
 		opts.Output = file
+		opts.Format = "junit"
 	}
 
 	opts.TestingT = t
-	opts.Format = "junit"
 
 	status := godog.TestSuite{
 		Name:                "DHCP Lease Management",
@@ -396,18 +393,3 @@ func TestFeaturesWithOutputFile(t *testing.T) {
 		t.Fatalf("zero status code expected, %d received", status)
 	}
 }
-
-// Example of running with custom tags
-// func ExampleTags() {
-// 	suite := godog.TestSuite{
-// 		Name:                "DHCP Lease Management",
-// 		ScenarioInitializer: InitializeScenario,
-// 		Options: &godog.Options{
-// 			Format: "pretty",
-// 			Tags:   "@smoke", // Only run scenarios tagged with @smoke
-// 			Paths:  []string{"features"},
-// 		},
-// 	}
-
-// 	suite.Run()
-// }

@@ -4,4 +4,5 @@ internal/web/ui/dist
 **/*.htpasswd
 leases.db
 **/mocks
-test-report.xml
+*test-report.xml
+coverage.out

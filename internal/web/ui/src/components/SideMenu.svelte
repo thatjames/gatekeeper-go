@@ -9,7 +9,7 @@
   import { onDestroy, onMount } from "svelte";
   import { push } from "svelte-spa-router";
   import { location } from "svelte-spa-router";
-  import { isMenuOpen, isDropDownClicked } from "$lib/stores/menu.js"; // Import the store
+  import { isMenuOpen, dropdownStates } from "$lib/stores/menu.js"; // Import dropdownStates from store
   import { logout } from "$lib/auth/auth.svelte";
   import { Routes } from "$lib/common/routes";
   import { MenuComponent } from "$lib/common/menu-types";
@@ -18,12 +18,32 @@
   let { menuOptions = [], children } = $props();
   let componentId = Math.random().toString(36).substr(2, 9);
   let isLargeScreen = $state(false);
+
+  // Use the dropdown states from the store instead of local state
+  // let dropdownStates = $state({}); // Remove this line
+
   const checkScreenSize = () => {
-    isLargeScreen = window.innerWidth >= 1536;
+    isLargeScreen = window.innerWidth >= 768;
   };
 
   const toggleMenu = (e) => {
     isMenuOpen.update((open) => !open);
+  };
+
+  const toggleDropdown = (optionLabel) => {
+    dropdownStates.update((states) => ({
+      ...states,
+      [optionLabel]: !states[optionLabel],
+    }));
+  };
+
+  // Check if current location matches any submenu item in a dropdown
+  const getActiveDropdown = () => {
+    return menuOptions.find(
+      (option) =>
+        option.type === MenuComponent.Dropdown &&
+        option.items?.some((item) => item.location === $location),
+    )?.label;
   };
 
   const doLogout = () => {
@@ -31,9 +51,39 @@
     window.location.reload();
   };
 
+  // Reactive statement to keep dropdown open if submenu is active
+  // but don't close dropdowns when navigating to other pages
+  $effect(() => {
+    const activeDropdown = getActiveDropdown();
+    if (activeDropdown && !dropdownStates[activeDropdown]) {
+      dropdownStates[activeDropdown] = true;
+    }
+    // Don't close other dropdowns when navigating - only open the relevant one
+  });
+
   onMount(() => {
     checkScreenSize();
     window.addEventListener("resize", checkScreenSize);
+
+    // Initialize dropdown states in store only if they haven't been set yet
+    dropdownStates.update((states) => {
+      const newStates = { ...states };
+
+      menuOptions.forEach((option) => {
+        if (
+          option.type === MenuComponent.Dropdown &&
+          newStates[option.label] === undefined
+        ) {
+          // Keep dropdown open if one of its subitems is currently active
+          const hasActiveSubitem = option.items?.some(
+            (item) => item.location === $location,
+          );
+          newStates[option.label] = hasActiveSubitem || false;
+        }
+      });
+
+      return newStates;
+    });
   });
 </script>
 
@@ -49,13 +99,14 @@
   </div>
 
   <div
-    class="side-menu fixed top-0 left-0 h-full dark:bg-gray-800 bg-gray-200 text-white transition-transform duration-300 ease-in-out w-64 z-40 flex flex-col {$isMenuOpen ||
-    isLargeScreen
-      ? 'translate-x-0'
-      : '-translate-x-full'}"
+    class="side-menu fixed z-40 dark:bg-gray-800 bg-gray-200 text-white transition-transform duration-300 ease-in-out flex flex-col {!isLargeScreen
+      ? 'top-0 left-0 right-0 bottom-0 w-full h-full ' +
+        ($isMenuOpen ? 'translate-y-0' : '-translate-y-full')
+      : 'top-0 left-0 h-full w-64 ' +
+        ($isMenuOpen ? 'translate-x-0' : '-translate-x-full')}"
   >
     <!-- Header Section -->
-    <div class="pt-16 p-4 flex-shrink-0">
+    <div class="{!isLargeScreen ? 'pt-20' : 'pt-16'} p-4 flex-shrink-0">
       <div class="flex">
         <img
           src="/logo.png"
@@ -74,7 +125,11 @@
     </div>
 
     <!-- Main Menu Content - Scrollable -->
-    <div class="flex-grow overflow-y-auto p-4 pt-0">
+    <div
+      class="flex-grow overflow-y-auto p-4 pt-0 {!isLargeScreen
+        ? 'max-h-screen'
+        : ''}"
+    >
       {#each menuOptions as option}
         <div>
           <div
@@ -85,17 +140,29 @@
             onclick={option.type !== MenuComponent.Dropdown
               ? (e) => {
                   push(option?.location);
+                  // Close menu on mobile after navigation
+                  if (!isLargeScreen) {
+                    isMenuOpen.set(false);
+                  }
                 }
               : (e) => {
-                  $isDropDownClicked = !$isDropDownClicked;
+                  toggleDropdown(option.label);
                 }}
             role="button"
             tabindex="0"
             onkeydown={option.type !== MenuComponent.Dropdown
-              ? (e) => e.key === "Enter" && push(option?.location)
+              ? (e) => {
+                  if (e.key === "Enter") {
+                    push(option?.location);
+                    // Close menu on mobile after navigation
+                    if (!isLargeScreen) {
+                      isMenuOpen.set(false);
+                    }
+                  }
+                }
               : (e) => {
                   if (e.key === "Enter") {
-                    $isDropDownClicked = !$isDropDownClicked;
+                    toggleDropdown(option.label);
                   }
                 }}
           >
@@ -105,7 +172,9 @@
             <span class="w-5 h-5 mr-2 text-black dark:text-gray-100">
               {#if option.type === MenuComponent.Dropdown}
                 <div
-                  class="transform transition-transform duration-300 ease-in-out {$isDropDownClicked
+                  class="transform transition-transform duration-300 ease-in-out {$dropdownStates[
+                    option.label
+                  ]
                     ? 'rotate-90'
                     : 'rotate-0'}"
                 >
@@ -119,21 +188,36 @@
 
           <div
             class="transition-all duration-300 ease-in-out overflow-hidden ml-6 {option.type ===
-              MenuComponent.Dropdown && $isDropDownClicked
+              MenuComponent.Dropdown && $dropdownStates[option.label]
               ? 'max-h-96 opacity-100'
               : 'max-h-0 opacity-0'}"
           >
             {#if option.type === MenuComponent.Dropdown}
               {#each option.items as item}
                 <div
+                  id={item.label}
                   class="py-2 px-3 my-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded cursor-pointer text-black dark:text-gray-100 text-sm transition-colors duration-200 {$location ===
                   item.location
                     ? 'bg-primary-500'
                     : ''}"
-                  onclick={() => push(item.location)}
+                  onclick={() => {
+                    push(item.location);
+                    // Close menu on mobile after navigation
+                    if (!isLargeScreen) {
+                      isMenuOpen.set(false);
+                    }
+                  }}
                   role="button"
                   tabindex="0"
-                  onkeydown={(e) => e.key === "Enter" && push(item.location)}
+                  onkeydown={(e) => {
+                    if (e.key === "Enter") {
+                      push(item.location);
+                      // Close menu on mobile after navigation
+                      if (!isLargeScreen) {
+                        isMenuOpen.set(false);
+                      }
+                    }
+                  }}
                 >
                   <div class="flex items-center justify-between">
                     <span class="text-black dark:text-gray-100">
@@ -170,12 +254,12 @@
   </div>
 
   <div
-    class="transition-all duration-300 ease-in-out min-h-screen {$isMenuOpen ||
-    isLargeScreen
+    class="transition-all duration-300 ease-in-out min-h-screen {isLargeScreen &&
+    $isMenuOpen
       ? 'ml-64'
       : 'ml-0'}"
   >
-    <div class="2xl:pt-20">
+    <div class="md:pt-20">
       {@render children?.()}
     </div>
   </div>

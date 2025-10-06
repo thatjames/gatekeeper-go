@@ -10,17 +10,11 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
 	v1 "gitlab.com/thatjames-go/gatekeeper-go/internal/web/v1"
 )
 
-var (
-	leasePool *dhcp.LeasePool
-)
-
-func Init(ver string, cfg *config.Web, leases *dhcp.LeasePool) error {
+func Init(ver string, cfg *config.Web) error {
 	version = ver
-	leasePool = leases
 
 	r := gin.New()
 	r.Use(gin.Recovery())

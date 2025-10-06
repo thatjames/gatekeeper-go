@@ -249,7 +249,7 @@
 </Modal>
 
 <div class="flex flex-col gap-5">
-  <Heading tag="h4">Leases</Heading>
+  <Heading tag="h3">Leases</Heading>
   <Tabs>
     <TabItem title="Active Leases" open>
       <LeaseTable leases={leases.active} {onLeaseClick} />

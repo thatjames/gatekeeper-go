@@ -25,10 +25,12 @@ func GetSystemInfo() (SystemInfo, error) {
 		"Uptime":   formatDuration((time.Second * time.Duration(t.Uptime)).Round(time.Second)),
 		"Memory":   fmt.Sprintf("%s / %s", byteSize(uint64(t.Freeram)), byteSize(uint64(t.Totalram))),
 	}
-	if lanStats, err := getInterfaceStatsByName(config.Config.DHCP.Interface); err == nil {
-		si["LAN Interface"] = config.Config.DHCP.Interface
-		si["LAN Tx"] = byteSize(uint64(lanStats.TxBytes))
-		si["LAN Rx"] = byteSize(uint64(lanStats.RxBytes))
+	if config.Config.DHCP != nil {
+		if lanStats, err := getInterfaceStatsByName(config.Config.DHCP.Interface); err == nil {
+			si["LAN Interface"] = config.Config.DHCP.Interface
+			si["LAN Tx"] = byteSize(uint64(lanStats.TxBytes))
+			si["LAN Rx"] = byteSize(uint64(lanStats.RxBytes))
+		}
 	}
 	if lanStats, err := getInterfaceStatsByName("ppp0"); err == nil {
 		si["WAN Interface"] = "ppp0"
@@ -38,7 +40,7 @@ func GetSystemInfo() (SystemInfo, error) {
 	return si, nil
 }
 
-func GetDHCPInterfaces() ([]string, error) {
+func GetNetworkInterfaces() ([]string, error) {
 	interfaces := make([]string, 0)
 	ifaces, err := net.Interfaces()
 	if err != nil {

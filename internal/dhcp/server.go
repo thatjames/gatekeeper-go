@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -52,6 +53,7 @@ type DHCPServer struct {
 	requestChan   chan *DHCPPacket
 	responseChan  chan *DHCPPacket
 	stopChan      chan struct{}
+	lock          sync.Mutex
 }
 
 type DHCPServerOpts struct {
@@ -190,8 +192,8 @@ func (z *DHCPServer) Stop() error {
 	}
 
 	close(z.stopChan)
-	z.packetConn.Close()
-
+	z.lock.Lock()
+	defer z.lock.Unlock()
 	return z.issuedLeases.PeristLeases(z.opts.LeaseFile)
 }
 
@@ -209,14 +211,25 @@ func (z *DHCPServer) UpdateOptions(opts *DHCPServerOpts) error {
 }
 
 func (z *DHCPServer) listen() {
-	buff := make([]byte, 1500)
+	defer func() {
+		log.Trace("closing DHCP server")
+		z.packetConn.Close()
+		z.lock.Unlock()
+	}()
+	z.lock.Lock()
 	for {
 		select {
 		case <-z.stopChan:
 			return
 		default:
+			buff := make([]byte, 1500)
+			z.packetConn.SetReadDeadline(time.Now().Add(time.Second * 2))
 			n, addr, err := z.packetConn.ReadFrom(buff)
 			if err != nil {
+				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					// This is a timeout error, don't log it
+					continue
+				}
 				log.Error("unable to read datastream: ", err.Error())
 				continue
 			}
