@@ -105,6 +105,30 @@ Remember to replace `username` and `password` with your own values
 
 ![WebUI DHCP Options Config](images/web_dhcp_options_form.png)
 
+##### WebUI DNS Local Domains
+
+![WebUI DNS Local Domains](images/web_dns_local_domains.png)
+
+##### WebUI DNS Add Local Domain
+
+![WebUI DNS Add Local Domain](images/web_dns_local_domains_add.png)
+
+##### WebUI DNS Statistics
+
+![WebUI DNS Statistics](images/web_dns_stats.png)
+
+##### WebUI DNS Config
+
+![WebUI DNS Config](images/web_dns_settings_view.png)
+
+##### WebUI DNS Edit Config
+
+![WebUI DNS Edit Config](images/web_dns_settings_edit.png)
+
+##### WebUI DNS Add Upstream Server
+
+![WebUI DNS Add Upstream Server](images/web_dns_add_upstream.png)
+
 ## Configuration
 
 Example config:
@@ -127,8 +151,19 @@ DHCP:
   LeaseFile: /var/lib/gatekeeper/leases
 Web:
   Address: :8085
+  TLS: null
   HTPasswdFile: .htpasswd
   Prometheus: true
+DNS:
+  UpstreamServers:
+    - 8.8.8.8
+    - 1.1.1.1
+  Interface: eth0
+  LocalDomains:
+    international-space-station: 10.0.0.2
+  Port: 53
+  BlockLists:
+    - https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
 ```
 
 ### DHCP
@@ -185,6 +220,28 @@ Relative or Fully Qualified path to the htaccess file
 
 #### Prometheus
 
-If true, the webserver will expose a prometheus metrics endpoint at `/metrics`
+If true, the webserver will expose a prometheus metrics endpoint at `/metrics`. This is required for the metrics to be displayed in the UI.
+
+### DNS
+
+#### UpstreamServers
+
+An array of DNS servers to use for upstream queries
+
+#### Interface
+
+The interface name gatekeeper will bind to
+
+#### LocalDomains
+
+A mapping of domain_name:desired_static_ip to provide static IP addresses to clients.
+
+#### Port
+
+The port gatekeeper will bind the DHCP server to
+
+#### BlockLists
+
+An array of URLs to blocklists to use for upstream queries
 
 **note:** if no `HTPasswdFile` is provided, then the default username/password is admin/admin
