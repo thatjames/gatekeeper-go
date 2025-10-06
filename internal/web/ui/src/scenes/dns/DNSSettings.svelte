@@ -19,7 +19,6 @@
   let settings = $state({});
   let edit = $state(false);
   let errors = $state(null);
-  let fieldErrors = $state({});
   let showLocalDomain = $state(false);
   let generalError = $state("");
   let activeDomain = $state({});
@@ -40,35 +39,17 @@
         settings = resp;
         edit = false;
         // Clear errors on successful save
-        fieldErrors = {};
         generalError = "";
       })
-      .catch((err) => handleError(err))
+      .catch((err) => {
+        errors = err;
+      })
       .finally(() => (loading = false));
   };
 
-  const handleError = (error) => {
-    if (error.fields && Array.isArray(error.fields)) {
-      fieldErrors = error.fields.reduce((acc, fieldError) => {
-        acc[fieldError.field] = fieldError.message;
-        return acc;
-      }, {});
-    }
-    if (error.error) {
-      generalError = error.error;
-    }
-  };
-
-  // Simplified error clearing - just clear the specific field
-  const clearFieldError = (fieldName) => {
-    if (fieldErrors[fieldName]) {
-      const newFieldErrors = { ...fieldErrors };
-      delete newFieldErrors[fieldName];
-      fieldErrors = newFieldErrors;
-    }
-    if (generalError) {
-      generalError = "";
-    }
+  const clearErrors = () => {
+    console.log("clear errors");
+    errors = null;
   };
 </script>
 
@@ -77,10 +58,9 @@
     <Heading tag="h3">Edit DNS Settings</Heading>
     <div class="w-4/5 mx-auto flex flex-col gap-5">
       <DNSSettingsForm
-        {settings}
-        externalErrors={fieldErrors}
-        {generalError}
-        onerrorscleared={clearFieldError}
+        bind:settings
+        externalErrors={errors}
+        on:errorsCleared={clearErrors}
       />
       <div class="grid grid-cols-2 gap-5">
         <Button
@@ -104,7 +84,7 @@
         <P
           class="text-primary-600 dark:text-primary-600 col-span-2 text-center"
         >
-          {errors?.error}
+          {generalError}
         </P>
       </div>
     </div>

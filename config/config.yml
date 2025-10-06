@@ -22,7 +22,6 @@ DNS:
   UpstreamServers:
     - 1.1.1.1
     - 9.9.9.9
-    - 8.8.8.8
   Interface: enp34s0
   LocalDomains:
     international-space-station: 10.0.0.2

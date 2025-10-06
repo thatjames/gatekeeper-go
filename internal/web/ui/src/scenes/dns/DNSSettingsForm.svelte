@@ -20,6 +20,7 @@
   let newUpstreamIP = $state("");
 
   let { settings, externalErrors, generalError } = $props();
+  let fieldErrors = $state({});
 
   let interfaceItems = $state(
     $networkInterfaces.map((interfaceItem) => {
@@ -47,7 +48,16 @@
 
   const closeModal = () => {
     showModal = false;
+    dispatch("errorsCleared", "upstreams");
   };
+
+  $effect(() => {
+    fieldErrors =
+      externalErrors?.fields?.reduce((acc, error) => {
+        acc[error.field] = error.message;
+        return acc;
+      }, {}) || {};
+  });
 </script>
 
 <Modal bind:open={showModal} title="Add Upstream">
@@ -80,7 +90,9 @@
       />
     </div>
     <div class="grid grid-cols-2 gap-2">
-      <Button outline onclick={addUpstream}>Add</Button>
+      <Button outline disabled={!newUpstreamIP} onclick={addUpstream}
+        >Add</Button
+      >
       <Button outline color="dark" onclick={closeModal}>Close</Button>
     </div>
   </div>
@@ -97,9 +109,9 @@
         items={interfaceItems}
         bind:value={settings.interface}
       />
-      {#if externalErrors.interface}
+      {#if fieldErrors.interface}
         <Helper class="mt-2 text-primary-500 dark:text-primary-500">
-          {externalErrors.interface}
+          {fieldErrors.interface}
         </Helper>
       {/if}
     </div>
@@ -120,9 +132,9 @@
         >
         <Tooltip>Edit Upstreams</Tooltip>
       </ButtonGroup>
-      {#if externalErrors.upstreams}
+      {#if fieldErrors.upstreams}
         <Helper class="mt-2 text-primary-500 dark:text-primary-500">
-          {externalErrors.upstreams}
+          {fieldErrors.upstreams}
         </Helper>
       {/if}
     </div>
