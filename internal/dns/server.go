@@ -165,7 +165,7 @@ func (d *DNSServer) receiverWorker() {
 			packet.DNSMessage.Header.SetRCODE(RCODESuccess)
 			if response != nil {
 				packet.DNSMessage.Answers = append(packet.DNSMessage.Answers, response)
-				log.Trace("adding answer %s", response)
+				log.Tracef("adding answer %v", response)
 			}
 			if authority != nil {
 				packet.DNSMessage.Authorities = append(packet.DNSMessage.Authorities, authority)
