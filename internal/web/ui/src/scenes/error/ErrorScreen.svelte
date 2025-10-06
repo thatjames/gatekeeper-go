@@ -5,6 +5,7 @@
   import { Routes } from "$lib/common/routes";
 
   if (!$systemError) {
+    console.log("no system error");
     push(Routes.Home);
   }
 </script>

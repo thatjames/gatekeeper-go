@@ -45,7 +45,6 @@ export class API {
           "Server unavailable. Please check your connection.";
         systemError.set(errorMessage);
         push(Routes.Error);
-        throw new Error(errorMessage);
       }
       // Re-throw HTTP errors or other errors
       throw error;
