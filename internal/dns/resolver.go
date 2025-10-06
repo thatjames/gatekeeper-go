@@ -76,7 +76,21 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (*DNSRecord, error
 	log.Debugf("resolving %s", domain)
 	if index := sort.SearchStrings(r.blacklist, domain); index < len(r.blacklist) && r.blacklist[index] == domain {
 		log.Debugf("found %s in blacklist", domain)
-		return nil, ErrNxDomain
+		var result []byte
+		if dnsType == DNSTypeA {
+			result = make([]byte, 4)
+		} else if dnsType == DNSTypeAAAA {
+			result = net.IPv6zero
+		}
+		blockedDomainCounter.With(prometheus.Labels{"domain": domain}).Inc()
+		return &DNSRecord{
+			Name:       compressedDomainVal,
+			Type:       dnsType,
+			Class:      DNSClassIN,
+			TTL:        uint32((time.Second * 300).Seconds()),
+			ParsedName: domain,
+			RData:      result,
+		}, nil
 	}
 	keyBuff := bytes.NewBufferString(domain)
 	binary.Write(keyBuff, binary.BigEndian, dnsType)

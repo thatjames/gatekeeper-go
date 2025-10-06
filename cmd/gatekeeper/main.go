@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
@@ -60,11 +63,59 @@ func main() {
 		for domain, ip := range config.Config.DNS.LocalDomains {
 			localDomains[domain] = net.ParseIP(ip).To4()
 		}
+
+		var blockedDomains []string
+		if config.Config.DNS.BlockLists != nil && len(config.Config.DNS.BlockLists) > 0 {
+			blockedDomains = make([]string, 0)
+			http.DefaultClient.Timeout = time.Second * 2
+			resultChan := make(chan string, len(config.Config.DNS.BlockLists))
+			signalChan := make(chan interface{}, len(config.Config.DNS.BlockLists))
+			var workerCount = len(config.Config.DNS.BlockLists)
+			for _, host := range config.Config.DNS.BlockLists {
+				go func() {
+					defer func() {
+						log.Debugf("worker %s finished", host)
+						signalChan <- nil
+					}()
+					log.Debugf("Fetch hosts from %s", host)
+					resp, err := http.DefaultClient.Get(host)
+					if err != nil {
+						log.Warnf("unable to fetch blocklist %s: %s", host, err.Error())
+						return
+					}
+					defer resp.Body.Close()
+					dat, err := ioutil.ReadAll(resp.Body)
+					if err != nil {
+						log.Warnf("unable to read blocklist %s: %s", host, err.Error())
+						return
+					}
+					for _, line := range strings.Split(string(dat), "\n") {
+						if line != "" && !strings.HasPrefix(line, "#") {
+							blockedHost := strings.Split(line, " ")[1]
+							resultChan <- blockedHost
+						}
+					}
+				}()
+			}
+			for workerCount > 0 {
+				select {
+				case <-signalChan:
+					workerCount--
+
+				case results := <-resultChan:
+					blockedDomains = append(blockedDomains, results)
+				}
+			}
+			close(signalChan)
+			close(resultChan)
+			log.Infof("loaded %d blocked domains", len(blockedDomains))
+		}
 		dnsServer := dns.NewDNSServerWithOpts(dns.DNSServerOpts{
 			Interface: config.Config.DNS.Interface,
 			ResolverOpts: &dns.ResolverOpts{
 				LocalDomains: localDomains,
 				Upstreams:    config.Config.DNS.UpstreamServers,
+				Blacklist:    blockedDomains,
 			},
 			Port: config.Config.DNS.Port,
 		})

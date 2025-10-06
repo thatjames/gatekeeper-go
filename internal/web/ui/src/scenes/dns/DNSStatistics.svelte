@@ -9,6 +9,7 @@
   let dnsRequestTime = $state(null);
   let queryCounters = $state([]);
   let cacheHitCounters = $state([]);
+  let blockedDomainCounters = $state([]);
   let refreshInterval = null;
 
   const PROMETHEUS_URL = "http://localhost:8085"; // Update with your Prometheus URL
@@ -28,6 +29,9 @@
       queryCounters = await metricsService.getCounterVec("dns_query_counter");
       cacheHitCounters = await metricsService.getCounterVec(
         "dns_cache_hit_counter",
+      );
+      blockedDomainCounters = await metricsService.getCounterVec(
+        "dns_blocked_domain_counter",
       );
     } catch (err) {
       error = err.message;
@@ -111,6 +115,19 @@
     }));
   });
 
+  // Aggregate blocked domains
+  const blockedDomains = $derived.by(() => {
+    if (!blockedDomainCounters || blockedDomainCounters.length === 0) return [];
+
+    return blockedDomainCounters
+      .map((counter) => ({
+        domain: counter.labels.domain || "unknown",
+        count: counter.value,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10); // Top 10 blocked domains
+  });
+
   // Prepare top domains chart
   const topDomainsChartData = $derived.by(() => {
     if (!queryByDomain || queryByDomain.length === 0) {
@@ -128,12 +145,33 @@
     };
   });
 
+  // Prepare blocked domains chart
+  const blockedDomainsChartData = $derived.by(() => {
+    if (!blockedDomains || blockedDomains.length === 0) {
+      return { series: [], categories: [] };
+    }
+
+    return {
+      series: [
+        {
+          name: "Blocked Requests",
+          data: blockedDomains.map((d) => d.count),
+        },
+      ],
+      categories: blockedDomains.map((d) => d.domain),
+    };
+  });
+
   const totalCacheHits = $derived(
     cacheHitCounters.reduce((sum, counter) => sum + counter.value, 0),
   );
 
+  const totalBlockedRequests = $derived(
+    blockedDomainCounters.reduce((sum, counter) => sum + counter.value, 0),
+  );
+
   const cacheHitRate = $derived(
-    dnsRequestTime.count > 0
+    dnsRequestTime?.count > 0
       ? ((totalCacheHits / dnsRequestTime.count) * 100).toFixed(1)
       : "0.0",
   );
@@ -149,7 +187,6 @@
       data.series.push(counter.count);
       data.labels.push(counter.upstream);
     }
-    console.log(data);
     return data;
   });
 </script>
@@ -171,7 +208,7 @@
     </Card>
   {:else if dnsRequestTime?.count > 0}
     <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
       <!-- Total Requests -->
       <Card class="p-4">
         <div class="space-y-2">
@@ -200,6 +237,18 @@
           <p class="text-sm text-gray-500 dark:text-gray-400">Cache Hit Rate</p>
           <p class="text-3xl font-bold text-gray-900 dark:text-white">
             {cacheHitRate}%
+          </p>
+        </div>
+      </Card>
+
+      <!-- Blocked Requests -->
+      <Card class="p-4">
+        <div class="space-y-2">
+          <p class="text-sm text-gray-500 dark:text-gray-400">
+            Blocked Requests
+          </p>
+          <p class="text-3xl font-bold text-red-600 dark:text-red-400">
+            {totalBlockedRequests.toLocaleString()}
           </p>
         </div>
       </Card>
@@ -284,21 +333,91 @@
         />
       </div>
     </div>
-    <div
-      class="flex flex-col gap-2 p-4 border shadow-lg rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800"
-    >
-      <div class="space-y-4">
-        <ApexChart
-          type="donut"
-          series={upstreamRate.series}
-          options={{
-            title: "Queries by Upstream",
-            labels: upstreamRate.labels,
-          }}
-          height={400}
-        />
+
+    <!-- Two column grid for pie charts -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <!-- Queries by Upstream Chart -->
+      <div
+        class="flex flex-col gap-2 p-4 border shadow-lg rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800"
+      >
+        <div class="space-y-4">
+          <ApexChart
+            type="donut"
+            series={upstreamRate.series}
+            options={{
+              title: "Queries by Upstream",
+              labels: upstreamRate.labels,
+            }}
+            height={400}
+          />
+        </div>
+      </div>
+
+      <!-- Blocked vs Allowed Chart -->
+      <div
+        class="flex flex-col gap-2 p-4 border shadow-lg rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800"
+      >
+        <div class="space-y-4">
+          <ApexChart
+            type="donut"
+            series={[
+              dnsRequestTime.count - totalBlockedRequests,
+              totalBlockedRequests,
+            ]}
+            options={{
+              title: "Allowed vs Blocked Requests",
+              labels: ["Allowed", "Blocked"],
+              colors: ["#10b981", "#ef4444"],
+              legend: {
+                position: "bottom",
+              },
+              tooltip: {
+                y: {
+                  formatter: (value) => `${value.toLocaleString()} requests`,
+                },
+              },
+            }}
+            height={400}
+          />
+        </div>
       </div>
     </div>
+
+    <!-- Blocked Domains Chart -->
+    {#if blockedDomains.length > 0}
+      <div
+        class="flex flex-col gap-2 p-4 border shadow-lg rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800"
+      >
+        <div class="space-y-4">
+          <ApexChart
+            type="bar"
+            series={blockedDomainsChartData.series}
+            options={{
+              plotOptions: {
+                bar: {
+                  borderRadius: 4,
+                  horizontal: true,
+                },
+              },
+              dataLabels: {
+                enabled: false,
+              },
+              xaxis: {
+                categories: blockedDomainsChartData.categories,
+              },
+              title: "Top Blocked Domains",
+              colors: ["#ef4444"],
+              tooltip: {
+                y: {
+                  formatter: (value) => `${value} blocked requests`,
+                },
+              },
+            }}
+            height={400}
+          />
+        </div>
+      </div>
+    {/if}
   {:else}
     <p class="text-gray-500 dark:text-gray-400 text-center py-8">
       No DNS request data available yet

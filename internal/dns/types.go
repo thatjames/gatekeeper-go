@@ -27,6 +27,11 @@ var (
 		Name: "dns_cache_hit_counter",
 		Help: "count of cache hits by domain",
 	}, []string{"domain"})
+
+	blockedDomainCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "dns_blocked_domain_counter",
+		Help: "count of blocked domains",
+	}, []string{"domain"})
 )
 
 var (

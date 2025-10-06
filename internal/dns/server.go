@@ -89,13 +89,13 @@ func (d *DNSServer) DeleteLocalDomain(domain string) {
 }
 
 func (d *DNSServer) listen() {
-	buff := make([]byte, 1500)
 	defer d.packetConn.Close()
 	for {
 		select {
 		case <-d.exitChan:
 			return
 		default:
+			buff := make([]byte, 1500)
 			n, addr, err := d.packetConn.ReadFrom(buff)
 			if err != nil {
 				log.Error("unable to read datastream: ", err.Error())
@@ -110,6 +110,8 @@ func (d *DNSServer) listen() {
 			if err != nil {
 				log.Error("unable to parse DNS message: ", err.Error())
 				workItem.err = err
+			} else if msg.Header == nil {
+				log.Error("unable to parse DNS message: no header")
 			} else {
 				workItem.DNSPacket = &DNSPacket{
 					DNSMessage:   msg,
@@ -124,27 +126,33 @@ func (d *DNSServer) listen() {
 func (d *DNSServer) receiverWorker() {
 	for packet := range d.receiverChan {
 		if packet.err != nil {
-			packet.DNSMessage.Header.SetRCODE(RCODEFormatError)
-			packet.DNSMessage.Header.SetQR(true)
-		} else {
-			log.Tracef("received DNS packet from %s", packet.ResponseAddr.String())
-			response, err := d.resolver.Resolve(packet.DNSMessage.Questions[0].ParsedName, packet.DNSMessage.Questions[0].Type)
-
-			packet.DNSMessage.Header.SetQR(true)
-
-			if err != nil {
-				if err == ErrNxDomain {
-					packet.DNSMessage.Header.SetRCODE(RCODENameFailure)
-				} else {
-					packet.DNSMessage.Header.SetRCODE(RCODEServerFailure)
-				}
-			} else if response == nil {
-				packet.DNSMessage.Header.SetRCODE(RCODESuccess)
-			} else {
-				packet.DNSMessage.Header.SetRCODE(RCODESuccess)
-				packet.DNSMessage.Answers = append(packet.DNSMessage.Answers, response)
-			}
+			log.Errorf("skipping malformed packet: %v", packet.err)
+			continue
 		}
+
+		if packet.DNSMessage == nil || packet.DNSMessage.Header == nil {
+			log.Error("received packet with nil DNSMessage or Header")
+			continue
+		}
+
+		log.Tracef("received DNS packet from %s", packet.ResponseAddr.String())
+		response, err := d.resolver.Resolve(packet.DNSMessage.Questions[0].ParsedName, packet.DNSMessage.Questions[0].Type)
+
+		packet.DNSMessage.Header.SetQR(true)
+
+		if err != nil {
+			if err == ErrNxDomain {
+				packet.DNSMessage.Header.SetRCODE(RCODENameFailure)
+			} else {
+				packet.DNSMessage.Header.SetRCODE(RCODEServerFailure)
+			}
+		} else if response == nil {
+			packet.DNSMessage.Header.SetRCODE(RCODESuccess)
+		} else {
+			packet.DNSMessage.Header.SetRCODE(RCODESuccess)
+			packet.DNSMessage.Answers = append(packet.DNSMessage.Answers, response)
+		}
+
 		d.responseChan <- packet
 	}
 }

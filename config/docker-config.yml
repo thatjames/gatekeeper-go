@@ -26,3 +26,5 @@ DNS:
   LocalDomains:
     international-space-station: 10.0.0.2
   Port: 53
+  BlockLists:
+    - https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
