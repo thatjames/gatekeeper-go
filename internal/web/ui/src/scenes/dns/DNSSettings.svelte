@@ -9,6 +9,7 @@
     Modal,
     Label,
     Input,
+    Card,
   } from "flowbite-svelte";
   import { EditOutline } from "flowbite-svelte-icons";
   import DNSSettingsForm from "./DNSSettingsForm.svelte";
@@ -68,7 +69,7 @@
 
 <div class="flex flex-col gap-5">
   {#if edit}
-    <Heading tag="h4">Edit DNS Settings</Heading>
+    <Heading tag="h3">Edit DNS Settings</Heading>
     <div class="w-4/5 mx-auto flex flex-col gap-5">
       <DNSSettingsForm
         {settings}
@@ -102,7 +103,7 @@
     </div>
   {:else}
     <div class="flex gap-5 items-center">
-      <Heading tag="h4">DNS Settings</Heading>
+      <Heading tag="h3">DNS Settings</Heading>
       <EditOutline
         class="shrink-0 h-6 w-6 text-primary-600 hover:text-primary-500 hover:cursor-pointer"
         onclick={onEditClick}
@@ -110,11 +111,26 @@
       <Tooltip>Edit Settings</Tooltip>
     </div>
     <div class="flex flex-col gap-5 md:grid md:grid-cols-2">
-      <SimpleCard title="Interface" description={settings?.interface} />
-      <SimpleCard
-        title="Upstreams"
-        description={settings?.upstreams?.replaceAll(",", " ")}
-      />
+      <Card class="p-5 min-w-full">
+        <h5
+          class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white"
+        >
+          Interface
+        </h5>
+        <p class="leading-tight font-normal text-gray-700 dark:text-gray-400">
+          {settings?.interface}
+        </p>
+      </Card>
+      <Card class="p-5 min-w-full">
+        <h5
+          class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white"
+        >
+          Upstreams
+        </h5>
+        <p class="leading-tight font-normal text-gray-700 dark:text-gray-400">
+          {settings?.upstreams?.replaceAll(",", " ")}
+        </p>
+      </Card>
     </div>
   {/if}
 </div>

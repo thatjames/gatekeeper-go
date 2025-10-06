@@ -181,7 +181,7 @@
   </div>
 </Modal>
 <div class="flex flex-col gap-5">
-  <Heading tag="h5">Local Domains</Heading>
+  <Heading tag="h3">Local Domains</Heading>
   <Table hoverable>
     <TableHead>
       <TableHeadCell>Domain Name</TableHeadCell>

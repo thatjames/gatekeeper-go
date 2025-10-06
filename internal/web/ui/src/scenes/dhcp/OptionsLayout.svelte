@@ -43,7 +43,7 @@
 
 <div class="flex flex-col gap-5 justify-center">
   {#if edit}
-    <Heading tag="h4">Edit Settings</Heading>
+    <Heading tag="h3">Edit Settings</Heading>
     <div class="w-4/5 mx-auto flex flex-col gap-5">
       <SettingsForm
         externalErrors={errors}
@@ -70,7 +70,7 @@
     </div>
   {:else}
     <div class="flex gap-5 items-center">
-      <Heading tag="h4">Settings</Heading>
+      <Heading tag="h3">Settings</Heading>
       <EditOutline
         class="shrink-0 h-6 w-6 text-primary-600 hover:text-primary-500 hover:cursor-pointer"
         onclick={editSettings}
