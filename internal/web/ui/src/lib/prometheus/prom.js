@@ -1,13 +1,15 @@
+import { env } from "$lib/api/api";
+
 class PrometheusMetricsService {
-  constructor(baseUrl) {
-    this.baseUrl = baseUrl;
+  constructor() {
+    this.url = env.metrics;
   }
 
   /**
    * Fetches raw Prometheus metrics from the endpoint
    */
   async fetchMetrics() {
-    const response = await fetch(`${this.baseUrl}/metrics`);
+    const response = await fetch(`${this.url}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch metrics: ${response.statusText}`);
     }

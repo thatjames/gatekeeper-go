@@ -12,10 +12,9 @@
   let blockedDomainCounters = $state([]);
   let refreshInterval = null;
 
-  const PROMETHEUS_URL = "http://localhost:8085"; // Update with your Prometheus URL
   const REFRESH_RATE = 30000; // Refresh every 30 seconds
 
-  const metricsService = new PrometheusMetricsService(PROMETHEUS_URL);
+  const metricsService = new PrometheusMetricsService();
 
   const fetchDNSMetrics = async () => {
     try {

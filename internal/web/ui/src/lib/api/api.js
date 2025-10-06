@@ -6,13 +6,15 @@ import { writable } from "svelte/store";
 const environments = {
   dev: {
     url: "http://localhost:8085/api/v1/",
+    metrics: "http://localhost:8085/metrics",
   },
   live: {
     url: "/api/v1/",
+    metrics: "/metrics",
   },
 };
 
-let env = import.meta.env.PROD ? environments.live : environments.dev;
+export let env = import.meta.env.PROD ? environments.live : environments.dev;
 
 export let systemError = writable(null);
 
