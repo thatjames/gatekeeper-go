@@ -48,7 +48,6 @@
   };
 
   const clearErrors = () => {
-    console.log("clear errors");
     errors = null;
   };
 </script>

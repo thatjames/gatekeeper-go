@@ -1,5 +1,6 @@
 export const Routes = {
   Home: "/",
+  Error: "/error",
   Login: "/auth/login",
   Leases: "/dhcp/leases",
   LeaseDetails: "/leases/details",

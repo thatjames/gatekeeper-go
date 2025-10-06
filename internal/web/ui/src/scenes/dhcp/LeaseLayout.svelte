@@ -59,14 +59,11 @@
       });
   };
 
-  const onDeleteLeaseClick = async (clientId) => {
-    try {
-      const resp = await deleteLease(clientId);
+  const onDeleteLeaseClick = (clientId) => {
+    deleteLease(clientId).then((resp) => {
       activeLease = null;
       leases = resp;
-    } catch (err) {
-      console.log(err);
-    }
+    });
   };
 
   const onLeaseClick = (lease) => {
