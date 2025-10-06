@@ -40,7 +40,7 @@ func GetSystemInfo() (SystemInfo, error) {
 	return si, nil
 }
 
-func GetDHCPInterfaces() ([]string, error) {
+func GetNetworkInterfaces() ([]string, error) {
 	interfaces := make([]string, 0)
 	ifaces, err := net.Interfaces()
 	if err != nil {

@@ -1,5 +1,5 @@
 <script>
-  import { dhcpInterfaces } from "$lib/system/system";
+  import { networkInterfaces } from "$lib/system/system";
   import { Helper, Input, Label, Select } from "flowbite-svelte";
   import { createEventDispatcher } from "svelte";
 
@@ -8,7 +8,7 @@
   let { settings, externalErrors, generalError } = $props();
 
   let interfaceItems = $state(
-    $dhcpInterfaces.map((interfaceItem) => {
+    $networkInterfaces.map((interfaceItem) => {
       return {
         value: interfaceItem,
         name: interfaceItem,

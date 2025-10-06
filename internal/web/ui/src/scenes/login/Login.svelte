@@ -1,7 +1,6 @@
 <script>
   import { login } from "$lib/auth/auth.svelte";
   import { Routes } from "$lib/common/routes";
-  import { getSystemInfo, loadModules } from "$lib/system/system";
   import { Button, Heading, Input, Label, P } from "flowbite-svelte";
   import { push } from "svelte-spa-router";
   let loginData = {};
@@ -10,7 +9,6 @@
     e.preventDefault();
     login(loginData)
       .then(() => {
-        loadModules();
         push(Routes.Home);
       })
       .catch((err) => {

@@ -4,7 +4,7 @@
   import { MenuComponent } from "$lib/common/menu-types";
   import { Routes } from "$lib/common/routes";
   import { getLeases } from "$lib/dhcp/lease";
-  import { modules } from "$lib/system/system";
+  import { getVersion, loadModules, modules } from "$lib/system/system";
   import { Button, P } from "flowbite-svelte";
   import {
     CogOutline,
@@ -95,6 +95,9 @@
   $effect(() => {
     menuOptions = generateMenuOptions($modules);
   });
+
+  loadModules();
+  getVersion();
 </script>
 
 <div class="flex flex-col gap-5">

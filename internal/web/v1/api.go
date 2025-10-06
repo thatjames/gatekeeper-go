@@ -55,7 +55,7 @@ func setupDNSRoutes(g *gin.RouterGroup) {
 func setupSystemRoutes(g *gin.RouterGroup) {
 	system := g.Group("/system")
 	system.GET("/info", getSystemInfo)
-	system.GET("/interfaces/dhcp", getDHCPInterfaces)
+	system.GET("/interfaces", getInterfaces)
 	system.GET("/modules", getModules)
 }
 
