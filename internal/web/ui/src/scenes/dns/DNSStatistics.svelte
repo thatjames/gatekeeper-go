@@ -10,6 +10,7 @@
   let queryCounters = $state([]);
   let cacheHitCounters = $state([]);
   let blockedDomainCounters = $state([]);
+  let queryByClientCounter = $state([]);
   let refreshInterval = null;
 
   const REFRESH_RATE = 30000; // Refresh every 30 seconds
@@ -31,6 +32,9 @@
       );
       blockedDomainCounters = await metricsService.getCounterVec(
         "dns_blocked_domain_counter",
+      );
+      queryByClientCounter = await metricsService.getCounterVec(
+        "dns_query_by_ip_counter",
       );
     } catch (err) {
       error = err.message;
@@ -127,6 +131,23 @@
       .slice(0, 10); // Top 10 blocked domains
   });
 
+  const clientDomains = $derived.by(() => {
+    if (!queryByClientCounter || queryByClientCounter.length === 0) return [];
+
+    // Group by IP and sum all queries regardless of result
+    const ipMap = new Map();
+
+    for (const counter of queryByClientCounter) {
+      const ip = counter.labels.ip || "unknown";
+      const current = ipMap.get(ip) || 0;
+      ipMap.set(ip, current + counter.value);
+    }
+
+    return Array.from(ipMap.entries())
+      .map(([ip, count]) => ({ ip, count }))
+      .sort((a, b) => b.count - a.count);
+  });
+
   // Prepare top domains chart
   const topDomainsChartData = $derived.by(() => {
     if (!queryByDomain || queryByDomain.length === 0) {
@@ -185,6 +206,22 @@
     for (const counter of countByUpstream) {
       data.series.push(counter.count);
       data.labels.push(counter.upstream);
+    }
+    return data;
+  });
+
+  const clientQueryRate = $derived.by(() => {
+    let data = {
+      series: [],
+      labels: [],
+    };
+    if (!clientDomains || clientDomains.length === 0) return data;
+
+    const topClients = clientDomains.slice(0, 10);
+
+    for (const client of topClients) {
+      data.series.push(client.count);
+      data.labels.push(client.ip);
     }
     return data;
   });
@@ -383,6 +420,44 @@
             height={400}
           />
         </div>
+      </div>
+    </div>
+
+    <div
+      class="flex flex-col gap-2 p-4 border shadow-lg rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800"
+    >
+      <div class="space-y-4">
+        <ApexChart
+          type="bar"
+          series={[{ name: "Queries", data: clientQueryRate.series }]}
+          options={{
+            plotOptions: {
+              bar: {
+                borderRadius: 4,
+                horizontal: true,
+              },
+            },
+            dataLabels: {
+              enabled: false,
+            },
+            xaxis: {
+              categories: clientQueryRate.labels,
+            },
+            yaxis: {
+              labels: {
+                maxWidth: 200,
+              },
+            },
+            title: "Queries by Client IP",
+            colors: ["#8b5cf6"],
+            tooltip: {
+              y: {
+                formatter: (value) => `${value} queries`,
+              },
+            },
+          }}
+          height={400}
+        />
       </div>
     </div>
 

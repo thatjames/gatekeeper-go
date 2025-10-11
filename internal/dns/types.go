@@ -33,6 +33,11 @@ var (
 		Name: "dns_blocked_domain_counter",
 		Help: "count of blocked domains",
 	}, []string{"domain"})
+
+	queryByIPCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "dns_query_by_ip_counter",
+		Help: "count of queries by IP",
+	}, []string{"ip", "result"})
 )
 
 var (
@@ -194,6 +199,10 @@ func (h *DNSHeader) SetZ(z uint8) {
 
 func (h *DNSHeader) SetRCODE(rcode RCODE) {
 	h.Flags = (h.Flags & 0xFFF0) | uint16(rcode)
+}
+
+func (h *DNSHeader) RCODE() RCODE {
+	return RCODE(h.Flags & 0x000F)
 }
 
 type RCODE uint8
@@ -508,7 +517,6 @@ func parseResourceRecord(data []byte, offset int) (*DNSRecord, int, error) {
 
 	record.RData = make([]byte, dataLength)
 	if record.Type == DNSTypeCNAME || record.Type == DNSTypeNS {
-		fmt.Println("Parse Target for CNAME/NS record")
 		parsedTarget, _, err := parseDNSName(data, offset)
 		if err != nil {
 			log.Debugf("unable to parse domain in RData for %s record: %v", record.Type, err)

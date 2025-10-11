@@ -3,9 +3,11 @@ package dns
 import (
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -174,6 +176,13 @@ func (d *DNSServer) receiverWorker() {
 		}
 
 		d.responseChan <- packet
+
+		// we do this afterwards to not interfere with the response timing
+		if packet.err != nil {
+			queryByIPCounter.With(prometheus.Labels{"ip": strings.Split(packet.ResponseAddr.String(), ":")[0], "result": "failed"}).Inc()
+		} else {
+			queryByIPCounter.With(prometheus.Labels{"ip": strings.Split(packet.ResponseAddr.String(), ":")[0], "result": "success"}).Inc()
+		}
 	}
 }
 

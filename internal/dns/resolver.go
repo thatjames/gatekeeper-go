@@ -16,7 +16,10 @@ import (
 )
 
 var (
-	ErrNxDomain = errors.New("domain unavailable/blocked")
+	ErrNxDomain         = errors.New("domain unavailable/blocked")
+	ErrDNSFormatError   = errors.New("DNS packet format error")
+	ErrDNSNameFailure   = errors.New("DNS packet name failure")
+	ErrDNSServerFailure = errors.New("DNS packet server failure")
 )
 
 var (
@@ -73,6 +76,8 @@ func NewDNSResolverWithOpts(options ResolverOpts) *DNSResolver {
 }
 
 func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorities []*DNSRecord, err error) {
+	r.domainLock.Lock()
+	defer r.domainLock.Unlock()
 	answers, authorities = make([]*DNSRecord, 0), make([]*DNSRecord, 0)
 	log.Debugf("resolving %s", domain)
 	if index := sort.SearchStrings(r.blacklist, domain); index < len(r.blacklist) && r.blacklist[index] == domain {
@@ -126,20 +131,22 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 		answers, authorities, err = r.lookup(domain, dnsType, upstream)
 		if err != nil {
 			log.Error("unable to lookup: ", err.Error())
-			queryCounter.With(prometheus.Labels{"domain": domain, "upstream": upstream.String(), "result": "failed"}).Inc()
+			if err != ErrDNSNameFailure { //not interested in recording domains that don't exist
+				queryCounter.With(prometheus.Labels{"domain": domain, "upstream": upstream.String(), "result": "failed"}).Inc()
+			}
 			continue
 		}
 		if answers != nil {
 			queryCounter.With(prometheus.Labels{"domain": domain, "upstream": upstream.String(), "result": "success"}).Inc()
-			var shortesTTL time.Time
+			var shortestTTL time.Time
 			for _, answer := range answers {
-				if shortesTTL.IsZero() || shortesTTL.After(time.Now().Add(time.Duration(answer.TTL)*time.Second)) {
-					shortesTTL = time.Now().Add(time.Duration(answer.TTL) * time.Second)
+				if shortestTTL.IsZero() || shortestTTL.After(time.Now().Add(time.Duration(answer.TTL)*time.Second)) {
+					shortestTTL = time.Now().Add(time.Duration(answer.TTL) * time.Second)
 				}
 			}
 			r.cache[cacheKey] = &DNSCacheItem{
 				records: answers,
-				ttl:     shortesTTL,
+				ttl:     shortestTTL,
 			}
 		}
 		return answers, authorities, nil
@@ -210,6 +217,21 @@ func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (a
 	msg, err := ParseDNSMessage(buff[:n])
 	if err != nil {
 		return nil, nil, err
+	}
+
+	log.Tracef("received DNS packet from %s", conn.RemoteAddr().String())
+	switch msg.Header.RCODE() {
+	case RCODESuccess:
+		log.Tracef("DNS packet from %s successful", conn.RemoteAddr().String())
+	case RCODEFormatError:
+		log.Errorf("DNS packet from %s format error", conn.RemoteAddr().String())
+		return nil, nil, ErrDNSFormatError
+	case RCODENameFailure:
+		log.Errorf("DNS packet from %s name failure", conn.RemoteAddr().String())
+		return nil, nil, ErrDNSNameFailure
+	case RCODEServerFailure:
+		log.Errorf("DNS packet from %s server failure", conn.RemoteAddr().String())
+		return nil, nil, ErrDNSServerFailure
 	}
 
 	if msg.Answers != nil && len(msg.Answers) > 0 {
