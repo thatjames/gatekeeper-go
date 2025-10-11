@@ -104,12 +104,13 @@ const (
 )
 
 type DNSRecord struct {
-	ParsedName string
-	Name       []byte
-	Type       DNSType
-	Class      uint16
-	TTL        uint32
-	RData      []byte
+	ParsedName  string
+	Name        []byte
+	Type        DNSType
+	Class       uint16
+	TTL         uint32
+	RData       []byte
+	ParsedRData string
 }
 
 func (r *DNSRecord) String() string {
@@ -487,6 +488,7 @@ func parseResourceRecord(data []byte, offset int) (*DNSRecord, int, error) {
 
 		record.RData = make([]byte, dataLength)
 		copy(record.RData, data[offset:offset+int(dataLength)])
+
 		offset += int(dataLength)
 
 		return &record, offset, nil
@@ -505,6 +507,15 @@ func parseResourceRecord(data []byte, offset int) (*DNSRecord, int, error) {
 	}
 
 	record.RData = make([]byte, dataLength)
+	if record.Type == DNSTypeCNAME || record.Type == DNSTypeNS {
+		fmt.Println("Parse Target for CNAME/NS record")
+		parsedTarget, _, err := parseDNSName(data, offset)
+		if err != nil {
+			log.Debugf("unable to parse domain in RData for %s record: %v", record.Type, err)
+		} else {
+			record.ParsedRData = parsedTarget
+		}
+	}
 	copy(record.RData, data[offset:offset+int(dataLength)])
 	offset += int(dataLength)
 

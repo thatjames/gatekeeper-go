@@ -44,8 +44,8 @@ var defaultResolverOpts = ResolverOpts{
 }
 
 type DNSCacheItem struct {
-	record *DNSRecord
-	ttl    time.Time
+	records []*DNSRecord //Handle multiple answers, e.g. CNAME
+	ttl     time.Time
 }
 
 func NewDNSResolverWithDefaultOpts() *DNSResolver {
@@ -72,7 +72,8 @@ func NewDNSResolverWithOpts(options ResolverOpts) *DNSResolver {
 	}
 }
 
-func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answer, authority *DNSRecord, err error) {
+func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorities []*DNSRecord, err error) {
+	answers, authorities = make([]*DNSRecord, 0), make([]*DNSRecord, 0)
 	log.Debugf("resolving %s", domain)
 	if index := sort.SearchStrings(r.blacklist, domain); index < len(r.blacklist) && r.blacklist[index] == domain {
 		log.Debugf("found %s in blacklist", domain)
@@ -83,23 +84,24 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answer, authority
 			result = net.IPv6zero
 		}
 		blockedDomainCounter.With(prometheus.Labels{"domain": domain}).Inc()
-		return &DNSRecord{
+		answers = append(answers, &DNSRecord{
 			Name:       compressedDomainVal,
 			Type:       dnsType,
 			Class:      DNSClassIN,
 			TTL:        uint32((time.Second * 300).Seconds()),
 			ParsedName: domain,
 			RData:      result,
-		}, nil, nil
+		})
+		return answers, nil, nil
 	}
 	keyBuff := bytes.NewBufferString(domain)
 	binary.Write(keyBuff, binary.BigEndian, dnsType)
 	cacheKey := fmt.Sprintf("%x", keyBuff.Bytes())
 	if cacheItem, ok := r.cache[cacheKey]; ok {
 		if cacheItem.ttl.After(time.Now()) {
-			log.Debugf("found %s - %s in cache", cacheItem.record.ParsedName, cacheItem.record.Type)
 			cacheHitCounter.With(prometheus.Labels{"domain": domain}).Inc()
-			return cacheItem.record, nil, nil
+			answers = cacheItem.records
+			return answers, nil, nil
 		} else {
 			log.Debugf("removing expired cache item for %s", domain)
 			delete(r.cache, domain)
@@ -110,31 +112,37 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answer, authority
 			return nil, nil, nil
 		}
 		queryCounter.With(prometheus.Labels{"domain": domain, "upstream": "local-domain", "result": "success"}).Inc()
-		return &DNSRecord{
+		answers = append(answers, &DNSRecord{
 			Name:       compressedDomainVal,
 			Type:       dnsType,
 			Class:      DNSClassIN,
 			TTL:        uint32((time.Second * 300).Seconds()),
 			ParsedName: domain,
 			RData:      responseIP.To4(),
-		}, nil, nil
+		})
+		return answers, nil, nil
 	}
 	for _, upstream := range r.upstream {
-		answer, authority, err = r.lookup(domain, dnsType, upstream)
+		answers, authorities, err = r.lookup(domain, dnsType, upstream)
 		if err != nil {
 			log.Error("unable to lookup: ", err.Error())
 			queryCounter.With(prometheus.Labels{"domain": domain, "upstream": upstream.String(), "result": "failed"}).Inc()
 			continue
 		}
-		if answer != nil {
+		if answers != nil {
 			queryCounter.With(prometheus.Labels{"domain": domain, "upstream": upstream.String(), "result": "success"}).Inc()
-			log.Tracef("cache %s%s with value %s", domain, dnsType, answer.ParsedName)
+			var shortesTTL time.Time
+			for _, answer := range answers {
+				if shortesTTL.IsZero() || shortesTTL.After(time.Now().Add(time.Duration(answer.TTL)*time.Second)) {
+					shortesTTL = time.Now().Add(time.Duration(answer.TTL) * time.Second)
+				}
+			}
 			r.cache[cacheKey] = &DNSCacheItem{
-				record: answer,
-				ttl:    time.Now().Add(time.Duration(answer.TTL) * time.Second),
+				records: answers,
+				ttl:     shortesTTL,
 			}
 		}
-		return answer, authority, nil
+		return answers, authorities, nil
 	}
 	return nil, nil, ErrNxDomain
 }
@@ -156,7 +164,7 @@ func (r *DNSResolver) DeleteLocalDomain(domain string) {
 	delete(r.localDomains, domain)
 }
 
-func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (answer, authority *DNSRecord, err error) {
+func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (answers, authorities []*DNSRecord, err error) {
 	log.Debugf("looking up %s in %s", domain, upstream.String())
 	message := NewDnsMessage()
 	message.Header.ID = uint16(rand.Intn(65535))
@@ -205,13 +213,11 @@ func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (a
 	}
 
 	if msg.Answers != nil && len(msg.Answers) > 0 {
-		log.Tracef("found answer %v", msg.Answers[0])
-		answer = msg.Answers[0]
+		answers = msg.Answers
 	}
 
 	if msg.Authorities != nil && len(msg.Authorities) > 0 {
-		log.Tracef("found authority %v", msg.Authorities[0])
-		authority = msg.Authorities[0]
+		authorities = msg.Authorities
 	}
 
 	return

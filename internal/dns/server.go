@@ -151,7 +151,7 @@ func (d *DNSServer) receiverWorker() {
 		}
 
 		log.Tracef("received DNS packet from %s", packet.ResponseAddr.String())
-		response, authority, err := d.resolver.Resolve(packet.DNSMessage.Questions[0].ParsedName, packet.DNSMessage.Questions[0].Type)
+		responses, authorities, err := d.resolver.Resolve(packet.DNSMessage.Questions[0].ParsedName, packet.DNSMessage.Questions[0].Type)
 
 		packet.DNSMessage.Header.SetQR(true)
 
@@ -163,13 +163,13 @@ func (d *DNSServer) receiverWorker() {
 			}
 		} else {
 			packet.DNSMessage.Header.SetRCODE(RCODESuccess)
-			if response != nil {
-				packet.DNSMessage.Answers = append(packet.DNSMessage.Answers, response)
-				log.Tracef("adding answer %v", response)
+			if responses != nil {
+				packet.DNSMessage.Answers = responses
+				log.Tracef("adding answer %v", responses)
 			}
-			if authority != nil {
-				packet.DNSMessage.Authorities = append(packet.DNSMessage.Authorities, authority)
-				log.Tracef("adding authority %s", authority)
+			if authorities != nil {
+				packet.DNSMessage.Authorities = authorities
+				log.Tracef("adding authority %s", authorities)
 			}
 		}
 

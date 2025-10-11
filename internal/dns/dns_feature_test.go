@@ -25,6 +25,26 @@ var (
 	}
 )
 
+var (
+	dnsTypeMappings = map[string]DNSType{
+		"A":     DNSTypeA,
+		"AAAA":  DNSTypeAAAA,
+		"CNAME": DNSTypeCNAME,
+		"MX":    DNSTypeMX,
+		"NS":    DNSTypeNS,
+		"TXT":   DNSTypeTXT,
+		"OPT":   DNSTypeOPT,
+	}
+)
+
+var (
+	countMapping = map[string]int{
+		"first":  0,
+		"second": 1,
+		"third":  2,
+	}
+)
+
 const (
 	DNSQueryContextKey  = "dnsQuery"
 	DNSPacketContextKey = "dnsPacket"
@@ -105,14 +125,16 @@ func (ts *DNSFeatureTestSuite) thatServerHasACacheForWithIP(domain string, ip st
 	keyBuff := bytes.NewBufferString(domain)
 	binary.Write(keyBuff, binary.BigEndian, DNSTypeA)
 	cacheKey := fmt.Sprintf("%x", keyBuff.Bytes())
+	records := make([]*DNSRecord, 0)
+	records = append(records, &DNSRecord{
+		Type:  DNSTypeA,
+		Class: 1,
+		TTL:   300,
+		RData: net.ParseIP(ip).To4(),
+	})
 	ts.resolver.cache[cacheKey] = &DNSCacheItem{
-		record: &DNSRecord{
-			Type:  DNSTypeA,
-			Class: 1,
-			TTL:   300,
-			RData: net.ParseIP(ip).To4(),
-		},
-		ttl: time.Now().Add(time.Second * 300),
+		ttl:     time.Now().Add(time.Second * 300),
+		records: records,
 	}
 	return nil
 }
@@ -126,8 +148,8 @@ func (ts *DNSFeatureTestSuite) iSendADNSRequestAFor(ctx context.Context, domain 
 	return context.WithValue(ctx, DNSQueryContextKey, dnsRecord), nil
 }
 
-func (ts *DNSFeatureTestSuite) theDNSServerShouldRespondWith(ctx context.Context, expectedResponse string) error {
-	dnsRecord := ctx.Value(DNSQueryContextKey).(*DNSRecord)
+func (ts *DNSFeatureTestSuite) theDNSServerShouldRespondWithASingleRecord(ctx context.Context, expectedResponse string) error {
+	dnsRecord := ctx.Value(DNSQueryContextKey).([]*DNSRecord)[0]
 	if dnsRecord.Type != DNSTypeA {
 		return fmt.Errorf("expected DNS record type A, but got %s", dnsRecord.Type)
 	}
@@ -240,6 +262,59 @@ func (ts *DNSFeatureTestSuite) andThePacketShouldHaveAuthority(ctx context.Conte
 	return nil
 }
 
+func (ts *DNSFeatureTestSuite) andTheRecordShouldBeARecordPointingTo(ctx context.Context, positionType, recordType, expectedValue string) error {
+	packet := ctx.Value(DNSPacketContextKey).(*DNSMessage)
+	var record *DNSRecord
+	switch positionType {
+	case "first":
+		if len(packet.Answers) == 0 {
+			return fmt.Errorf("expected at least 1 answer, got %d", len(packet.Answers))
+		}
+		record = packet.Answers[0]
+	case "second":
+		if len(packet.Answers) < 2 {
+			return fmt.Errorf("expected at least 2 answers, got %d", len(packet.Answers))
+		}
+		record = packet.Answers[1]
+	case "third":
+		if len(packet.Answers) < 3 {
+			return fmt.Errorf("expected at least 3 answers, got %d", len(packet.Answers))
+		}
+		record = packet.Answers[2]
+	}
+
+	if record.Type != dnsTypeMappings[recordType] {
+		return fmt.Errorf("expected record type %s, got %s", recordType, record.Type)
+	}
+
+	if record.RData == nil {
+		return fmt.Errorf("expected record RData to be non-nil")
+	}
+
+	rdata := record.RData
+	switch recordType {
+	case "A":
+		if len(rdata) != 4 {
+			return fmt.Errorf("expected 4 bytes for A record, got %d", len(rdata))
+		}
+		actualIP := fmt.Sprintf("%d.%d.%d.%d", rdata[0], rdata[1], rdata[2], rdata[3])
+		if actualIP != expectedValue {
+			return fmt.Errorf("expected IP %s, got %s", expectedValue, actualIP)
+		}
+	case "CNAME":
+		if len(rdata) < 1 {
+			return fmt.Errorf("expected CNAME record to have at least 1 byte of data, got %d", len(rdata))
+		}
+		if record.ParsedRData != expectedValue {
+			return fmt.Errorf("expected CNAME %s, got %s", expectedValue, record.ParsedRData)
+		}
+	default:
+		return fmt.Errorf("record type %s not supported", recordType)
+	}
+
+	return nil
+}
+
 func TestFeatures(t *testing.T) {
 	flag.Parse()
 
@@ -290,7 +365,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 
 	ctx.Given(`^the resolver has a cache for "([^"]*)" with IP "([^"]*)"$`, ts.thatServerHasACacheForWithIP)
 	ctx.When(`^I send a DNS request A for "([^"]*)"$`, ts.iSendADNSRequestAFor)
-	ctx.Then(`^I should receive a valid DNS response with IP "([^"]*)"$`, ts.theDNSServerShouldRespondWith)
+	ctx.Then(`^I should receive a single valid DNS response with IP "([^"]*)"$`, ts.theDNSServerShouldRespondWithASingleRecord)
 	ctx.Then(`^I should receive the error "([^"]*)"$`, ts.iShouldReceiveTheError)
 	ctx.Step(`^The packet should parse`, ts.thePacketShouldParse)
 	ctx.Then(`^the packet should have (\d+) additional record$`, ts.thePacketShouldHaveAdditionalRecord)
@@ -298,4 +373,9 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Then(`^I should receive a DNS packet with an authority count of (\d+)$`, ts.thenIShouldReceiveADNSPacketWithAnAuthorityCountOf)
 	ctx.Step(`^the packet should have (\d+) answers$`, ts.andThePacketShouldHaveAnswers)
 	ctx.Step(`^the packet should have (\d+) authority$`, ts.andThePacketShouldHaveAuthority)
+
+	// And the first record should be a CNAME record pointing to "home.slimjim.xyz"
+	// And the second record should be an A record pointing to "84.82.5.244"
+	ctx.Step(`^the (first|second|third) record should be (?:a|an) (A|CNAME) record pointing to "([^"]*)"$`, ts.andTheRecordShouldBeARecordPointingTo)
+
 }

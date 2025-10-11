@@ -44,3 +44,13 @@ Feature: DNS Packet Parsing
     Then I should receive a DNS packet with an authority count of 1
     And the packet should have 0 answers
     And the packet should have 1 authority
+
+  Scenario: Parsing a DNS Response with multiple answers
+    Given the DNS packet "jQOBgAABAAIAAAAACmdhdGVrZWVwZXIHc2xpbWppbQN4eXoAAAEAAcAMAAUAAQAAADwABwRob21lwBfANAABAAEAAAEsAARUUgX0"
+    When I parse the DNS packet
+    Then The packet should parse
+    Then I should receive a DNS packet with an authority count of 0
+    And the packet should have 2 answers
+    And the packet should have 0 authority
+    And the first record should be a CNAME record pointing to "home.slimjim.xyz"
+    And the second record should be an A record pointing to "84.82.5.244"

@@ -6,4 +6,4 @@ Feature: DNS Requests
   Scenario: A DNS request
     Given the resolver has a cache for "slimjim.xyz" with IP "10.0.0.1"
     When I send a DNS request A for "slimjim.xyz"
-    Then I should receive a valid DNS response with IP "10.0.0.1"
+    Then I should receive a single valid DNS response with IP "10.0.0.1"
