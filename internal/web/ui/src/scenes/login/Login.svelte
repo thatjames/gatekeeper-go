@@ -19,7 +19,7 @@
         push(Routes.Home);
       })
       .catch((err) => {
-        errorText = err;
+        errorText = err.error;
       });
   };
 </script>

@@ -8,6 +8,9 @@
 
   let { options = {}, series = [], type = "line", height = 350 } = $props();
 
+  // Check if there's any data in the series
+  const hasData = $derived(series && series.length > 0);
+
   // Detect dark mode
   function checkDarkMode() {
     isDarkMode = document.documentElement.classList.contains("dark");
@@ -104,7 +107,7 @@
       attributeFilter: ["class"],
     });
 
-    if (chartElement) {
+    if (chartElement && hasData) {
       setTimeout(() => {
         chart = new ApexCharts(chartElement, getThemedOptions);
         chart.render();
@@ -121,10 +124,51 @@
 
   // Update chart when theme or data changes
   $effect(() => {
-    if (chart) {
-      chart.updateOptions(getThemedOptions);
+    if (hasData) {
+      if (chart) {
+        chart.updateOptions(getThemedOptions);
+      } else if (chartElement) {
+        // Create chart if data becomes available
+        chart = new ApexCharts(chartElement, getThemedOptions);
+        chart.render();
+      }
+    } else if (chart) {
+      // Destroy chart if data is removed
+      chart.destroy();
+      chart = null;
     }
   });
 </script>
 
-<div bind:this={chartElement}></div>
+{#if hasData}
+  <div bind:this={chartElement}></div>
+{:else}
+  <div>
+    {#if options.title}
+      <svg width="100%" height="35" style="margin-bottom: -10px;">
+        <text
+          x="10"
+          y="24.5"
+          text-anchor="start"
+          dominant-baseline="auto"
+          font-size="22px"
+          font-family="Helvetica, Arial, sans-serif"
+          font-weight="900"
+          fill={isDarkMode ? "#f6f7f8" : "#374151"}
+          class="apexcharts-title-text"
+          style="font-family: Helvetica, Arial, sans-serif; opacity: 1;"
+        >
+          {options.title}
+        </text>
+      </svg>
+    {/if}
+    <div
+      class="flex items-center justify-center {isDarkMode
+        ? 'text-gray-400'
+        : 'text-gray-500'}"
+      style="height: {height}px;"
+    >
+      No chart data
+    </div>
+  </div>
+{/if}

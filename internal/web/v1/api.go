@@ -50,6 +50,8 @@ func setupDNSRoutes(g *gin.RouterGroup) {
 	dns.POST("/local-domains", addLocalDomain)
 	dns.PUT("/local-domains/:domain", updateLocalDomain)
 	dns.DELETE("/local-domains/:domain", deleteLocalDomain)
+	dns.POST("/blocklist", addBlocklist)
+	dns.DELETE("/blocklist/:id", deleteBlocklist)
 }
 
 func setupSystemRoutes(g *gin.RouterGroup) {

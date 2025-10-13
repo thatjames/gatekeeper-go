@@ -98,6 +98,7 @@ func (z *DhcpLeaseRequest) Validate() []ValidationError {
 type DNSConfigResponse struct {
 	Upstreams []string `json:"upstreams"`
 	Interface string   `json:"interface"`
+	Blocklist []string `json:"blocklist"`
 }
 
 type LocalDomainRequest struct {
@@ -347,6 +348,21 @@ func (z *DNSConfigRequest) Validate() []ValidationError {
 		return validationErrors
 	}
 	return nil
+}
+
+type BlocklistRequest struct {
+	Url string `json:"url"`
+}
+
+func (z *BlocklistRequest) Validate() []ValidationError {
+	validationErrors := make([]ValidationError, 0)
+	if z.Url == "" {
+		validationErrors = append(validationErrors, ValidationError{
+			Field:   "url",
+			Message: "URL is required",
+		})
+	}
+	return validationErrors
 }
 
 func MapLease(lease dhcp.Lease) Lease {

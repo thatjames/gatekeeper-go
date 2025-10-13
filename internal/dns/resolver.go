@@ -36,13 +36,11 @@ type DNSResolver struct {
 
 type ResolverOpts struct {
 	Upstreams    []string
-	Blacklist    []string
 	LocalDomains map[string]net.IP
 }
 
 var defaultResolverOpts = ResolverOpts{
 	Upstreams:    []string{"1.1.1.1", "9.9.9.9"},
-	Blacklist:    []string{},
 	LocalDomains: make(map[string]net.IP),
 }
 
@@ -56,7 +54,6 @@ func NewDNSResolverWithDefaultOpts() *DNSResolver {
 }
 
 func NewDNSResolverWithOpts(options ResolverOpts) *DNSResolver {
-	sort.Strings(options.Blacklist)
 	var upstreamAddrs []net.IP
 	for _, upstream := range options.Upstreams {
 		ip := net.ParseIP(upstream).To4()
@@ -69,9 +66,9 @@ func NewDNSResolverWithOpts(options ResolverOpts) *DNSResolver {
 	return &DNSResolver{
 		cache:        make(map[string]*DNSCacheItem),
 		upstream:     upstreamAddrs,
-		blacklist:    options.Blacklist,
 		localDomains: options.LocalDomains,
 		domainLock:   new(sync.RWMutex),
+		blacklist:    make([]string, 0),
 	}
 }
 
@@ -138,15 +135,10 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 		}
 		if answers != nil {
 			queryCounter.With(prometheus.Labels{"domain": domain, "upstream": upstream.String(), "result": "success"}).Inc()
-			var shortestTTL time.Time
-			for _, answer := range answers {
-				if shortestTTL.IsZero() || shortestTTL.After(time.Now().Add(time.Duration(answer.TTL)*time.Second)) {
-					shortestTTL = time.Now().Add(time.Duration(answer.TTL) * time.Second)
-				}
-			}
+			ttl := time.Now().Add(time.Duration(answers[0].TTL) * time.Second)
 			r.cache[cacheKey] = &DNSCacheItem{
 				records: answers,
-				ttl:     shortestTTL,
+				ttl:     ttl,
 			}
 		}
 		return answers, authorities, nil
@@ -169,6 +161,18 @@ func (r *DNSResolver) DeleteLocalDomain(domain string) {
 	defer r.domainLock.Unlock()
 	r.domainLock.Lock()
 	delete(r.localDomains, domain)
+}
+
+func (r *DNSResolver) AddBlocklistEntries(blacklist []string) {
+	defer r.domainLock.Unlock()
+	r.domainLock.Lock()
+	r.blacklist = append(r.blacklist, blacklist...)
+}
+
+func (r *DNSResolver) FlushBlocklist() {
+	defer r.domainLock.Unlock()
+	r.domainLock.Lock()
+	r.blacklist = make([]string, 0)
 }
 
 func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (answers, authorities []*DNSRecord, err error) {

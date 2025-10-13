@@ -2,6 +2,7 @@ package v1
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
@@ -14,6 +15,7 @@ func getDNSConfig(c *gin.Context) {
 	c.JSON(200, DNSConfigResponse{
 		Upstreams: config.Config.DNS.UpstreamServers,
 		Interface: config.Config.DNS.Interface,
+		Blocklist: config.Config.DNS.BlockLists,
 	})
 }
 
@@ -137,4 +139,61 @@ func updateLocalDomain(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, config.Config.DNS.LocalDomains)
+}
+
+func addBlocklist(c *gin.Context) {
+	var req BlocklistRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		return
+	}
+	if validationErrors := req.Validate(); validationErrors != nil && len(validationErrors) > 0 {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:  "Unable to add blocklist",
+			Fields: validationErrors,
+		})
+		return
+	}
+
+	dnsService := service.GetService[*dns.DNSServer](service.DNS)
+	oldBlocklist := config.Config.DNS.BlockLists
+	config.Config.DNS.BlockLists = append(config.Config.DNS.BlockLists, req.Url)
+	if err := config.UpdateConfig(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		config.Config.DNS.BlockLists = oldBlocklist
+		return
+	}
+
+	if err := dnsService.AddBlocklistFromURL(req.Url); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+}
+
+func deleteBlocklist(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid blocklist id"})
+		return
+	}
+	if id < 0 || id >= len(config.Config.DNS.BlockLists) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid blocklist id"})
+		return
+	}
+	log.Info("Deleting blocklist: ", config.Config.DNS.BlockLists[id])
+	oldBlocklist := config.Config.DNS.BlockLists
+	if id == len(config.Config.DNS.BlockLists)-1 {
+		config.Config.DNS.BlockLists = config.Config.DNS.BlockLists[:id]
+	} else {
+		config.Config.DNS.BlockLists = append(config.Config.DNS.BlockLists[:id], config.Config.DNS.BlockLists[id+1:]...)
+	}
+	if err := config.UpdateConfig(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		config.Config.DNS.BlockLists = oldBlocklist
+		return
+	}
+
+	dnsService := service.GetService[*dns.DNSServer](service.DNS)
+	dnsService.FlushBlocklist()
+	dnsService.LoadBlocklistFromURLS(config.Config.DNS.BlockLists)
 }

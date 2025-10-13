@@ -1,5 +1,5 @@
 <script>
-  import { Button, DarkMode, Dropdown } from "flowbite-svelte";
+  import { Button, DarkMode, Dropdown, Tooltip } from "flowbite-svelte";
   import {
     BarsFromLeftOutline,
     ChevronDownOutline,
@@ -88,7 +88,7 @@
 </script>
 
 <div>
-  <div class="flex items-center relative 2xl:hidden top-1 left-1 z-50">
+  <div class="flex items-center relative md:fixed 2xl:hidden top-1 left-1 z-50">
     <Button
       onclick={toggleMenu}
       class="menu-toggle p-2 m-2"
@@ -96,6 +96,7 @@
     >
       <BarsFromLeftOutline class="w-6 h-6" />
     </Button>
+    <Tooltip>Show/Hide the menu</Tooltip>
   </div>
 
   <div
