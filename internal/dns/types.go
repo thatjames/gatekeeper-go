@@ -56,6 +56,7 @@ const (
 	DNSTypeTXT   DNSType = 16
 	DNSTypeOPT   DNSType = 41
 	DNSTypePTR   DNSType = 12
+	DNSTypeSOA   DNSType = 6
 )
 
 func (t DNSType) String() string {
@@ -76,6 +77,8 @@ func (t DNSType) String() string {
 		return "OPT"
 	case DNSTypePTR:
 		return "PTR"
+	case DNSTypeSOA:
+		return "SOA"
 	default:
 		return "unknown"
 	}
@@ -572,10 +575,12 @@ func MarshalDNSMessage(msg *DNSMessage) ([]byte, error) {
 	}
 
 	for _, r := range msg.Additionals {
+		log.Debugf("Additional record: Type=%s, Name len=%d, RData len=%d", r.Type, len(r.Name), len(r.RData))
 		recordBytes, err := marshalResourceRecord(r)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling additional record: %v", err)
 		}
+		log.Debugf("Marshaled additional record: %d bytes", len(recordBytes))
 		buf = append(buf, recordBytes...)
 	}
 

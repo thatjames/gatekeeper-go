@@ -181,7 +181,7 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 			continue
 		}
 
-		if res.answers != nil {
+		if res.answers != nil || res.authorities != nil {
 			cancel()
 
 			queryCounter.With(prometheus.Labels{
@@ -190,7 +190,13 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 				"result":   "success",
 			}).Inc()
 
-			ttl := time.Now().Add(time.Duration(res.answers[0].TTL) * time.Second)
+			var ttl time.Time
+			if res.answers != nil {
+				ttl = time.Now().Add(time.Duration(res.answers[0].TTL) * time.Second)
+			} else {
+				ttl = time.Now().Add(time.Duration(res.authorities[0].TTL) * time.Second)
+				log.Debugf("TTL: %v", ttl)
+			}
 			r.cache[cacheKey] = &DNSCacheItem{
 				records: res.answers,
 				ttl:     ttl,

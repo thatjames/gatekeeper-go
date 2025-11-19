@@ -253,8 +253,6 @@ func (d *DNSServer) receiverWorker() {
 		log.Tracef("received DNS packet from %s", packet.ResponseAddr.String())
 		responses, authorities, err := d.resolver.Resolve(packet.DNSMessage.Questions[0].ParsedName, packet.DNSMessage.Questions[0].Type)
 
-		packet.DNSMessage.Header.SetQR(true)
-
 		if err != nil {
 			if err == ErrNxDomain {
 				packet.DNSMessage.Header.SetRCODE(RCODENameFailure)
@@ -288,12 +286,15 @@ func (d *DNSServer) responseWorker() {
 	for packet := range d.responseChan {
 		log.Tracef("sending DNS response packet to %s", packet.ResponseAddr.String())
 		packet.Header.SetQR(true)
+		packet.Header.SetRA(true)
+		packet.DNSMessage.Additionals = nil
 		data, err := MarshalDNSMessage(packet.DNSMessage)
 		if err != nil {
 			log.Error("unable to marshal DNS packet: ", err.Error())
 			continue
 		}
-		_, err = d.packetConn.WriteTo(data, packet.ResponseAddr)
+		n, err := d.packetConn.WriteTo(data, packet.ResponseAddr)
+		log.Tracef("sent %d bytes to %s", n, packet.ResponseAddr.String())
 		timeElapsed := time.Since(packet.startTime).Round(time.Millisecond)
 		reqDuration.Observe(float64(timeElapsed.Milliseconds()))
 		if err != nil {
