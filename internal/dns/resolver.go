@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -81,6 +82,8 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 	answers, authorities = make([]*DNSRecord, 0), make([]*DNSRecord, 0)
 	log.Debugf("resolving %s", domain)
 
+	searchIndex := sort.SearchStrings(r.blacklist, domain)
+	log.Debugf("blacklist: [%d] - %v", searchIndex, r.blacklist[searchIndex])
 	if index := sort.SearchStrings(r.blacklist, domain); index < len(r.blacklist) && r.blacklist[index] == domain {
 		log.Debugf("found %s in blacklist", domain)
 		var result []byte
@@ -225,6 +228,7 @@ func (r *DNSResolver) AddBlocklistEntries(blacklist []string) {
 	defer r.domainLock.Unlock()
 	r.domainLock.Lock()
 	r.blacklist = append(r.blacklist, blacklist...)
+	slices.Sort(r.blacklist)
 }
 
 func (r *DNSResolver) FlushBlocklist() {
