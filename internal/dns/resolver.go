@@ -83,8 +83,6 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 	log.Debugf("resolving %s", domain)
 
 	if r.blacklist != nil && len(r.blacklist) > 0 {
-		searchIndex := sort.SearchStrings(r.blacklist, domain)
-		log.Debugf("blacklist: [%d] - %v", searchIndex, r.blacklist[searchIndex])
 		if index := sort.SearchStrings(r.blacklist, domain); index < len(r.blacklist) && r.blacklist[index] == domain {
 			log.Debugf("found %s in blacklist", domain)
 			var result []byte
