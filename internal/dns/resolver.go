@@ -115,6 +115,7 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 	if cacheItem, ok := r.cache[cacheKey]; ok {
 		if cacheItem.ttl.After(time.Now()) {
 			cacheHitCounter.With(prometheus.Labels{"domain": domain}).Inc()
+			queryCounter.With(prometheus.Labels{"domain": domain, "upstream": "cache", "result": "success"}).Inc()
 			answers = cacheItem.records
 			return answers, nil, nil
 		} else {
