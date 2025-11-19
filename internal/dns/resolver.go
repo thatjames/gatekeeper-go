@@ -329,7 +329,7 @@ func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (a
 		return nil, nil, ErrDNSFormatError
 	case RCODENameFailure:
 		log.Errorf("DNS packet from %s name failure", conn.RemoteAddr().String())
-		return nil, nil, ErrDNSNameFailure
+		return nil, nil, ErrNxDomain
 	case RCODEServerFailure:
 		log.Errorf("DNS packet from %s server failure", conn.RemoteAddr().String())
 		return nil, nil, ErrDNSServerFailure
