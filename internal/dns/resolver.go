@@ -2,6 +2,7 @@ package dns
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -76,8 +77,10 @@ func NewDNSResolverWithOpts(options ResolverOpts) *DNSResolver {
 func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorities []*DNSRecord, err error) {
 	r.domainLock.Lock()
 	defer r.domainLock.Unlock()
+
 	answers, authorities = make([]*DNSRecord, 0), make([]*DNSRecord, 0)
 	log.Debugf("resolving %s", domain)
+
 	if index := sort.SearchStrings(r.blacklist, domain); index < len(r.blacklist) && r.blacklist[index] == domain {
 		log.Debugf("found %s in blacklist", domain)
 		var result []byte
@@ -97,9 +100,13 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 		})
 		return answers, nil, nil
 	}
+
+	// Generate cache key
 	keyBuff := bytes.NewBufferString(domain)
 	binary.Write(keyBuff, binary.BigEndian, dnsType)
 	cacheKey := fmt.Sprintf("%x", keyBuff.Bytes())
+
+	// Check cache
 	if cacheItem, ok := r.cache[cacheKey]; ok {
 		if cacheItem.ttl.After(time.Now()) {
 			cacheHitCounter.With(prometheus.Labels{"domain": domain}).Inc()
@@ -107,9 +114,11 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 			return answers, nil, nil
 		} else {
 			log.Debugf("removing expired cache item for %s", domain)
-			delete(r.cache, domain)
+			delete(r.cache, cacheKey)
 		}
-	} else if responseIP, ok := r.localDomains[domain]; ok {
+	}
+
+	if responseIP, ok := r.localDomains[domain]; ok {
 		log.Debugf("found %s in local domains", domain)
 		if dnsType != DNSTypeA {
 			return nil, nil, nil
@@ -125,24 +134,72 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 		})
 		return answers, nil, nil
 	}
+
+	type result struct {
+		answers     []*DNSRecord
+		authorities []*DNSRecord
+		upstream    net.IP
+		err         error
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	results := make(chan result, len(r.upstream))
+
 	for _, upstream := range r.upstream {
-		answers, authorities, err = r.lookup(domain, dnsType, upstream)
-		if err != nil {
-			log.Error("unable to lookup: ", err.Error())
-			if err != ErrDNSNameFailure { //not interested in recording domains that don't exist
-				queryCounter.With(prometheus.Labels{"domain": domain, "upstream": upstream.String(), "result": "failed"}).Inc()
+		go func(up net.IP) {
+			ans, auth, err := r.lookup(domain, dnsType, up)
+
+			select {
+			case results <- result{ans, auth, up, err}:
+			case <-ctx.Done():
+			}
+		}(upstream)
+	}
+
+	var lastErr error
+
+	for i := 0; i < len(r.upstream); i++ {
+		res := <-results
+
+		if res.err != nil {
+			log.Error("unable to lookup: ", res.err.Error())
+			lastErr = res.err
+
+			if res.err != ErrDNSNameFailure {
+				queryCounter.With(prometheus.Labels{
+					"domain":   domain,
+					"upstream": res.upstream.String(),
+					"result":   "failed",
+				}).Inc()
 			}
 			continue
 		}
-		if answers != nil {
-			queryCounter.With(prometheus.Labels{"domain": domain, "upstream": upstream.String(), "result": "success"}).Inc()
-			ttl := time.Now().Add(time.Duration(answers[0].TTL) * time.Second)
+
+		if res.answers != nil {
+			cancel()
+
+			queryCounter.With(prometheus.Labels{
+				"domain":   domain,
+				"upstream": res.upstream.String(),
+				"result":   "success",
+			}).Inc()
+
+			ttl := time.Now().Add(time.Duration(res.answers[0].TTL) * time.Second)
 			r.cache[cacheKey] = &DNSCacheItem{
-				records: answers,
+				records: res.answers,
 				ttl:     ttl,
 			}
+			log.Infof("Processing response from upstream %v", res.upstream)
+
+			return res.answers, res.authorities, nil
 		}
-		return answers, authorities, nil
+	}
+
+	// All upstreams failed
+	if lastErr != nil {
+		return nil, nil, lastErr
 	}
 	return nil, nil, ErrNxDomain
 }
