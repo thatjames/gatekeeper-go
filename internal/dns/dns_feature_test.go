@@ -371,11 +371,11 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Then(`^the packet should have (\d+) additional record$`, ts.thePacketShouldHaveAdditionalRecord)
 	ctx.Then(`^the additional record should be an EDNS OPT record$`, ts.theAdditionalRecordShouldBeAnEDNSOPTRecord)
 	ctx.Then(`^I should receive a DNS packet with an authority count of (\d+)$`, ts.thenIShouldReceiveADNSPacketWithAnAuthorityCountOf)
-	ctx.Step(`^the packet should have (\d+) answers$`, ts.andThePacketShouldHaveAnswers)
+	ctx.Step(`^the packet should have (\d+) (?:answer|answers)$`, ts.andThePacketShouldHaveAnswers)
 	ctx.Step(`^the packet should have (\d+) authority$`, ts.andThePacketShouldHaveAuthority)
 
 	// And the first record should be a CNAME record pointing to "home.slimjim.xyz"
 	// And the second record should be an A record pointing to "84.82.5.244"
-	ctx.Step(`^the (first|second|third) record should be (?:a|an) (A|CNAME) record pointing to "([^"]*)"$`, ts.andTheRecordShouldBeARecordPointingTo)
+	ctx.Step(`^the (first|second|third) record should be (?:a|an) ([a-z|A-Z]+) record pointing to "([^"]*)"$`, ts.andTheRecordShouldBeARecordPointingTo)
 
 }

@@ -55,6 +55,7 @@ const (
 	DNSTypeNS    DNSType = 2
 	DNSTypeTXT   DNSType = 16
 	DNSTypeOPT   DNSType = 41
+	DNSTypePTR   DNSType = 12
 )
 
 func (t DNSType) String() string {
@@ -73,6 +74,8 @@ func (t DNSType) String() string {
 		return "TXT"
 	case DNSTypeOPT:
 		return "OPT"
+	case DNSTypePTR:
+		return "PTR"
 	default:
 		return "unknown"
 	}
