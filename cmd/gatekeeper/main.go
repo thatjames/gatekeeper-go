@@ -62,8 +62,9 @@ func main() {
 		}
 
 		dnsServer := dns.NewDNSServerWithOpts(dns.DNSServerOpts{
-			Interface:     config.Config.DNS.Interface,
-			BlocklistUrls: config.Config.DNS.BlockLists,
+			Interface:      config.Config.DNS.Interface,
+			BlocklistUrls:  config.Config.DNS.BlockLists,
+			BlockedDomains: config.Config.DNS.BlockedDomains,
 			ResolverOpts: &dns.ResolverOpts{
 				LocalDomains: localDomains,
 				Upstreams:    config.Config.DNS.UpstreamServers,

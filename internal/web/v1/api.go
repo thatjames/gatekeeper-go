@@ -52,6 +52,8 @@ func setupDNSRoutes(g *gin.RouterGroup) {
 	dns.DELETE("/local-domains/:domain", deleteLocalDomain)
 	dns.POST("/blocklist", addBlocklist)
 	dns.DELETE("/blocklist/:id", deleteBlocklist)
+	dns.PUT("/blockeddomains", addBlockedDomain)
+	dns.DELETE("/blockeddomains/:id", deleteBlockedDomain)
 }
 
 func setupSystemRoutes(g *gin.RouterGroup) {

@@ -17,12 +17,13 @@ import (
 )
 
 type DNSServerOpts struct {
-	Options       *DNSServerOpts
-	Interface     string
-	Port          int
-	Upstream      []string
-	ResolverOpts  *ResolverOpts
-	BlocklistUrls []string
+	Options        *DNSServerOpts
+	Interface      string
+	Port           int
+	Upstream       []string
+	ResolverOpts   *ResolverOpts
+	BlocklistUrls  []string //represents a list of URLs to load blocklists from
+	BlockedDomains []string //represents a list of domains to block
 }
 
 var defaultDNSServerOpts = DNSServerOpts{
@@ -52,7 +53,6 @@ func NewDNSServer() *DNSServer {
 
 func NewDNSServerWithOpts(opts DNSServerOpts) *DNSServer {
 	return &DNSServer{
-		resolver:     NewDNSResolverWithOpts(*opts.ResolverOpts),
 		opts:         &opts,
 		packetConn:   nil,
 		receiverChan: make(chan *dnsWorkItem, 100),
@@ -62,6 +62,11 @@ func NewDNSServerWithOpts(opts DNSServerOpts) *DNSServer {
 }
 
 func (d *DNSServer) Start() error {
+	d.resolver = NewDNSResolverWithOpts(*d.opts.ResolverOpts)
+	if len(d.opts.BlockedDomains) > 0 {
+		log.Debugf("adding %d blocked domains", len(d.opts.BlockedDomains))
+		d.resolver.AddBlocklistEntries(d.opts.BlockedDomains)
+	}
 	log.Info("starting DNS server")
 	log.Tracef("starting DNS server on port %d", d.opts.Port)
 	var err error
@@ -191,6 +196,14 @@ func (d *DNSServer) LoadBlocklistFromURLS(urls []string) {
 	close(resultChan)
 	log.Infof("loaded %d blocked domains", len(blockedDomains))
 	d.resolver.AddBlocklistEntries(blockedDomains)
+}
+
+func (d *DNSServer) DeleteBlockedDomain(domain string) {
+	d.resolver.DeleteBlocklistEntry(domain)
+}
+
+func (d *DNSServer) AddBlockedDomain(domain string) {
+	d.resolver.AddBlocklistEntries([]string{domain})
 }
 
 func (d *DNSServer) listen() {

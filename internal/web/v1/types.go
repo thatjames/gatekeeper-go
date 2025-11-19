@@ -96,9 +96,10 @@ func (z *DhcpLeaseRequest) Validate() []ValidationError {
 }
 
 type DNSConfigResponse struct {
-	Upstreams []string `json:"upstreams"`
-	Interface string   `json:"interface"`
-	Blocklist []string `json:"blocklist"`
+	Upstreams      []string `json:"upstreams"`
+	Interface      string   `json:"interface"`
+	Blocklist      []string `json:"blocklist"`
+	BlockedDomains []string `json:"blockedDomains"`
 }
 
 type LocalDomainRequest struct {
@@ -317,8 +318,9 @@ func (opts *DhcpOptions) Validate() []ValidationError {
 }
 
 type DNSConfigRequest struct {
-	Interface string   `json:"interface"`
-	Upstreams []string `json:"upstreams"`
+	Interface      string   `json:"interface"`
+	Upstreams      []string `json:"upstreams"`
+	BlockedDomains []string `json:"blockedDomains"`
 }
 
 func (z *DNSConfigRequest) Validate() []ValidationError {

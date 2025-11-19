@@ -21,7 +21,6 @@ import (
 var (
 	ErrNxDomain         = errors.New("domain unavailable/blocked")
 	ErrDNSFormatError   = errors.New("DNS packet format error")
-	ErrDNSNameFailure   = errors.New("DNS packet name failure")
 	ErrDNSServerFailure = errors.New("DNS packet server failure")
 )
 
@@ -84,7 +83,7 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 
 	if r.blacklist != nil && len(r.blacklist) > 0 {
 		if index := sort.SearchStrings(r.blacklist, domain); index < len(r.blacklist) && r.blacklist[index] == domain {
-			log.Debugf("found %s in blacklist", domain)
+			log.Infof("rejected %s in blacklist", domain)
 			var result []byte
 			if dnsType == DNSTypeA {
 				result = make([]byte, 4)
@@ -171,7 +170,7 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 			log.Error("unable to lookup: ", res.err.Error())
 			lastErr = res.err
 
-			if res.err != ErrDNSNameFailure {
+			if res.err != ErrNxDomain {
 				queryCounter.With(prometheus.Labels{
 					"domain":   domain,
 					"upstream": res.upstream.String(),
@@ -238,6 +237,18 @@ func (r *DNSResolver) AddBlocklistEntries(blacklist []string) {
 	slices.Sort(r.blacklist)
 }
 
+func (r *DNSResolver) DeleteBlocklistEntry(domain string) {
+	defer r.domainLock.Unlock()
+	r.domainLock.Lock()
+	if index := sort.SearchStrings(r.blacklist, domain); index < len(r.blacklist) && r.blacklist[index] == domain {
+		if index == len(r.blacklist)-1 {
+			r.blacklist = r.blacklist[:index]
+		} else {
+			r.blacklist = append(r.blacklist[:index], r.blacklist[index+1:]...)
+		}
+	}
+}
+
 func (r *DNSResolver) FlushBlocklist() {
 	defer r.domainLock.Unlock()
 	r.domainLock.Lock()
@@ -270,7 +281,7 @@ func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (a
 					})
 					return answers, nil, nil
 				}
-				return nil, nil, ErrDNSNameFailure // we don't have this defined, so we treat it as a bad name
+				return nil, nil, ErrNxDomain // we don't have this local domain defined, so we treat it as a bad name
 			}
 		}
 	}

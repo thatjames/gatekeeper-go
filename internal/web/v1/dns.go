@@ -13,9 +13,10 @@ import (
 
 func getDNSConfig(c *gin.Context) {
 	c.JSON(200, DNSConfigResponse{
-		Upstreams: config.Config.DNS.UpstreamServers,
-		Interface: config.Config.DNS.Interface,
-		Blocklist: config.Config.DNS.BlockLists,
+		Upstreams:      config.Config.DNS.UpstreamServers,
+		Interface:      config.Config.DNS.Interface,
+		Blocklist:      config.Config.DNS.BlockLists,
+		BlockedDomains: config.Config.DNS.BlockedDomains,
 	})
 }
 
@@ -38,6 +39,7 @@ func updateDNSConfig(c *gin.Context) {
 	*oldOpts = *dnsService.Options()
 	dnsService.Options().Interface = req.Interface
 	dnsService.Options().ResolverOpts.Upstreams = req.Upstreams
+	dnsService.Options().BlockedDomains = req.BlockedDomains
 	if err := dnsService.Stop(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		dnsService.Options().Interface = oldOpts.Interface
@@ -57,8 +59,10 @@ func updateDNSConfig(c *gin.Context) {
 		return
 	}
 	c.JSON(200, DNSConfigResponse{
-		Upstreams: config.Config.DNS.UpstreamServers,
-		Interface: config.Config.DNS.Interface,
+		Upstreams:      config.Config.DNS.UpstreamServers,
+		Interface:      config.Config.DNS.Interface,
+		Blocklist:      config.Config.DNS.BlockLists,
+		BlockedDomains: config.Config.DNS.BlockedDomains,
 	})
 }
 
@@ -168,6 +172,8 @@ func addBlocklist(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	dnsService.FlushBlocklist()
+	dnsService.LoadBlocklistFromURLS(config.Config.DNS.BlockLists)
 }
 
 func deleteBlocklist(c *gin.Context) {
@@ -196,4 +202,71 @@ func deleteBlocklist(c *gin.Context) {
 	dnsService := service.GetService[*dns.DNSServer](service.DNS)
 	dnsService.FlushBlocklist()
 	dnsService.LoadBlocklistFromURLS(config.Config.DNS.BlockLists)
+}
+
+func deleteBlockedDomain(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid blocklist id"})
+		return
+	}
+	if id < 0 || id >= len(config.Config.DNS.BlockedDomains) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid blocklist id"})
+		return
+	}
+	log.Info("Deleting blocked domain: ", config.Config.DNS.BlockedDomains[id])
+	dnsService := service.GetService[*dns.DNSServer](service.DNS)
+	dnsService.DeleteBlockedDomain(config.Config.DNS.BlockedDomains[id])
+	oldBlockedDomains := config.Config.DNS.BlockedDomains
+	if id == len(config.Config.DNS.BlockedDomains)-1 {
+		config.Config.DNS.BlockedDomains = config.Config.DNS.BlockedDomains[:id]
+	} else {
+		config.Config.DNS.BlockedDomains = append(config.Config.DNS.BlockedDomains[:id], config.Config.DNS.BlockedDomains[id+1:]...)
+	}
+	if err := config.UpdateConfig(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		config.Config.DNS.BlockedDomains = oldBlockedDomains
+		return
+	}
+
+	c.JSON(http.StatusOK, DNSConfigResponse{
+		Upstreams:      config.Config.DNS.UpstreamServers,
+		Interface:      config.Config.DNS.Interface,
+		Blocklist:      config.Config.DNS.BlockLists,
+		BlockedDomains: config.Config.DNS.BlockedDomains,
+	})
+}
+
+func addBlockedDomain(c *gin.Context) {
+	var req BlocklistRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		return
+	}
+	if validationErrors := req.Validate(); validationErrors != nil && len(validationErrors) > 0 {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:  "Unable to add blocked domain",
+			Fields: validationErrors,
+		})
+		return
+	}
+
+	log.Info("Adding blocked domain: ", req)
+
+	dnsService := service.GetService[*dns.DNSServer](service.DNS)
+	oldBlockedDomains := config.Config.DNS.BlockedDomains
+	config.Config.DNS.BlockedDomains = append(config.Config.DNS.BlockedDomains, req.Url)
+	if err := config.UpdateConfig(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		config.Config.DNS.BlockedDomains = oldBlockedDomains
+		return
+	}
+
+	dnsService.AddBlockedDomain(req.Url)
+	c.JSON(http.StatusOK, DNSConfigResponse{
+		Upstreams:      config.Config.DNS.UpstreamServers,
+		Interface:      config.Config.DNS.Interface,
+		Blocklist:      config.Config.DNS.BlockLists,
+		BlockedDomains: config.Config.DNS.BlockedDomains,
+	})
 }

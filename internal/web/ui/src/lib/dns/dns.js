@@ -34,3 +34,11 @@ export const addDNSBlocklist = (blocklistURL) => {
 export const deleteDNSBlocklist = (index) => {
   return api.delete(`/dns/blocklist/${index}`);
 };
+
+export const deleteDNSBlockedDomain = (index) => {
+  return api.delete(`/dns/blockeddomains/${index}`);
+};
+
+export const addDNSBlockedDomain = (domain) => {
+  return api.put(`/dns/blockeddomains`, { url: domain });
+};

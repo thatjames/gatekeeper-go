@@ -5,6 +5,8 @@
     deleteDNSBlocklist,
     getDNSSettings,
     updateDNSSettings,
+    deleteDNSBlockedDomain,
+    addDNSBlockedDomain,
   } from "$lib/dns/dns";
   import {
     Button,
@@ -45,7 +47,9 @@
   let activeDomain = $state({});
   let loading = $state(false);
   let showAddBlocklistModal = $state(false);
+  let showAddBlockedDomainModal = $state(false);
   let showDeleteBlocklistModal = $state(false);
+  let showDeleteBlockedDomainModal = $state(false);
   let deleteModalIndex = $state(0);
   let blockListError = $state("");
   let blocklistUrl = $state("");
@@ -92,6 +96,23 @@
       const newArrVal = settings.blocklist.filter((_, i) => i !== index);
       settings.blocklist = newArrVal;
     });
+  };
+
+  const deleteBlockedDomainByIndex = (index) => {
+    deleteDNSBlockedDomain(index).then(() => {
+      showDeleteBlockedDomainModal = false;
+      const newArrVal = settings.blockedDomains.filter((_, i) => i !== index);
+      settings.blockedDomains = newArrVal;
+    });
+  };
+
+  const submitBlockedDomain = () => {
+    addDNSBlockedDomain(blocklistUrl)
+      .then((resp) => {
+        settings.blockedDomains.push(blocklistUrl);
+        showAddBlockedDomainModal = false;
+      })
+      .catch((error) => (blockListError = error.error));
   };
 
   const clearModalValues = () => {
@@ -181,71 +202,130 @@
         </div>
       </Card>
     </div>
-    {#if settings.blocklist && settings.blocklist.length > 0}
-      <Modal
-        bind:open={showAddBlocklistModal}
-        title="Add Blocklist"
-        onclose={clearModalValues}
-      >
-        <div class="flex flex-col gap-5">
-          <Label for="url">URL</Label>
-          <div>
-            <ButtonGroup class="w-full">
-              <Input
-                type="text"
-                id="url"
-                name="url"
-                placeholder="/path/to/blocklist or http://host.com/blocklist"
-                bind:value={blocklistUrl}
-                color={blockListError ? "red" : "default"}
-              />
-              <InputAddon
-                ><InfoCircleOutline /><Tooltip
-                  >The target file must be a standard hosts file format</Tooltip
-                ></InputAddon
-              >
-            </ButtonGroup>
-            <Helper class="mt-2 !text-primary-500">{blockListError}</Helper>
-          </div>
-          <div class="grid-cols-2 gap-5">
-            <Button outline onclick={submitBlocklist}>Add</Button>
-            <Button
-              outline
-              color="dark"
-              onclick={() => (showAddBlocklistModal = false)}>Cancel</Button
-            >
-          </div>
-        </div>
-      </Modal>
-      <Modal
-        bind:open={showDeleteBlocklistModal}
-        title="Delete blocklist entry?"
-      >
-        <div class="flex flex-col gap-5">
-          <P
-            >Are you sure you want to delete the blocklist entries from <span
-              class="font-mono text-primary-700"
-              >{settings.blocklist[deleteModalIndex]}</span
-            > ?</P
-          >
-          <div class="grid grid-cols-2 gap-2">
-            <Button
-              outline
-              color="red"
-              class="focus:outline-none focus:ring-0"
-              onclick={() => deleteBlocklistByIndex(deleteModalIndex)}
-              >Delete</Button
-            >
-            <Button
-              outline
-              color="dark"
-              onclick={() => (showDeleteBlocklistModal = false)}>Cancel</Button
-            >
-          </div>
-        </div>
-      </Modal>
+    <Modal
+      bind:open={showAddBlocklistModal}
+      title="Add Blocklist"
+      onclose={clearModalValues}
+    >
       <div class="flex flex-col gap-5">
-        <Heading tag="h4">Blocklists</Heading>
+        <Label for="url">URL</Label>
+        <div>
+          <ButtonGroup class="w-full">
+            <Input
+              type="text"
+              id="url"
+              name="url"
+              placeholder="/path/to/blocklist or http://host.com/blocklist"
+              bind:value={blocklistUrl}
+              color={blockListError ? "red" : "default"}
+            />
+            <InputAddon
+              ><InfoCircleOutline /><Tooltip
+                >The target file must be a standard hosts file format</Tooltip
+              ></InputAddon
+            >
+          </ButtonGroup>
+          <Helper class="mt-2 !text-primary-500">{blockListError}</Helper>
+        </div>
+        <div class="grid-cols-2 gap-5">
+          <Button outline onclick={submitBlocklist}>Add</Button>
+          <Button
+            outline
+            color="dark"
+            onclick={() => (showAddBlocklistModal = false)}>Cancel</Button
+          >
+        </div>
+      </div>
+    </Modal>
+    <Modal
+      bind:open={showAddBlockedDomainModal}
+      title="Add Blocked Domain"
+      onclose={clearModalValues}
+    >
+      <div class="flex flex-col gap-5">
+        <Label for="url">URL</Label>
+        <div>
+          <ButtonGroup class="w-full">
+            <Input
+              type="text"
+              id="url"
+              name="url"
+              placeholder="blocked.domain.com"
+              bind:value={blocklistUrl}
+              color={blockListError ? "red" : "default"}
+            />
+            <InputAddon
+              ><InfoCircleOutline /><Tooltip
+                >The provided domain will be blocked by GateKeeper going forward</Tooltip
+              ></InputAddon
+            >
+          </ButtonGroup>
+          <Helper class="mt-2 !text-primary-500">{blockListError}</Helper>
+        </div>
+        <div class="grid-cols-2 gap-5">
+          <Button outline onclick={submitBlockedDomain}>Add</Button>
+          <Button
+            outline
+            color="dark"
+            onclick={() => (showAddBlockedDomainModal = false)}>Cancel</Button
+          >
+        </div>
+      </div>
+    </Modal>
+    <Modal bind:open={showDeleteBlocklistModal} title="Delete blocklist entry?">
+      <div class="flex flex-col gap-5">
+        <P
+          >Are you sure you want to delete the blocklist entries from <span
+            class="font-mono text-primary-700"
+            >{settings.blocklist[deleteModalIndex]}</span
+          > ?</P
+        >
+        <div class="grid grid-cols-2 gap-2">
+          <Button
+            outline
+            color="red"
+            class="focus:outline-none focus:ring-0"
+            onclick={() => deleteBlocklistByIndex(deleteModalIndex)}
+            >Delete</Button
+          >
+          <Button
+            outline
+            color="dark"
+            onclick={() => (showDeleteBlocklistModal = false)}>Cancel</Button
+          >
+        </div>
+      </div>
+    </Modal>
+    <Modal
+      bind:open={showDeleteBlockedDomainModal}
+      title="Delete Blocked Domain?"
+    >
+      <div class="flex flex-col gap-5">
+        <P
+          >Are you sure you want to delete the blocked domain <span
+            class="font-mono text-primary-700"
+            >{settings.blockedDomains[deleteModalIndex]}</span
+          > ?</P
+        >
+        <div class="grid grid-cols-2 gap-2">
+          <Button
+            outline
+            color="red"
+            class="focus:outline-none focus:ring-0"
+            onclick={() => deleteBlockedDomainByIndex(deleteModalIndex)}
+            >Delete</Button
+          >
+          <Button
+            outline
+            color="dark"
+            onclick={() => (showDeleteBlocklistModal = false)}>Cancel</Button
+          >
+        </div>
+      </div>
+    </Modal>
+    <div class="flex flex-col gap-5">
+      <Heading tag="h4">Blocklists</Heading>
+      {#if settings.blocklist?.length > 0}
         <P class="text-xs">Click on an entry below to delete it</P>
         <div>
           <Listgroup active>
@@ -268,7 +348,44 @@
             <Tooltip>Add a blocklist</Tooltip>
           </div>
         </div>
+      {:else}
+        <P class="text-xs">Click the button below to add a blocklist</P>
+        <div>
+          <Button
+            outline
+            class="mt-3"
+            onclick={() => (showAddBlocklistModal = true)}>Add</Button
+          >
+          <Tooltip>Add a blocklist</Tooltip>
+        </div>
+      {/if}
+      <Heading tag="h4">Blocked Domains</Heading>
+      <div class="flex flex-col">
+        {#if settings.blockedDomains?.length > 0}
+          <P class="text-xs mb-5">Click on an entry below to delete it.</P>
+          <Listgroup active>
+            {#each settings.blockedDomains as listItem, index}
+              <ListgroupItem
+                class="hover:cursor-pointer"
+                onclick={() => {
+                  deleteModalIndex = index;
+                  showDeleteBlockedDomainModal = true;
+                }}>{listItem}</ListgroupItem
+              >
+            {/each}
+          </Listgroup>
+        {:else}
+          <P class="text-xs">Click the button below to add a blocked domain</P>
+        {/if}
+        <div>
+          <Button
+            outline
+            class="mt-3"
+            onclick={() => (showAddBlockedDomainModal = true)}>Add</Button
+          >
+          <Tooltip>Add a blocked domain</Tooltip>
+        </div>
       </div>
-    {/if}
+    </div>
   {/if}
 </div>
