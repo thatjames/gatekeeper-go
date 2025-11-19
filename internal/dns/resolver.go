@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -177,6 +178,34 @@ func (r *DNSResolver) FlushBlocklist() {
 
 func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (answers, authorities []*DNSRecord, err error) {
 	log.Debugf("looking up %s in %s", domain, upstream.String())
+	if dnsType == DNSTypePTR {
+		reverseDNS := strings.TrimSuffix(domain, ".in-addr.arpa.")
+		reverseDNS = strings.TrimSuffix(domain, ".in-addr.arpa")
+		octets := strings.Split(reverseDNS, ".")
+		if len(octets) != 4 {
+			return nil, nil, errors.New("invalid reverse DNS")
+		}
+		ip := octets[3] + "." + octets[2] + "." + octets[1] + "." + octets[0]
+		log.Debugf("reverse lookup %s", ip)
+		if net.ParseIP(ip).IsPrivate() {
+			for host, localIp := range r.localDomains {
+				log.Tracef("checking %s against %v", host, localIp)
+				if localIp.String() == ip {
+					log.Tracef("found %s in local domains", host)
+					answers = append(answers, &DNSRecord{
+						Name:       compressedDomainVal,
+						Type:       dnsType,
+						Class:      DNSClassIN,
+						TTL:        uint32((time.Second * 300).Seconds()),
+						ParsedName: host,
+						RData:      stringToDNSWireFormat(host),
+					})
+					return answers, nil, nil
+				}
+				return nil, nil, ErrDNSNameFailure // we don't have this defined, so we treat it as a bad name
+			}
+		}
+	}
 	message := NewDnsMessage()
 	message.Header.ID = uint16(rand.Intn(65535))
 	message.Header.SetRD(true)
