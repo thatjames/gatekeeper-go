@@ -191,7 +191,7 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 				records: res.answers,
 				ttl:     ttl,
 			}
-			log.Infof("Processing response from upstream %v", res.upstream)
+			log.Debugf("Processing response from upstream %v", res.upstream)
 
 			return res.answers, res.authorities, nil
 		}
