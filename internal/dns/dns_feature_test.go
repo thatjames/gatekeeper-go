@@ -46,9 +46,11 @@ var (
 )
 
 const (
-	DNSQueryContextKey  = "dnsQuery"
-	DNSPacketContextKey = "dnsPacket"
-	DNSErrorContextKey  = "dnsError"
+	DNSQueryContextKey       = "dnsQuery"
+	DNSPacketContextKey      = "dnsPacket"
+	DNSErrorContextKey       = "dnsError"
+	DNSAnswersContextKey     = "dnsAnswers"
+	DNSAuthoritiesContextKey = "dnsAuthorities"
 )
 
 type DNSFeatureTestSuite struct {
@@ -315,6 +317,34 @@ func (ts *DNSFeatureTestSuite) andTheRecordShouldBeARecordPointingTo(ctx context
 	return nil
 }
 
+func (ts *DNSFeatureTestSuite) iResolveTheDNSRequest(ctx context.Context) (context.Context, error) {
+	packet := ctx.Value(DNSPacketContextKey).(*DNSMessage)
+	answers, authorities, err := ts.resolver.Resolve(packet.Questions[0].ParsedName, packet.Questions[0].Type)
+	ctx = context.WithValue(ctx, DNSAnswersContextKey, answers)
+	ctx = context.WithValue(ctx, DNSAuthoritiesContextKey, authorities)
+	return ctx, err
+}
+
+func (ts *DNSFeatureTestSuite) iShouldReceiveADNSResponseWithTheFollowingAnswers(ctx context.Context, expectedAnswers *godog.Table) error {
+	answers := ctx.Value(DNSAnswersContextKey).([]*DNSRecord)
+	if len(answers) < len(expectedAnswers.Rows)-1 { // minus 1 for the header
+		return fmt.Errorf("expected at least %d answers, got %d", len(expectedAnswers.Rows)-1, len(answers))
+	}
+	for i, row := range expectedAnswers.Rows[1:] {
+		answer := answers[i]
+		if answer.Type.String() != row.Cells[0].Value {
+			return fmt.Errorf("expected answer %d to be type %s, got %s", i+1, row.Cells[0].Value, answer.Type)
+		}
+		if fmt.Sprintf("%d", answer.Class) != row.Cells[1].Value {
+			return fmt.Errorf("expected answer %d to be class %s, got %d", i+1, row.Cells[1].Value, answer.Class)
+		}
+		if !bytes.Equal(net.IP(answer.RData).To4(), net.ParseIP(row.Cells[2].Value).To4()) {
+			return fmt.Errorf("expected answer %d to be %s, got %s", i+1, row.Cells[2].Value, net.IP(answer.RData))
+		}
+	}
+	return nil
+}
+
 func TestFeatures(t *testing.T) {
 	flag.Parse()
 
@@ -373,9 +403,9 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Then(`^I should receive a DNS packet with an authority count of (\d+)$`, ts.thenIShouldReceiveADNSPacketWithAnAuthorityCountOf)
 	ctx.Step(`^the packet should have (\d+) (?:answer|answers)$`, ts.andThePacketShouldHaveAnswers)
 	ctx.Step(`^the packet should have (\d+) authority$`, ts.andThePacketShouldHaveAuthority)
-
-	// And the first record should be a CNAME record pointing to "home.slimjim.xyz"
-	// And the second record should be an A record pointing to "84.82.5.244"
 	ctx.Step(`^the (first|second|third) record should be (?:a|an) ([a-z|A-Z]+) record pointing to "([^"]*)"$`, ts.andTheRecordShouldBeARecordPointingTo)
+
+	ctx.Step(`^I resolve the DNS request$`, ts.iResolveTheDNSRequest)
+	ctx.Step(`^I should receive a DNS response with the following answers$`, ts.iShouldReceiveADNSResponseWithTheFollowingAnswers)
 
 }

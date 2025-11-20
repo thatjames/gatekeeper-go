@@ -575,7 +575,6 @@ func MarshalDNSMessage(msg *DNSMessage) ([]byte, error) {
 	}
 
 	for _, r := range msg.Additionals {
-		log.Debugf("Additional record: Type=%s, Name len=%d, RData len=%d", r.Type, len(r.Name), len(r.RData))
 		recordBytes, err := marshalResourceRecord(r)
 		if err != nil {
 			return nil, fmt.Errorf("error marshaling additional record: %v", err)
