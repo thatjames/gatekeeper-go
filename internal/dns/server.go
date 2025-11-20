@@ -223,6 +223,7 @@ func (d *DNSServer) listen() {
 			n, addr, err := d.packetConn.ReadFrom(buff)
 			if err != nil {
 				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+					log.Tracef("timeout error, no packet")
 					// This is a timeout error, don't log it
 					continue
 				}
@@ -246,7 +247,9 @@ func (d *DNSServer) listen() {
 					ResponseAddr: addr,
 				}
 			}
+			log.Tracef("push packet to worker")
 			d.receiverChan <- workItem
+			log.Tracef("packet pushed to worker")
 		}
 	}
 }
@@ -284,7 +287,9 @@ func (d *DNSServer) receiverWorker() {
 			}
 		}
 
+		log.Tracef("push packet to response worker")
 		d.responseChan <- packet
+		log.Tracef("packet pushed to response worker")
 
 		// we do this afterwards to not interfere with the response timing
 		if packet.err != nil {

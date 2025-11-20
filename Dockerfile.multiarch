@@ -12,7 +12,7 @@ COPY --chmod=755 bin/gatekeeper-linux-* /tmp/binaries/
 RUN case "$TARGETPLATFORM" in \
         "linux/amd64") cp /tmp/binaries/gatekeeper-linux-amd64 /app/gatekeeper ;; \
         "linux/arm64") cp /tmp/binaries/gatekeeper-linux-arm64 /app/gatekeeper ;; \
-        "linux/arm/v7") cp /tmp/binaries/gatekeeper-linux-arm /app/gatekeeper ;; \
+        "linux/arm/v7"|"linux/arm/v8") cp /tmp/binaries/gatekeeper-linux-arm /app/gatekeeper ;; \
         "linux/386") cp /tmp/binaries/gatekeeper-linux-386 /app/gatekeeper ;; \
         *) echo "Unsupported platform: $TARGETPLATFORM" && exit 1 ;; \
     esac && \

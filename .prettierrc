@@ -1,0 +1,3 @@
+{
+  "plugins": ["./internal/web/ui/node_modules/prettier-plugin-gherkin/dist/index.js"]
+}
