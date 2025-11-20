@@ -186,7 +186,7 @@ func (ts *DNSFeatureTestSuite) iShouldReceiveTheError(ctx context.Context, expec
 
 func (ts *DNSFeatureTestSuite) thePacketShouldParse(ctx context.Context) error {
 	if err, ok := ctx.Value(DNSErrorContextKey).(error); ok {
-		if err != nil {
+		if err != nil && err != ErrNxDomain {
 			return fmt.Errorf("expected packet to parse, but got error: %v", err)
 		}
 	}
@@ -317,12 +317,13 @@ func (ts *DNSFeatureTestSuite) andTheRecordShouldBeARecordPointingTo(ctx context
 	return nil
 }
 
-func (ts *DNSFeatureTestSuite) iResolveTheDNSRequest(ctx context.Context) (context.Context, error) {
+func (ts *DNSFeatureTestSuite) iResolveTheDNSRequest(ctx context.Context) context.Context {
 	packet := ctx.Value(DNSPacketContextKey).(*DNSMessage)
 	answers, authorities, err := ts.resolver.Resolve(packet.Questions[0].ParsedName, packet.Questions[0].Type)
 	ctx = context.WithValue(ctx, DNSAnswersContextKey, answers)
 	ctx = context.WithValue(ctx, DNSAuthoritiesContextKey, authorities)
-	return ctx, err
+	ctx = context.WithValue(ctx, DNSErrorContextKey, err)
+	return ctx
 }
 
 func (ts *DNSFeatureTestSuite) iShouldReceiveADNSResponseWithTheFollowingAnswers(ctx context.Context, expectedAnswers *godog.Table) error {
@@ -342,6 +343,38 @@ func (ts *DNSFeatureTestSuite) iShouldReceiveADNSResponseWithTheFollowingAnswers
 			return fmt.Errorf("expected answer %d to be %s, got %s", i+1, row.Cells[2].Value, net.IP(answer.RData))
 		}
 	}
+	return nil
+}
+
+func (ts *DNSFeatureTestSuite) theDomainIsBlocked(domain string) error {
+	ts.resolver.AddBlocklistEntries([]string{domain})
+	return nil
+}
+
+func (ts *DNSFeatureTestSuite) theResolverHasALocalDomainWithIP(domain string, ip string) error {
+	ipAddr := net.ParseIP(ip).To4()
+	if ipAddr == nil {
+		return fmt.Errorf("invalid IP address: %s", ip)
+	}
+	ts.resolver.AddLocalDomain(domain, ipAddr)
+	return nil
+}
+
+func (ts *DNSFeatureTestSuite) iShouldReceiveAnError(ctx context.Context, expectedError string) error {
+	err := ctx.Value(DNSErrorContextKey).(error)
+	if err == nil {
+		return fmt.Errorf("expected error %s, but got nil", expectedError)
+	}
+
+	switch expectedError {
+	case "NXDOMAIN":
+		if err != ErrNxDomain {
+			return fmt.Errorf("expected error %s, but got %s", expectedError, err.Error())
+		}
+	default:
+		return fmt.Errorf("expected error %s, but got %s", expectedError, err.Error())
+	}
+
 	return nil
 }
 
@@ -407,5 +440,7 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 
 	ctx.Step(`^I resolve the DNS request$`, ts.iResolveTheDNSRequest)
 	ctx.Step(`^I should receive a DNS response with the following answers$`, ts.iShouldReceiveADNSResponseWithTheFollowingAnswers)
-
+	ctx.Step(`^the domain "([^"]*)" is blocked$`, ts.theDomainIsBlocked)
+	ctx.Step(`^the resolver has local domain for "([^"]*)" with IP "([^"]*)"$`, ts.theResolverHasALocalDomainWithIP)
+	ctx.Step(`^I should receive a ([a-z|A-Z]+) error$`, ts.iShouldReceiveAnError)
 }
