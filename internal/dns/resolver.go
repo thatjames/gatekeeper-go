@@ -111,7 +111,6 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 	// Check cache
 	if cacheItem, ok := r.cache[cacheKey]; ok {
 		if cacheItem.ttl.After(time.Now()) {
-			cacheHitCounter.With(prometheus.Labels{"domain": domain}).Inc()
 			queryCounter.With(prometheus.Labels{"domain": domain, "upstream": "cache", "result": "success"}).Inc()
 			answers = cacheItem.records
 			return answers, nil, nil
@@ -164,7 +163,13 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 	var lastErr error
 
 	for i := 0; i < len(r.upstream); i++ {
-		res := <-results
+		var res result
+		select {
+		case res = <-results:
+		case <-time.After(time.Second * 5):
+			log.Warn("timeout waiting for an upstream response")
+			continue
+		}
 
 		if res.err != nil {
 			log.Error("unable to lookup: ", res.err.Error())
@@ -314,6 +319,7 @@ func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (a
 		return nil, nil, err
 	}
 	defer conn.Close()
+	conn.SetDeadline(time.Now().Add(time.Second * 2))
 
 	_, err = conn.Write(dat)
 	if err != nil {

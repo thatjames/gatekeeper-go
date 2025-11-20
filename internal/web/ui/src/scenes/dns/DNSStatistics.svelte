@@ -26,15 +26,15 @@
       dnsRequestTime = await metricsService.getHistogram("dns_req_time");
 
       // Fetch counter vectors
-      queryCounters = await metricsService.getCounterVec("dns_query_counter");
+      queryCounters = await metricsService.getCounterVec("dns_query_count");
       cacheHitCounters = await metricsService.getCounterVec(
-        "dns_cache_hit_counter",
+        "dns_cache_hit_count",
       );
       blockedDomainCounters = await metricsService.getCounterVec(
-        "dns_blocked_domain_counter",
+        "dns_blocked_domain_count",
       );
       queryByClientCounter = await metricsService.getCounterVec(
-        "dns_query_by_ip_counter",
+        "dns_query_by_ip_count",
       );
     } catch (err) {
       error = err.message;
@@ -182,17 +182,23 @@
     };
   });
 
-  const totalCacheHits = $derived(
-    cacheHitCounters.reduce((sum, counter) => sum + counter.value, 0),
-  );
-
   const totalBlockedRequests = $derived(
     blockedDomainCounters.reduce((sum, counter) => sum + counter.value, 0),
   );
 
+  const totalQueryCount = $derived(
+    queryCounters.reduce((sum, counter) => sum + counter.value, 0),
+  );
+
+  const cacheQueryCount = $derived(
+    queryCounters
+      .filter((counter) => counter.labels.upstream === "cache")
+      .reduce((sum, counter) => sum + counter.value, 0),
+  );
+
   const cacheHitRate = $derived(
-    dnsRequestTime?.count > 0
-      ? ((totalCacheHits / dnsRequestTime.count) * 100).toFixed(1)
+    totalQueryCount > 0
+      ? ((cacheQueryCount / totalQueryCount) * 100).toFixed(1)
       : "0.0",
   );
 

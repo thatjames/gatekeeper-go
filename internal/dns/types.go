@@ -20,22 +20,17 @@ var (
 	})
 
 	queryCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "dns_query_counter",
+		Name: "dns_query_count",
 		Help: "Count by domain",
 	}, []string{"domain", "upstream", "result"})
 
-	cacheHitCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "dns_cache_hit_counter",
-		Help: "count of cache hits by domain",
-	}, []string{"domain"})
-
 	blockedDomainCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "dns_blocked_domain_counter",
+		Name: "dns_blocked_domain_count",
 		Help: "count of blocked domains",
 	}, []string{"domain"})
 
 	queryByIPCounter = promauto.NewCounterVec(prometheus.CounterOpts{
-		Name: "dns_query_by_ip_counter",
+		Name: "dns_query_by_ip_count",
 		Help: "count of queries by IP",
 	}, []string{"ip", "result"})
 )
