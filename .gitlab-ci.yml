@@ -1,22 +1,18 @@
 image: golang:latest
-
 workflow:
   rules:
     - if: $CI_COMMIT_TAG
     - if: $CI_COMMIT_BRANCH
-
 variables:
   BASE_NAME: gatekeeper
   DOCKER_HUB: smokeycircles
   DOCKER_IMAGE: $DOCKER_HUB/$BASE_NAME
-
 stages:
   - test
   - build_web
   - build_go
   - build_docker
   - distribute
-
 # YAML Templates
 .go_common: &go_common
   stage: build_go
@@ -24,9 +20,8 @@ stages:
     - if: $CI_COMMIT_TAG
   tags:
     - shell
-
 .build_template: &build_template
-  <<: *go_common
+  !!merge <<: *go_common
   script:
     - make build-pipeline
   artifacts:
@@ -34,10 +29,17 @@ stages:
       - bin/
       - internal/web/ui/dist/
     expire_in: 2days
-
+.build_router_template: &build_router_template
+  !!merge <<: *go_common
+  script:
+    - make build-router
+  artifacts:
+    paths:
+      - bin/
+    expire_in: 2days
 # Jobs
 test:
-  <<: *go_common
+  !!merge <<: *go_common
   stage: test
   rules:
     - if: $CI_COMMIT_TAG
@@ -52,7 +54,6 @@ test:
         - dns-test-report.xml
     expire_in: 1year
   coverage: '/Total project coverage:\s*(\d+(?:\.\d+)?)%/'
-
 build_web:
   stage: build_web
   rules:
@@ -65,44 +66,38 @@ build_web:
     expire_in: 2days
   tags:
     - shell
-
 # Build matrix using templates - Linux architectures
 build_amd64_linux:
-  <<: *build_template
+  !!merge <<: *build_template
   variables:
     GOARCH: amd64
     GOOS: linux
     BIN_NAME: $BASE_NAME-amd64
-
 #build_amd64_windows:
 #  <<: *build_template
 #  variables:
 #    GOARCH: amd64
 #    GOOS: windows
 #    BIN_NAME: $BASE_NAME-amd64.exe
-
 build_arm_linux:
-  <<: *build_template
+  !!merge <<: *build_template
   variables:
     GOARCH: arm
     GOOS: linux
     GOARM: "7"
     BIN_NAME: $BASE_NAME-arm
-
 build_arm64_linux:
-  <<: *build_template
+  !!merge <<: *build_template
   variables:
     GOARCH: arm64
     GOOS: linux
     BIN_NAME: $BASE_NAME-arm64
-
 build_386_linux:
-  <<: *build_template
+  !!merge <<: *build_template
   variables:
     GOARCH: "386"
     GOOS: linux
     BIN_NAME: $BASE_NAME-i386
-
 # Single architecture Docker build (existing)
 build_docker:
   variables:
@@ -116,7 +111,6 @@ build_docker:
     - make BIN_NAME=$BIN_NAME docker
   tags:
     - shell
-
 # Multi-architecture Docker build
 build_docker_multiarch:
   stage: build_docker
@@ -143,7 +137,33 @@ build_docker_multiarch:
     - docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7,linux/386 --push -t $DOCKER_IMAGE:$CI_COMMIT_TAG -t $DOCKER_IMAGE:latest -f Dockerfile.multiarch .
   tags:
     - shell
-
+# router builds
+build_router_amd64_linux:
+  !!merge <<: *build_router_template
+  variables:
+    GOARCH: amd64
+    GOOS: linux
+    BIN_NAME: $BASE_NAME-router-amd64
+build_router_386_linux:
+  !!merge <<: *build_router_template
+  variables:
+    GOARCH: "386"
+    GOOS: linux
+    BIN_NAME: $BASE_NAME-router-i386
+build_router_arm_v7_linux:
+  !!merge <<: *build_router_template
+  variables:
+    GOARCH: arm
+    GOOS: linux
+    GOARM: "7"
+    BIN_NAME: $BASE_NAME-router-arm-v7
+build_router_arm_v8_linux:
+  !!merge <<: *build_router_template
+  variables:
+    GOARCH: arm
+    GOOS: linux
+    GOARM: "8"
+    BIN_NAME: $BASE_NAME-router-arm-v8
 s3_upload:
   stage: distribute
   rules:

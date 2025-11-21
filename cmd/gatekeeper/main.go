@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -13,19 +12,19 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/dns"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/system"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/web"
 )
 
 // Flags
 var (
 	configFile   string
 	debug, trace bool
-	version      = "development-build"
+	version                   = "development-build"
+	moduleHooks  []moduleHook = make([]moduleHook, 0)
 )
+
+type moduleHook func(*config.ConfigInstance) error
 
 func main() {
 	flag.StringVar(&configFile, "config", "config.yml", "config file")
@@ -47,47 +46,12 @@ func main() {
 	system.Version = version
 	log.Debugf("Config: %v", config.Config)
 
-	if config.Config.DHCP != nil {
-		log.Info("Registering DHCP server")
-		dhcpServer := dhcp.NewDHCPServerFromConfig(config.Config.DHCP)
-		service.Register(dhcpServer, service.DHCP)
-
-	}
-
-	if config.Config.DNS != nil {
-		log.Info("Registering DNS server")
-		localDomains := make(map[string]net.IP)
-		for domain, ip := range config.Config.DNS.LocalDomains {
-			localDomains[domain] = net.ParseIP(ip).To4()
+	loadModules()
+	for _, hook := range moduleHooks {
+		if err := hook(config.Config); err != nil {
+			log.Fatal(err)
 		}
-
-		dnsServer := dns.NewDNSServerWithOpts(dns.DNSServerOpts{
-			Interface:      config.Config.DNS.Interface,
-			BlocklistUrls:  config.Config.DNS.BlockLists,
-			BlockedDomains: config.Config.DNS.BlockedDomains,
-			ResolverOpts: &dns.ResolverOpts{
-				LocalDomains: localDomains,
-				Upstreams:    config.Config.DNS.UpstreamServers,
-			},
-			Port: config.Config.DNS.Port,
-		})
-		service.Register(dnsServer, service.DNS)
 	}
-
-	if config.Config.Web != nil {
-		log.Info("Registering web server")
-		go func() {
-			if err := web.Init(version, config.Config.Web); err != nil {
-				log.Error("unable to start web server:", err)
-			}
-		}()
-	}
-
-	// routingMan, err := routing.New()
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// service.Register(routingMan)
 
 	log.Debug("Starting registered services")
 	if err := service.Start(); err != nil {

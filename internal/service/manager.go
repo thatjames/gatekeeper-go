@@ -9,9 +9,10 @@ import (
 type ServiceKey string
 
 var (
-	DHCP ServiceKey = "dhcp"
-	Web  ServiceKey = "web"
-	DNS  ServiceKey = "dns"
+	DHCP   ServiceKey = "dhcp"
+	Web    ServiceKey = "web"
+	DNS    ServiceKey = "dns"
+	Router ServiceKey = "router"
 )
 
 type serviceManager map[ServiceKey]Service
