@@ -172,7 +172,7 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 		}
 
 		if res.err != nil {
-			log.Error("unable to lookup: ", res.err.Error())
+			log.Errorf("unable to lookup domain %s: %s\n", domain, res.err.Error())
 			lastErr = res.err
 
 			if res.err != ErrNxDomain {

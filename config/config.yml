@@ -30,3 +30,6 @@ DNS:
     - 'https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts '
   BlockedDomains:
     - test.domain.com
+Router:
+  WANInterface: eth0
+  LANInterface: eth1

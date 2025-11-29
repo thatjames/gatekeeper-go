@@ -15,9 +15,10 @@ var loadedFilePath *string
 var Config *ConfigInstance
 
 type ConfigInstance struct {
-	DHCP *DHCP `yaml:"DHCP"`
-	Web  *Web  `yaml:"Web"`
-	DNS  *DNS  `yaml:"DNS"`
+	DHCP   *DHCP   `yaml:"DHCP"`
+	Web    *Web    `yaml:"Web"`
+	DNS    *DNS    `yaml:"DNS"`
+	Router *Router `yaml:"Router"`
 }
 
 func (c ConfigInstance) String() string {
@@ -91,6 +92,11 @@ type DNS struct {
 	Port            int               `yaml:"Port"`
 	BlockLists      []string          `yaml:"BlockLists"`
 	BlockedDomains  []string          `yaml:"BlockedDomains"`
+}
+
+type Router struct {
+	LANInterface string `yaml:"LANInterface"`
+	WANInterface string `yaml:"WANInterface"`
 }
 
 func LoadConfig(filePath string) error {
