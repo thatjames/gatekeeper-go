@@ -1,6 +1,6 @@
 # GateKeeper
 
-GateKeeper is a configurable hobbyist DHCP server written in Go.
+GateKeeper is a configurable hobbyist DNS and DHCP server written in Go.
 
 It is **not** intended for production use, but it powers my home network just fine!
 
@@ -8,7 +8,7 @@ It is **not** intended for production use, but it powers my home network just fi
 
 ## Installation
 
-Install gatekeeper from source with `go install gitlab.com/thatjames-go/gatekeeper-go@latest` or download one of the binaries under the [releases](https://gitlab.com/thatjames-go/gatekeeper-go/-/releases) page.
+Install gatekeeper from source with `go install github.com/thatjames/gatekeeper-go@latest` or download one of the binaries under the [releases](https://github.com/thatjames/gatekeeper-go/releases) page.
 
 ## Building
 
