@@ -1,0 +1,259 @@
+name: Release pipeline
+on:
+  push:
+    tags:
+      - '**'
+permissions:
+  contents: write
+env:
+  BASE_NAME: gatekeeper
+  DOCKER_HUB: smokeycircles
+  DOCKER_IMAGE: smokeycircles/gatekeeper
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.4'
+      - name: Run tests
+        run: make test-report
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            dhcp-test-report.xml
+            dns-test-report.xml
+          retention-days: 365
+  build_web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build web
+        run: make web
+      - name: Upload web artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: internal/web/ui/dist
+          retention-days: 2
+  build_amd64_linux:
+    runs-on: ubuntu-latest
+    needs: build_web
+    env:
+      GOARCH: amd64
+      GOOS: linux
+      BIN_NAME: gatekeeper-amd64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.4'
+      - name: Download web artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: internal/web/ui/dist
+      - name: Build
+        run: make build-pipeline
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bin-amd64-linux
+          path: |
+            bin/
+            internal/web/ui/dist/
+          retention-days: 2
+  build_arm_linux:
+    runs-on: ubuntu-latest
+    needs: build_web
+    env:
+      GOARCH: arm
+      GOOS: linux
+      GOARM: "7"
+      BIN_NAME: gatekeeper-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.4'
+      - name: Download web artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: internal/web/ui/dist
+      - name: Build
+        run: make build-pipeline
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bin-arm-linux
+          path: |
+            bin/
+            internal/web/ui/dist/
+          retention-days: 2
+  build_arm64_linux:
+    runs-on: ubuntu-latest
+    needs: build_web
+    env:
+      GOARCH: arm64
+      GOOS: linux
+      BIN_NAME: gatekeeper-arm64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.4'
+      - name: Download web artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: internal/web/ui/dist
+      - name: Build
+        run: make build-pipeline
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bin-arm64-linux
+          path: |
+            bin/
+            internal/web/ui/dist/
+          retention-days: 2
+  build_386_linux:
+    runs-on: ubuntu-latest
+    needs: build_web
+    env:
+      GOARCH: "386"
+      GOOS: linux
+      BIN_NAME: gatekeeper-i386
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.4'
+      - name: Download web artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: internal/web/ui/dist
+      - name: Build
+        run: make build-pipeline
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bin-386-linux
+          path: |
+            bin/
+            internal/web/ui/dist/
+          retention-days: 2
+  build_docker_multiarch:
+    runs-on: ubuntu-latest
+    needs:
+      - build_web
+      - build_amd64_linux
+      - build_arm_linux
+      - build_arm64_linux
+      - build_386_linux
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+      - name: Prepare binaries
+        run: |
+          mkdir -p bin
+          mv artifacts/bin-amd64-linux/bin/$BASE_NAME-amd64 bin/$BASE_NAME-linux-amd64
+          mv artifacts/bin-arm64-linux/bin/$BASE_NAME-arm64 bin/$BASE_NAME-linux-arm64
+          mv artifacts/bin-arm-linux/bin/$BASE_NAME-arm bin/$BASE_NAME-linux-arm
+          mv artifacts/bin-386-linux/bin/$BASE_NAME-i386 bin/$BASE_NAME-linux-386
+          cp -r artifacts/web-dist internal/web/ui/dist
+      - name: Extract tag name
+        id: tag
+        run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.multiarch
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/386
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:${{ steps.tag.outputs.TAG }}
+            ${{ env.DOCKER_IMAGE }}:latest
+  s3_upload:
+    runs-on: ubuntu-latest
+    needs:
+      - build_amd64_linux
+      - build_arm_linux
+      - build_arm64_linux
+      - build_386_linux
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Prepare binaries
+        run: |
+          mkdir -p bin
+          find artifacts -name "$BASE_NAME-*" -type f -exec cp {} bin/ \;
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-1
+      - name: Extract tag name
+        id: tag
+        run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      - name: Upload to S3
+        run: aws s3 sync bin s3://gatekeeper-dist/${{ steps.tag.outputs.TAG }}
+  create_release:
+    runs-on: ubuntu-latest
+    needs:
+      - test
+      - build_docker_multiarch
+      - s3_upload
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -name "$BASE_NAME-*" -type f -exec cp {} release-assets/ \;
+      - name: Extract tag name
+        id: tag
+        run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tag.outputs.TAG }}
+          name: Release ${{ steps.tag.outputs.TAG }}
+          draft: false
+          prerelease: false
+          files: release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

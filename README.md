@@ -1,11 +1,5 @@
 # GateKeeper
 
-[![Latest Release](https://gitlab.com/thatjames-go/gatekeeper-go/-/badges/release.svg)](https://gitlab.com/thatjames-go/gatekeeper-go/-/releases)
-
-[![pipeline status](https://gitlab.com/thatjames-go/gatekeeper-go/badges/main/pipeline.svg)](https://gitlab.com/thatjames-go/gatekeeper-go/-/commits/main)
-
-[![coverage report](https://gitlab.com/thatjames-go/gatekeeper-go/badges/main/coverage.svg)](https://gitlab.com/thatjames-go/gatekeeper-go/-/commits/main)
-
 GateKeeper is a configurable hobbyist DHCP server written in Go.
 
 It is **not** intended for production use, but it powers my home network just fine!
