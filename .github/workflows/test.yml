@@ -25,4 +25,18 @@ jobs:
           path: |
             dhcp-test-report.xml
             dns-test-report.xml
-          retention-days: 365
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build web
+        run: make web
+      - name: Upload web artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: internal/web/ui/dist
