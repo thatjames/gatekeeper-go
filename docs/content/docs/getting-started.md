@@ -1,7 +1,6 @@
 ---
-layout: default
-title: Getting Started
-nav_order: 2
+title: "Getting Started"
+weight: 1
 ---
 
 # Getting Started

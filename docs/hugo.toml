@@ -1,3 +1,10 @@
 baseURL = 'https://thatjames.github.io/gatekeeper-go/'
 languageCode = 'en-us'
 title = 'GateKeeper Documentation'
+theme = 'book'
+# Book theme configuration
+[params]
+  BookRepo = 'https://github.com/yourusername/gatekeeper-go'
+  BookEditPath = 'edit/main/docs'
+  BookSearch = true
+  BookToC = true
