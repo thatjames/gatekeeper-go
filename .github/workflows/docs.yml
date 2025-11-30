@@ -22,17 +22,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive # Fetch Hugo themes (if using git submodules)
-          fetch-depth: 0 # Fetch all history for .GitInfo and .Lastmod
+          submodules: recursive
+          fetch-depth: 0
       - name: Setup Hugo
         uses: peaceiris/actions-hugo@v3
         with:
           hugo-version: 'latest'
-          extended: true # Set to true if you need Hugo Extended (for SCSS/Sass)
+          extended: true
       - name: Build with Hugo
-        run: hugo --source ./docs --destination ./_site --minify
+        run: hugo --source ./docs --minify
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs/public
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
