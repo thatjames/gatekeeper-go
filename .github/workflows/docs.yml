@@ -21,13 +21,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-      - name: Build with Jekyll
-        uses: actions/jekyll-build-pages@v1
         with:
-          source: ./docs
-          destination: ./_site
+          submodules: recursive # Fetch Hugo themes (if using git submodules)
+          fetch-depth: 0 # Fetch all history for .GitInfo and .Lastmod
+      - name: Setup Hugo
+        uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: 'latest'
+          extended: true # Set to true if you need Hugo Extended (for SCSS/Sass)
+      - name: Build with Hugo
+        run: hugo --source ./docs --destination ./_site --minify
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
       - name: Deploy to GitHub Pages
