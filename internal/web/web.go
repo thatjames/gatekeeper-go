@@ -15,6 +15,9 @@ import (
 
 func Init(ver string, cfg *config.Web) error {
 	version = ver
+	if cfg.Address == "" {
+		cfg.Address = ":8085"
+	}
 
 	r := gin.New()
 	r.Use(gin.Recovery())

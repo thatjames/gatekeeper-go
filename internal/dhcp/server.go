@@ -70,9 +70,13 @@ type DHCPServerOpts struct {
 }
 
 var defaultOpts = &DHCPServerOpts{
-	Interface: "enp34s0",
-	StartFrom: net.ParseIP("10.0.0.2").To4(),
-	EndAt:     net.ParseIP("10.0.0.99").To4(),
+	Interface:  "eth0",
+	StartFrom:  net.ParseIP("10.0.0.2").To4(),
+	EndAt:      net.ParseIP("10.0.0.99").To4(),
+	LeaseTTL:   300,
+	SubnetMask: net.ParseIP("255.255.255.0").To4(),
+	Gateway:    net.ParseIP("10.0.0.1").To4(),
+	LeaseFile:  "/var/lib/gatekeeper/leases",
 }
 
 func NewDHCPServer() *DHCPServer {

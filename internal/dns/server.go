@@ -29,6 +29,7 @@ type DNSServerOpts struct {
 var defaultDNSServerOpts = DNSServerOpts{
 	Interface: "eth0",
 	Port:      53,
+	Upstream:  []string{"8.8.8.8", "1.1.1.1"},
 }
 
 type DNSServer struct {

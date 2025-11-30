@@ -1,0 +1,17 @@
+name: Sync Wiki
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Sync to Wiki
+        uses: Andrew-Chen-Wang/github-wiki-action@v4
+        with:
+          path: docs/
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
