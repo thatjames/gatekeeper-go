@@ -1,3 +1,8 @@
-title: Gatekeeper Go Documentation
-description: Documentation for gatekeeper-go
-theme: jekyll-theme-cayman # or: minima, slate, midnight, etc.
+title: Gatekeeper Documentation
+description: Documentation for the gatekeeper project
+remote_theme: just-the-docs/just-the-docs
+search_enabled: true
+color_scheme: dark # or light
+aux_links:
+  'GitHub':
+    - '//github.com/thatjames/gatekeeper-go'

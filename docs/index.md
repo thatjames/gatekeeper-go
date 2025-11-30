@@ -1,3 +1,9 @@
+---
+layout: home
+title: Home
+nav_order: 1
+---
+
 # GateKeeper wiki
 
 Welcome to the GateKeeper wiki!
