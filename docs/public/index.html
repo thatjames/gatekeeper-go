@@ -11,7 +11,6 @@ https://github.com/alex-shpak/hugo-book
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="GateKeeper wiki# Welcome to the GateKeeper wiki!
 In this wiki# This wiki is a place to document GateKeeper’s design and implementation as well as features and how to use them.
-GateKeeper Modules# GateKeeper is built up of a number of modules, each of which is responsible for a specific task. Some modules can be enabled/disabled using config keys in YAML, but the Router module requires the use of a certain binary/docker-image.
 ">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#343a40">
@@ -19,17 +18,15 @@ GateKeeper Modules# GateKeeper is built up of a number of modules, each of which
   <meta property="og:site_name" content="GateKeeper Documentation">
   <meta property="og:title" content="Home">
   <meta property="og:description" content="GateKeeper wiki# Welcome to the GateKeeper wiki!
-In this wiki# This wiki is a place to document GateKeeper’s design and implementation as well as features and how to use them.
-GateKeeper Modules# GateKeeper is built up of a number of modules, each of which is responsible for a specific task. Some modules can be enabled/disabled using config keys in YAML, but the Router module requires the use of a certain binary/docker-image.">
+In this wiki# This wiki is a place to document GateKeeper’s design and implementation as well as features and how to use them.">
   <meta property="og:locale" content="en_us">
   <meta property="og:type" content="website">
 
 
   <meta itemprop="name" content="Home">
   <meta itemprop="description" content="GateKeeper wiki# Welcome to the GateKeeper wiki!
-In this wiki# This wiki is a place to document GateKeeper’s design and implementation as well as features and how to use them.
-GateKeeper Modules# GateKeeper is built up of a number of modules, each of which is responsible for a specific task. Some modules can be enabled/disabled using config keys in YAML, but the Router module requires the use of a certain binary/docker-image.">
-  <meta itemprop="wordCount" content="486">
+In this wiki# This wiki is a place to document GateKeeper’s design and implementation as well as features and how to use them.">
+  <meta itemprop="wordCount" content="30">
 
 <title>Home | GateKeeper Documentation</title>
 <link rel="icon" href="/gatekeeper-go/favicon.png" >
@@ -39,7 +36,7 @@ GateKeeper Modules# GateKeeper is built up of a number of modules, each of which
 
 
   <script defer src="/gatekeeper-go/fuse.min.js"></script>
-  <script defer src="/gatekeeper-go/en.search.min.832947d9ec863a8af5c4bb174f6ddbe87450de4aed463dad25c988eb362871d2.js" integrity="sha256-gylH2eyGOor1xLsXT23b6HRQ3krtRj2tJcmI6zYocdI=" crossorigin="anonymous"></script>
+  <script defer src="/gatekeeper-go/en.search.min.4ea60a0c672e1dae161565ea9463ab186c561c9cacead88d3cd27a0cd5e6f388.js" integrity="sha256-TqYKDGcuHa4WFWXqlGOrGGxWHJys6tiNPNJ6DNXm84g=" crossorigin="anonymous"></script>
 
 
 <link rel="alternate" type="application/rss+xml" href="http://localhost:1313/gatekeeper-go/index.xml" title="GateKeeper Documentation" />
@@ -100,6 +97,20 @@ GateKeeper Modules# GateKeeper is built up of a number of modules, each of which
         </li>
       
     
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/gatekeeper-go/docs/modules/" class="">
+      Modules</a>
+  
+
+        </li>
+      
+    
   </ul>
 
 
@@ -152,13 +163,6 @@ GateKeeper Modules# GateKeeper is built up of a number of modules, each of which
 <nav id="TableOfContents">
   <ul>
     <li><a href="#in-this-wiki">In this wiki</a></li>
-    <li><a href="#gatekeeper-modules">GateKeeper Modules</a>
-      <ul>
-        <li><a href="#dns">DNS</a></li>
-        <li><a href="#dhcp">DHCP</a></li>
-        <li><a href="#web">Web</a></li>
-      </ul>
-    </li>
   </ul>
 </nav>
 
@@ -175,150 +179,6 @@ GateKeeper Modules# GateKeeper is built up of a number of modules, each of which
 <p>Welcome to the GateKeeper wiki!</p>
 <h2 id="in-this-wiki">In this wiki<a class="anchor" href="#in-this-wiki">#</a></h2>
 <p>This wiki is a place to document GateKeeper&rsquo;s design and implementation as well as features and how to use them.</p>
-<h2 id="gatekeeper-modules">GateKeeper Modules<a class="anchor" href="#gatekeeper-modules">#</a></h2>
-<p>GateKeeper is built up of a number of modules, each of which is responsible for a specific task. Some modules can be enabled/disabled using config keys in YAML, but the Router module requires the use of a certain binary/docker-image.</p>
-<p>This is because the Router module is heavily reliant on the Netlink API, which is only available on Linux. Separating the Router module into a separate binary/docker-image allows for the use of GateKeeper on other platforms as a DHCP/DNS server while also making it easier to maintain the router module without impacting other features.</p>
-<h3 id="dns">DNS<a class="anchor" href="#dns">#</a></h3>
-<p>The DNS module is a simple recursive DNS server that can be used to resolve DNS locally. It includes a local domain list that can be used to resolve local DNS entries (such as router, mediapc, etc) or just a way to override DNS entries as this local list is considered before a recursive request is made upstream.</p>
-<h4 id="configuration">Configuration<a class="anchor" href="#configuration">#</a></h4>
-<p>The DNS module is loaded if the config file contains the <code>DNS</code> key.</p>
-<p>Below are the list of configuration options for the DNS module.</p>
-<table>
-  <thead>
-      <tr>
-          <th>Key</th>
-          <th>Description</th>
-          <th>Default</th>
-      </tr>
-  </thead>
-  <tbody>
-      <tr>
-          <td>Interface</td>
-          <td>The interface the UDP socket will bind to</td>
-          <td>eth0</td>
-      </tr>
-      <tr>
-          <td>LocalDomains</td>
-          <td>A map of DNS names to IP addresses</td>
-          <td></td>
-      </tr>
-      <tr>
-          <td>UpstreamServers</td>
-          <td>The upstream DNS servers to use</td>
-          <td>8.8.8.8, 1.1.1.1</td>
-      </tr>
-      <tr>
-          <td>Blocklists</td>
-          <td>A list of host file formated files that will be used to block DNS requests</td>
-          <td></td>
-      </tr>
-      <tr>
-          <td>BlockedDomains</td>
-          <td>A list of domains to outright block</td>
-          <td></td>
-      </tr>
-  </tbody>
-</table>
-<h3 id="dhcp">DHCP<a class="anchor" href="#dhcp">#</a></h3>
-<p>The DHCP module is a simple DHCP server that can be used to provide DHCP to devices on the network.</p>
-<h4 id="configuration-1">Configuration<a class="anchor" href="#configuration-1">#</a></h4>
-<p>The DHCP module is loaded if the config file contains the <code>DHCP</code> key.</p>
-<table>
-  <thead>
-      <tr>
-          <th>Key</th>
-          <th>Description</th>
-          <th>Default</th>
-      </tr>
-  </thead>
-  <tbody>
-      <tr>
-          <td>Interface</td>
-          <td>Network interface for DHCP server</td>
-          <td>eth0</td>
-      </tr>
-      <tr>
-          <td>StartAddr</td>
-          <td>Starting IP address for DHCP pool</td>
-          <td>10.0.0.2</td>
-      </tr>
-      <tr>
-          <td>EndAddr</td>
-          <td>Ending IP address for DHCP pool</td>
-          <td>10.0.0.99</td>
-      </tr>
-      <tr>
-          <td>DomainName</td>
-          <td>Domain name provided to DHCP clients</td>
-          <td></td>
-      </tr>
-      <tr>
-          <td>NameServers</td>
-          <td>DNS servers provided to clients. If you have the DNS module enabled, you should include this device&rsquo;s IP here</td>
-          <td></td>
-      </tr>
-      <tr>
-          <td>LeaseTTL</td>
-          <td>DHCP lease time-to-live in seconds</td>
-          <td>300</td>
-      </tr>
-      <tr>
-          <td>SubnetMask</td>
-          <td>Subnet mask for the network</td>
-          <td>255.255.255.0</td>
-      </tr>
-      <tr>
-          <td>Gateway</td>
-          <td>Default gateway IP address</td>
-          <td>10.0.0.1</td>
-      </tr>
-      <tr>
-          <td>ReservedAddresses</td>
-          <td>MAC to IP address mappings for static reservations</td>
-          <td></td>
-      </tr>
-      <tr>
-          <td>LeaseFile</td>
-          <td>Path to file storing DHCP lease information</td>
-          <td>/var/lib/gatekeeper/leases</td>
-      </tr>
-  </tbody>
-</table>
-<h3 id="web">Web<a class="anchor" href="#web">#</a></h3>
-<p>The Web module is a simple HTTP server that can be used to provide a web interface to the GateKeeper.</p>
-<h4 id="configuration-2">Configuration<a class="anchor" href="#configuration-2">#</a></h4>
-<p>The Web module is loaded if the config file contains the <code>Web</code> key.</p>
-<table>
-  <thead>
-      <tr>
-          <th>Key</th>
-          <th>Description</th>
-          <th>Default</th>
-      </tr>
-  </thead>
-  <tbody>
-      <tr>
-          <td>Address</td>
-          <td>Address and port for web server to listen on</td>
-          <td>:8085</td>
-      </tr>
-      <tr>
-          <td>TLS</td>
-          <td>TLS configuration for HTTPS</td>
-          <td></td>
-      </tr>
-      <tr>
-          <td>HTPasswdFile</td>
-          <td>Path to htpasswd file for authentication. If this is not included, the module defaults to username:password admin:admin</td>
-          <td></td>
-      </tr>
-      <tr>
-          <td>Prometheus</td>
-          <td>Enable Prometheus metrics endpoint. This is the same endpoint the DNS Statistics page uses, so disabling it here will disable that page</td>
-          <td>false</td>
-      </tr>
-  </tbody>
-</table>
 </article>
  
       
@@ -378,13 +238,6 @@ GateKeeper Modules# GateKeeper is built up of a number of modules, each of which
 <nav id="TableOfContents">
   <ul>
     <li><a href="#in-this-wiki">In this wiki</a></li>
-    <li><a href="#gatekeeper-modules">GateKeeper Modules</a>
-      <ul>
-        <li><a href="#dns">DNS</a></li>
-        <li><a href="#dhcp">DHCP</a></li>
-        <li><a href="#web">Web</a></li>
-      </ul>
-    </li>
   </ul>
 </nav>
 

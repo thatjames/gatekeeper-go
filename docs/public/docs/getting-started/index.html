@@ -9,7 +9,10 @@ https://github.com/alex-shpak/hugo-book
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="Getting Started# There are a number of options available for running GateKeeper.
-The easiest way to get started is to use the docker image, but there are limitations to each of the builds
+Currently, GateKeeper is not available for Windows.
+Docker# GateKeeper is built as a Docker image against a variety of architectures. The supported architectures are:
+amd64 arm64 armv7 armv8 i386 The image is available on Docker Hub as smokeycircles/gatekeeper.
+Compose File# version: &#39;3.8&#39; services: gatekeeper: image: smokeycircles/gatekeeper:latest container_name: gatekeeper ports: - 53:53/udp volumes: - ./data/gatekeeper/data:/var/lib/gatekeeper/ - ./data/gatekeeper/config.yml:/app/config.yml - ./data/gatekeeper/.htpasswd:/app/.htpasswdBinaries# GateKeeper is also available as a binary that can be run on the supported architectures on linux. The binary is available on GitHub Releases.
 ">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#343a40">
@@ -17,7 +20,10 @@ The easiest way to get started is to use the docker image, but there are limitat
   <meta property="og:site_name" content="GateKeeper Documentation">
   <meta property="og:title" content="Getting Started">
   <meta property="og:description" content="Getting Started# There are a number of options available for running GateKeeper.
-The easiest way to get started is to use the docker image, but there are limitations to each of the builds">
+Currently, GateKeeper is not available for Windows.
+Docker# GateKeeper is built as a Docker image against a variety of architectures. The supported architectures are:
+amd64 arm64 armv7 armv8 i386 The image is available on Docker Hub as smokeycircles/gatekeeper.
+Compose File# version: &#39;3.8&#39; services: gatekeeper: image: smokeycircles/gatekeeper:latest container_name: gatekeeper ports: - 53:53/udp volumes: - ./data/gatekeeper/data:/var/lib/gatekeeper/ - ./data/gatekeeper/config.yml:/app/config.yml - ./data/gatekeeper/.htpasswd:/app/.htpasswdBinaries# GateKeeper is also available as a binary that can be run on the supported architectures on linux. The binary is available on GitHub Releases.">
   <meta property="og:locale" content="en_us">
   <meta property="og:type" content="article">
     <meta property="article:section" content="docs">
@@ -25,8 +31,11 @@ The easiest way to get started is to use the docker image, but there are limitat
 
   <meta itemprop="name" content="Getting Started">
   <meta itemprop="description" content="Getting Started# There are a number of options available for running GateKeeper.
-The easiest way to get started is to use the docker image, but there are limitations to each of the builds">
-  <meta itemprop="wordCount" content="33">
+Currently, GateKeeper is not available for Windows.
+Docker# GateKeeper is built as a Docker image against a variety of architectures. The supported architectures are:
+amd64 arm64 armv7 armv8 i386 The image is available on Docker Hub as smokeycircles/gatekeeper.
+Compose File# version: &#39;3.8&#39; services: gatekeeper: image: smokeycircles/gatekeeper:latest container_name: gatekeeper ports: - 53:53/udp volumes: - ./data/gatekeeper/data:/var/lib/gatekeeper/ - ./data/gatekeeper/config.yml:/app/config.yml - ./data/gatekeeper/.htpasswd:/app/.htpasswdBinaries# GateKeeper is also available as a binary that can be run on the supported architectures on linux. The binary is available on GitHub Releases.">
+  <meta itemprop="wordCount" content="94">
 
 <title>Getting Started | GateKeeper Documentation</title>
 <link rel="icon" href="/gatekeeper-go/favicon.png" >
@@ -36,7 +45,7 @@ The easiest way to get started is to use the docker image, but there are limitat
 
 
   <script defer src="/gatekeeper-go/fuse.min.js"></script>
-  <script defer src="/gatekeeper-go/en.search.min.832947d9ec863a8af5c4bb174f6ddbe87450de4aed463dad25c988eb362871d2.js" integrity="sha256-gylH2eyGOor1xLsXT23b6HRQ3krtRj2tJcmI6zYocdI=" crossorigin="anonymous"></script>
+  <script defer src="/gatekeeper-go/en.search.min.4ea60a0c672e1dae161565ea9463ab186c561c9cacead88d3cd27a0cd5e6f388.js" integrity="sha256-TqYKDGcuHa4WFWXqlGOrGGxWHJys6tiNPNJ6DNXm84g=" crossorigin="anonymous"></script>
 
 
 
@@ -96,6 +105,20 @@ The easiest way to get started is to use the docker image, but there are limitat
         </li>
       
     
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/gatekeeper-go/docs/modules/" class="">
+      Modules</a>
+  
+
+        </li>
+      
+    
   </ul>
 
 
@@ -135,10 +158,30 @@ The easiest way to get started is to use the docker image, but there are limitat
 
   <label for="toc-control">
     
+    <img src="/gatekeeper-go/icons/toc.svg" class="book-icon" alt="Table of Contents" />
+    
   </label>
 </div>
 
 
+  
+  <aside class="hidden">
+    
+  
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#docker">Docker</a>
+      <ul>
+        <li><a href="#compose-file">Compose File</a></li>
+      </ul>
+    </li>
+    <li><a href="#binaries">Binaries</a></li>
+  </ul>
+</nav>
+
+
+
+  </aside>
   
  
       </header>
@@ -147,7 +190,30 @@ The easiest way to get started is to use the docker image, but there are limitat
       
   <article class="markdown book-article"><h1 id="getting-started">Getting Started<a class="anchor" href="#getting-started">#</a></h1>
 <p>There are a number of options available for running GateKeeper.</p>
-<p>The easiest way to get started is to use the docker image, but there are limitations to each of the builds</p>
+<p>Currently, GateKeeper is not available for Windows.</p>
+<h2 id="docker">Docker<a class="anchor" href="#docker">#</a></h2>
+<p>GateKeeper is built as a Docker image against a variety of architectures. The supported architectures are:</p>
+<ul>
+<li>amd64</li>
+<li>arm64</li>
+<li>armv7</li>
+<li>armv8</li>
+<li>i386</li>
+</ul>
+<p>The image is available on Docker Hub as <a href="https://hub.docker.com/r/smokeycircles/gatekeeper"><code>smokeycircles/gatekeeper</code></a>.</p>
+<h3 id="compose-file">Compose File<a class="anchor" href="#compose-file">#</a></h3>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-yaml" data-lang="yaml"><span style="display:flex;"><span><span style="color:#f92672">version</span>: <span style="color:#e6db74">&#39;3.8&#39;</span>
+</span></span><span style="display:flex;"><span><span style="color:#f92672">services</span>:
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">gatekeeper</span>:
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">image</span>: <span style="color:#ae81ff">smokeycircles/gatekeeper:latest</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">container_name</span>: <span style="color:#ae81ff">gatekeeper</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">ports</span>:
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">53</span>:<span style="color:#ae81ff">53</span><span style="color:#ae81ff">/udp</span>
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">volumes</span>:
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">./data/gatekeeper/data:/var/lib/gatekeeper/</span>
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">./data/gatekeeper/config.yml:/app/config.yml</span>
+</span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">./data/gatekeeper/.htpasswd:/app/.htpasswd</span></span></span></code></pre></div><h2 id="binaries">Binaries<a class="anchor" href="#binaries">#</a></h2>
+<p>GateKeeper is also available as a binary that can be run on the supported architectures on linux. The binary is available on <a href="https://github.com/thatjames/gatekeeper-go/releases">GitHub Releases</a>.</p>
 </article>
  
       
@@ -172,6 +238,20 @@ The easiest way to get started is to use the docker image, but there are limitat
 
   
   
+  
+  <div class="flex flex-wrap justify-between">
+    <span>
+    
+    </span>
+    <span>
+    
+      <a href="/gatekeeper-go/docs/modules/" class="flex align-center">
+        <span>Modules</span>
+        <img src="/gatekeeper-go/icons/forward.svg" class="book-icon" alt="Forward" />
+      </a>
+    
+    </span>
+  </div>
   
 
 
@@ -199,6 +279,26 @@ The easiest way to get started is to use the docker image, but there are limitat
     </div>
 
     
+  
+  <aside class="book-toc">
+    <div class="book-toc-content">
+      
+  
+<nav id="TableOfContents">
+  <ul>
+    <li><a href="#docker">Docker</a>
+      <ul>
+        <li><a href="#compose-file">Compose File</a></li>
+      </ul>
+    </li>
+    <li><a href="#binaries">Binaries</a></li>
+  </ul>
+</nav>
+
+
+
+    </div>
+  </aside>
   
  
   </main>

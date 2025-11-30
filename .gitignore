@@ -6,3 +6,4 @@ leases.db
 **/mocks
 *test-report.xml
 coverage.out
+rm .hugo_build.lock
