@@ -232,7 +232,6 @@ jobs:
     needs:
       - test
       - build_docker_multiarch
-      - s3_upload
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
