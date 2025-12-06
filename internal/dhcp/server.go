@@ -34,7 +34,7 @@ var (
 	}, []string{"op", "client", "hostname"})
 
 	activeLeaseGauge = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "active_lease_count",
+		Name: "dhcp_active_lease_count",
 		Help: "count of active leases",
 	})
 )
