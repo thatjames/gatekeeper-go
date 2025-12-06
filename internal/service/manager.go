@@ -58,7 +58,9 @@ func IsRegistered(stype ServiceKey) bool {
 	return ok
 }
 
-func GetActiveServices() []string {
+func ActiveServices() []string {
+	lock.Lock()
+	defer lock.Unlock()
 	services := make([]string, 0)
 	for name := range instance {
 		services = append(services, string(name))

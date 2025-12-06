@@ -41,6 +41,6 @@ func getVersion(c *gin.Context) {
 }
 
 func getModules(c *gin.Context) {
-	services := service.GetActiveServices()
+	services := service.ActiveServices()
 	c.JSON(http.StatusOK, services)
 }
