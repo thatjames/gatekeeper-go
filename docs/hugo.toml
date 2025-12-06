@@ -3,8 +3,11 @@ languageCode = 'en-us'
 title = 'GateKeeper Documentation'
 theme = 'book'
 # Book theme configuration
+
+canonifyURLs = true
+
 [params]
-  BookRepo = 'https://github.com/yourusername/gatekeeper-go'
+  BookRepo = 'https://github.com/thatjames/gatekeeper-go'
   BookEditPath = 'edit/main/docs'
   BookSearch = true
   BookToC = true
