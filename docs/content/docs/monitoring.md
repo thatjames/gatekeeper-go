@@ -9,6 +9,10 @@ GateKeeper includes a Prometheus metrics endpoint that can be used to monitor th
 
 This is available from the `/metrics` endpoint on the web server, provided the `prometheus` property is set to `true` in the configuration file's web module.
 
+## Authentication
+
+This endpoint is not protected by default. If you wish to expose this, it is recommended to set up authentication via a reverse proxy such as nginx or Caddy.
+
 ## Available Metrics
 
 Below is a list of the available metrics that can be scraped from the Prometheus endpoint.
