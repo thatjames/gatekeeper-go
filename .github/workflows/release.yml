@@ -6,6 +6,8 @@ on:
 permissions:
   contents: write
   packages: write
+  id-token: write
+  attestations: write
 env:
   BASE_NAME: gatekeeper
   REGISTRY: ghcr.io
@@ -29,7 +31,7 @@ jobs:
           path: |
             dhcp-test-report.xml
             dns-test-report.xml
-          retention-days: 365
+          retention-days: 90
   build_web:
     runs-on: ubuntu-latest
     steps:
