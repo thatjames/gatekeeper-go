@@ -2,7 +2,7 @@ build:
 	npm run build
 
 install: 
-	npm install
+	npm ci
 
 clean:
 	rm -rf node_modules

@@ -176,6 +176,12 @@ jobs:
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+      - name: Log in to the Container registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Prepare binaries
         run: |
           mkdir -p bin
@@ -187,22 +193,6 @@ jobs:
       - name: Extract tag name
         id: tag
         run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-      - name: Build and push multi-arch image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: Dockerfile.multiarch
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/386
-          push: true
-          tags: |
-            ${{ env.DOCKER_IMAGE }}:${{ steps.tag.outputs.TAG }}
-            ${{ env.DOCKER_IMAGE }}:latest
-      - name: Log in to the Container registry
-        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
@@ -213,6 +203,8 @@ jobs:
         uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
         with:
           context: .
+          file: Dockerfile.multiarch
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/386
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
