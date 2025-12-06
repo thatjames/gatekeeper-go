@@ -5,6 +5,7 @@ on:
       - '**'
 permissions:
   contents: write
+  packages: write
 env:
   BASE_NAME: gatekeeper
   REGISTRY: ghcr.io
