@@ -19,9 +19,6 @@
   let componentId = Math.random().toString(36).substr(2, 9);
   let isLargeScreen = $state(false);
 
-  // Use the dropdown states from the store instead of local state
-  // let dropdownStates = $state({}); // Remove this line
-
   const checkScreenSize = () => {
     isLargeScreen = window.innerWidth >= 768;
   };
@@ -58,7 +55,6 @@
     if (activeDropdown && !dropdownStates[activeDropdown]) {
       dropdownStates[activeDropdown] = true;
     }
-    // Don't close other dropdowns when navigating - only open the relevant one
   });
 
   onMount(() => {
@@ -141,7 +137,6 @@
             onclick={option.type !== MenuComponent.Dropdown
               ? (e) => {
                   push(option?.location);
-                  // Close menu on mobile after navigation
                   if (!isLargeScreen) {
                     isMenuOpen.set(false);
                   }
@@ -155,7 +150,6 @@
               ? (e) => {
                   if (e.key === "Enter") {
                     push(option?.location);
-                    // Close menu on mobile after navigation
                     if (!isLargeScreen) {
                       isMenuOpen.set(false);
                     }
@@ -203,7 +197,6 @@
                     : ''}"
                   onclick={() => {
                     push(item.location);
-                    // Close menu on mobile after navigation
                     if (!isLargeScreen) {
                       isMenuOpen.set(false);
                     }
@@ -213,7 +206,6 @@
                   onkeydown={(e) => {
                     if (e.key === "Enter") {
                       push(item.location);
-                      // Close menu on mobile after navigation
                       if (!isLargeScreen) {
                         isMenuOpen.set(false);
                       }

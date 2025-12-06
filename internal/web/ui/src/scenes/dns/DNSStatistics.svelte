@@ -13,7 +13,7 @@
   let queryByClientCounter = $state([]);
   let refreshInterval = null;
 
-  const REFRESH_RATE = 30000; // Refresh every 30 seconds
+  const REFRESH_RATE = 30000;
 
   const metricsService = new PrometheusMetricsService();
 
@@ -22,10 +22,8 @@
       loading = true;
       error = null;
 
-      // Fetch histogram for DNS request time
       dnsRequestTime = await metricsService.getHistogram("dns_req_time");
 
-      // Fetch counter vectors
       queryCounters = await metricsService.getCounterVec("dns_query_count");
       cacheHitCounters = await metricsService.getCounterVec(
         "dns_cache_hit_count",
@@ -47,7 +45,6 @@
   onMount(() => {
     fetchDNSMetrics();
 
-    // Set up automatic refresh
     refreshInterval = setInterval(fetchDNSMetrics, REFRESH_RATE);
 
     return () => {
@@ -57,7 +54,6 @@
     };
   });
 
-  // Prepare histogram chart data
   const histogramChartData = $derived.by(() => {
     if (!dnsRequestTime?.buckets) {
       return { series: [], categories: [] };
@@ -65,7 +61,6 @@
 
     const buckets = dnsRequestTime.buckets;
 
-    // Calculate incremental counts for each bucket
     const incrementalCounts = [];
     for (let i = 0; i < buckets.length; i++) {
       const current = buckets[i].count;
@@ -84,7 +79,6 @@
     };
   });
 
-  // Aggregate query counters by domain (summing across upstreams and results)
   const queryByDomain = $derived.by(() => {
     if (!queryCounters || queryCounters.length === 0) return [];
 
@@ -99,7 +93,7 @@
     return Array.from(domainMap.entries())
       .map(([domain, count]) => ({ domain, count }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 10); // Top 10 domains
+      .slice(0, 10);
   });
 
   const countByUpstream = $derived.by(() => {
@@ -128,13 +122,12 @@
         count: counter.value,
       }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 10); // Top 10 blocked domains
+      .slice(0, 10);
   });
 
   const clientDomains = $derived.by(() => {
     if (!queryByClientCounter || queryByClientCounter.length === 0) return [];
 
-    // Group by IP and sum all queries regardless of result
     const ipMap = new Map();
 
     for (const counter of queryByClientCounter) {
@@ -148,7 +141,6 @@
       .sort((a, b) => b.count - a.count);
   });
 
-  // Prepare top domains chart
   const topDomainsChartData = $derived.by(() => {
     if (!queryByDomain || queryByDomain.length === 0) {
       return { series: [], categories: [] };
@@ -165,7 +157,6 @@
     };
   });
 
-  // Prepare blocked domains chart
   const blockedDomainsChartData = $derived.by(() => {
     if (!blockedDomains || blockedDomains.length === 0) {
       return { series: [], categories: [] };
