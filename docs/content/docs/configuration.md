@@ -1,0 +1,47 @@
+---
+title: 'Configuration'
+weight: 2
+---
+
+# Configuration
+
+GateKeeper is configured using a YAML file.
+
+## Example Configuration
+
+```yaml
+DHCP:
+  Interface: enp34s0
+  StartAddr: 10.0.0.2
+  EndAddr: 10.0.0.99
+  DomainName: international-space-station
+  NameServers:
+    - 8.8.8.8
+    - 1.1.1.1
+  LeaseTTL: 300
+  SubnetMask: 255.255.255.0
+  Gateway: 10.0.0.1
+  ReservedAddresses:
+    00:d8:61:39:b5:6a: 10.0.0.101
+    bc:5f:f4:ac:ea:c4: 10.0.0.100
+  LeaseFile: /var/lib/gatekeeper/leases
+Web:
+  Address: :8085
+  TLS: null
+  HTPasswdFile: .htpasswd
+  Prometheus: true
+DNS:
+  UpstreamServers:
+    - 1.1.1.1
+    - 9.9.9.9
+  Interface: enp34s0
+  LocalDomains:
+    international-space-station: 10.0.0.2
+  Port: 53
+  BlockLists:
+    - 'https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts '
+  BlockedDomains:
+    - test.domain.com
+```
+
+A breakdown of the configuration options can be found in the [modules documentation]({{< relref "/docs/modules" >}}).
