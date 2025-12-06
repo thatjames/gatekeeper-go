@@ -100,7 +100,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: bin-arm-linux
+          name: bin-armv7-linux
           path: |
             bin/
             internal/web/ui/dist/
@@ -129,7 +129,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: bin-arm-linux
+          name: bin-armv8-linux
           path: |
             bin/
             internal/web/ui/dist/
