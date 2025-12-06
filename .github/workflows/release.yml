@@ -195,7 +195,8 @@ jobs:
     needs:
       - build_web
       - build_amd64_linux
-      - build_arm_linux
+      - build_armv7_linux
+      - build_armv8_linux
       - build_arm64_linux
       - build_386_linux
     steps:
