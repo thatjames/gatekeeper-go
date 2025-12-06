@@ -83,7 +83,7 @@ jobs:
       GOARCH: arm
       GOOS: linux
       GOARM: "7"
-      BIN_NAME: gatekeeper-arm
+      BIN_NAME: gatekeeper-armv7
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go
@@ -112,7 +112,7 @@ jobs:
       GOARCH: arm
       GOOS: linux
       GOARM: "8"
-      BIN_NAME: gatekeeper-arm
+      BIN_NAME: gatekeeper-armv8
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go
