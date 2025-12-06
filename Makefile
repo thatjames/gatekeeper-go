@@ -97,3 +97,6 @@ install-mockgen: ## Installs the mockgen tool if it's missing
 		echo "Installing mockgen..."; \
 		go install github.com/golang/mock/mockgen@latest; \
 	fi
+
+docs_server: ## Starts the hugo docs server
+	$(MAKE) -C docs server
