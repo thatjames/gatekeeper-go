@@ -34,7 +34,8 @@ docker-binary-multiarch: web test ## Builds docker binaries for all supported ar
 	@mkdir -p bin
 	env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/gatekeeper-linux-amd64 ./cmd/gatekeeper/
 	env CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/gatekeeper-linux-arm64 ./cmd/gatekeeper/
-	env CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/gatekeeper-linux-arm ./cmd/gatekeeper/
+	env CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/gatekeeper-linux-armv7 ./cmd/gatekeeper/
+	env CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=8 go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/gatekeeper-linux-armv8 ./cmd/gatekeeper/
 	env CGO_ENABLED=0 GOOS=linux GOARCH=386 go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/gatekeeper-linux-386 ./cmd/gatekeeper/
 
 docker: docker-binary ## Builds the docker binary, the web ui and the docker image

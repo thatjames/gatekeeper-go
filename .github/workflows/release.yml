@@ -76,13 +76,42 @@ jobs:
             bin/
             internal/web/ui/dist/
           retention-days: 2
-  build_arm_linux:
+  build_armv7_linux:
     runs-on: ubuntu-latest
     needs: build_web
     env:
       GOARCH: arm
       GOOS: linux
       GOARM: "7"
+      BIN_NAME: gatekeeper-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.4'
+      - name: Download web artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: internal/web/ui/dist
+      - name: Build
+        run: make build-pipeline
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bin-arm-linux
+          path: |
+            bin/
+            internal/web/ui/dist/
+          retention-days: 2
+  build_armv8_linux:
+    runs-on: ubuntu-latest
+    needs: build_web
+    env:
+      GOARCH: arm
+      GOOS: linux
+      GOARM: "8"
       BIN_NAME: gatekeeper-arm
     steps:
       - uses: actions/checkout@v4
