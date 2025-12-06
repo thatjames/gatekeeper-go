@@ -7,5 +7,3 @@ leases.db
 *test-report.xml
 coverage.out
 rm .hugo_build.lock
-.hugo_build.lock
-docs/public
