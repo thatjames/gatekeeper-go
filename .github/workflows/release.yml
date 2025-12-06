@@ -220,8 +220,8 @@ jobs:
           mkdir -p bin
           mv artifacts/bin-amd64-linux/bin/$BASE_NAME-amd64 bin/$BASE_NAME-linux-amd64
           mv artifacts/bin-arm64-linux/bin/$BASE_NAME-arm64 bin/$BASE_NAME-linux-arm64
-          mv artifacts/bin-arm-linux/bin/$BASE_NAME-armv7 bin/$BASE_NAME-linux-armv7
-          mv artifacts/bin-arm-linux/bin/$BASE_NAME-armv8 bin/$BASE_NAME-linux-armv8
+          mv artifacts/bin-armv7-linux/bin/$BASE_NAME-armv7 bin/$BASE_NAME-linux-armv7
+          mv artifacts/bin-armv8-linux/bin/$BASE_NAME-armv8 bin/$BASE_NAME-linux-armv8
           mv artifacts/bin-386-linux/bin/$BASE_NAME-i386 bin/$BASE_NAME-linux-386
           cp -r artifacts/web-dist internal/web/ui/dist
       - name: Extract tag name
