@@ -19,23 +19,63 @@ GateKeeper is built as a Docker image against a variety of architectures. The su
 - armv8
 - i386
 
-The image is available on [github packages](https://github.com/thatjames?tab=packages&repo_name=gatekeeper-go)
+The image is available on github packages as [gchr.io/thatjames/gatekeeper-go](https://github.com/thatjames?tab=packages&repo_name=gatekeeper-go)
+
+```bash
+docker run -d -p 53:53/udp -p 8085:8085 \
+    -v /path/to/data:/var/lib/gatekeeper \
+    -v /path/to/config.yml:/app/config.yml \
+    -v /path/to/.htpasswd:/app/.htpasswd \
+    --cap-add=NET_BIND_SERVICE \
+    gchr.io/thatjames/gatekeeper-go:latest
+```
 
 ### Compose File
 
 ```yaml
-version: '3.8'
 services:
   gatekeeper:
-    image: smokeycircles/gatekeeper:latest
+    image: gchr.io/thatjames/gatekeeper-go:latest
     container_name: gatekeeper
     ports:
-      - 53:53/udp
+      - 53:53/udp # DNS
+      - 8085:8085 # Web
     volumes:
       - ./data/gatekeeper/data:/var/lib/gatekeeper/
       - ./data/gatekeeper/config.yml:/app/config.yml
       - ./data/gatekeeper/.htpasswd:/app/.htpasswd
+    cap_add:
+      - NET_BIND_SERVICE
 ```
+
+**Note**: The keen eyed will notice the lack of a DHCP port in the initial examples.
+
+This is because running a DHCP server inside of a container is a tricky proposition due to how Docker's default bridge networking works (specifically, bridge networks do not support broadcast propagation between the host and containers). If you need DHCP functionality, you must use host networking mode as shown in the examples below. This configuration is doable, but it is not something I will officially support, as network configurations vary widely and debugging network issues in containerized environments is complex.
+
+That said, the below examples _might_ work for your use case, but I will not accept support requests if it does not.
+
+```bash
+docker run -d \
+    -v /path/to/data:/var/lib/gatekeeper \
+    -v /path/to/config.yml:/app/config.yml \
+    -v /path/to/.htpasswd:/app/.htpasswd \
+    --network=host \
+    gchr.io/thatjames/gatekeeper-go:latest
+```
+
+```yaml
+services:
+  gatekeeper:
+    image: gchr.io/thatjames/gatekeeper-go:latest
+    container_name: gatekeeper
+    volumes:
+      - ./data/gatekeeper/data:/var/lib/gatekeeper/
+      - ./data/gatekeeper/config.yml:/app/config.yml
+      - ./data/gatekeeper/.htpasswd:/app/.htpasswd
+    network_mode: host
+```
+
+If you are interested in running GateKeeper with the [DHCP module]({{< relref "/docs/modules#dhcp" >}}) enabled, you will have a much easier time running it as a native binary instead. True of many DHCP servers out there.
 
 ## Binaries
 

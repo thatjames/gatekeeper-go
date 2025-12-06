@@ -11,10 +11,10 @@ GateKeeper is configured using a YAML file.
 
 ```yaml
 DHCP:
-  Interface: enp34s0
+  Interface: eth0
   StartAddr: 10.0.0.2
   EndAddr: 10.0.0.99
-  DomainName: international-space-station
+  DomainName: gatekeeper
   NameServers:
     - 8.8.8.8
     - 1.1.1.1
@@ -34,12 +34,13 @@ DNS:
   UpstreamServers:
     - 1.1.1.1
     - 9.9.9.9
-  Interface: enp34s0
+  Interface: eth0
   LocalDomains:
-    international-space-station: 10.0.0.2
+    gatekeeper: 10.0.0.1
+    router: 10.0.0.1
   Port: 53
   BlockLists:
-    - 'https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts '
+    - 'https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts'
   BlockedDomains:
     - test.domain.com
 ```
