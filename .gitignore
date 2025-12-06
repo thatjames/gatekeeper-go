@@ -6,4 +6,13 @@ leases.db
 **/mocks
 *test-report.xml
 coverage.out
-rm .hugo_build.lock
+docs/public/
+docs/resources/_gen/
+docs/.hugo_build.lock
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/

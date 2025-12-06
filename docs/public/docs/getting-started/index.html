@@ -11,7 +11,7 @@ https://github.com/alex-shpak/hugo-book
 <meta name="description" content="Getting Started# There are a number of options available for running GateKeeper.
 Currently, GateKeeper is not available for Windows.
 Docker# GateKeeper is built as a Docker image against a variety of architectures. The supported architectures are:
-amd64 arm64 armv7 armv8 i386 The image is available on Docker Hub as smokeycircles/gatekeeper.
+amd64 arm64 armv7 armv8 i386 The image is available on github packages
 Compose File# version: &#39;3.8&#39; services: gatekeeper: image: smokeycircles/gatekeeper:latest container_name: gatekeeper ports: - 53:53/udp volumes: - ./data/gatekeeper/data:/var/lib/gatekeeper/ - ./data/gatekeeper/config.yml:/app/config.yml - ./data/gatekeeper/.htpasswd:/app/.htpasswdBinaries# GateKeeper is also available as a binary that can be run on the supported architectures on linux. The binary is available on GitHub Releases.
 ">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
@@ -22,7 +22,7 @@ Compose File# version: &#39;3.8&#39; services: gatekeeper: image: smokeycircles/
   <meta property="og:description" content="Getting Started# There are a number of options available for running GateKeeper.
 Currently, GateKeeper is not available for Windows.
 Docker# GateKeeper is built as a Docker image against a variety of architectures. The supported architectures are:
-amd64 arm64 armv7 armv8 i386 The image is available on Docker Hub as smokeycircles/gatekeeper.
+amd64 arm64 armv7 armv8 i386 The image is available on github packages
 Compose File# version: &#39;3.8&#39; services: gatekeeper: image: smokeycircles/gatekeeper:latest container_name: gatekeeper ports: - 53:53/udp volumes: - ./data/gatekeeper/data:/var/lib/gatekeeper/ - ./data/gatekeeper/config.yml:/app/config.yml - ./data/gatekeeper/.htpasswd:/app/.htpasswdBinaries# GateKeeper is also available as a binary that can be run on the supported architectures on linux. The binary is available on GitHub Releases.">
   <meta property="og:locale" content="en_us">
   <meta property="og:type" content="article">
@@ -33,9 +33,9 @@ Compose File# version: &#39;3.8&#39; services: gatekeeper: image: smokeycircles/
   <meta itemprop="description" content="Getting Started# There are a number of options available for running GateKeeper.
 Currently, GateKeeper is not available for Windows.
 Docker# GateKeeper is built as a Docker image against a variety of architectures. The supported architectures are:
-amd64 arm64 armv7 armv8 i386 The image is available on Docker Hub as smokeycircles/gatekeeper.
+amd64 arm64 armv7 armv8 i386 The image is available on github packages
 Compose File# version: &#39;3.8&#39; services: gatekeeper: image: smokeycircles/gatekeeper:latest container_name: gatekeeper ports: - 53:53/udp volumes: - ./data/gatekeeper/data:/var/lib/gatekeeper/ - ./data/gatekeeper/config.yml:/app/config.yml - ./data/gatekeeper/.htpasswd:/app/.htpasswdBinaries# GateKeeper is also available as a binary that can be run on the supported architectures on linux. The binary is available on GitHub Releases.">
-  <meta itemprop="wordCount" content="94">
+  <meta itemprop="wordCount" content="170">
 
 <title>Getting Started | GateKeeper Documentation</title>
 <link rel="icon" href="/gatekeeper-go/favicon.png" >
@@ -45,7 +45,7 @@ Compose File# version: &#39;3.8&#39; services: gatekeeper: image: smokeycircles/
 
 
   <script defer src="/gatekeeper-go/fuse.min.js"></script>
-  <script defer src="/gatekeeper-go/en.search.min.4ea60a0c672e1dae161565ea9463ab186c561c9cacead88d3cd27a0cd5e6f388.js" integrity="sha256-TqYKDGcuHa4WFWXqlGOrGGxWHJys6tiNPNJ6DNXm84g=" crossorigin="anonymous"></script>
+  <script defer src="/gatekeeper-go/en.search.min.04f2fce73a9e7f99abbfd50d1f87fea1d56ea09a14df887bdffaf775b003ff86.js" integrity="sha256-BPL85zqef5mrv9UNH4f&#43;odVuoJoU34h73/r3dbAD/4Y=" crossorigin="anonymous"></script>
 
 
 
@@ -100,6 +100,20 @@ Compose File# version: &#39;3.8&#39; services: gatekeeper: image: smokeycircles/
   
     <a href="/gatekeeper-go/docs/getting-started/" class="active">
       Getting Started</a>
+  
+
+        </li>
+      
+    
+      
+        <li>
+          
+  
+  
+
+  
+    <a href="/gatekeeper-go/docs/configuration/" class="">
+      Configuration</a>
   
 
         </li>
@@ -175,7 +189,12 @@ Compose File# version: &#39;3.8&#39; services: gatekeeper: image: smokeycircles/
         <li><a href="#compose-file">Compose File</a></li>
       </ul>
     </li>
-    <li><a href="#binaries">Binaries</a></li>
+    <li><a href="#binaries">Binaries</a>
+      <ul>
+        <li><a href="#installing-from-source">Installing from Source</a></li>
+        <li><a href="#running">Running</a></li>
+      </ul>
+    </li>
   </ul>
 </nav>
 
@@ -200,7 +219,7 @@ Compose File# version: &#39;3.8&#39; services: gatekeeper: image: smokeycircles/
 <li>armv8</li>
 <li>i386</li>
 </ul>
-<p>The image is available on Docker Hub as <a href="https://hub.docker.com/r/smokeycircles/gatekeeper"><code>smokeycircles/gatekeeper</code></a>.</p>
+<p>The image is available on <a href="https://github.com/thatjames?tab=packages&amp;repo_name=gatekeeper-go">github packages</a></p>
 <h3 id="compose-file">Compose File<a class="anchor" href="#compose-file">#</a></h3>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-yaml" data-lang="yaml"><span style="display:flex;"><span><span style="color:#f92672">version</span>: <span style="color:#e6db74">&#39;3.8&#39;</span>
 </span></span><span style="display:flex;"><span><span style="color:#f92672">services</span>:
@@ -214,6 +233,13 @@ Compose File# version: &#39;3.8&#39; services: gatekeeper: image: smokeycircles/
 </span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">./data/gatekeeper/config.yml:/app/config.yml</span>
 </span></span><span style="display:flex;"><span>      - <span style="color:#ae81ff">./data/gatekeeper/.htpasswd:/app/.htpasswd</span></span></span></code></pre></div><h2 id="binaries">Binaries<a class="anchor" href="#binaries">#</a></h2>
 <p>GateKeeper is also available as a binary that can be run on the supported architectures on linux. The binary is available on <a href="https://github.com/thatjames/gatekeeper-go/releases">GitHub Releases</a>.</p>
+<h3 id="installing-from-source">Installing from Source<a class="anchor" href="#installing-from-source">#</a></h3>
+<p>To install from source, you will need to have <a href="https://golang.org/doc/install">Go</a> 1.24.6 or higher installed, as well as the necessary dependencies for make.</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>git clone https://github.com/thatjames/gatekeeper-go.git
+</span></span><span style="display:flex;"><span>cd gatekeeper-go
+</span></span><span style="display:flex;"><span>make</span></span></code></pre></div><h3 id="running">Running<a class="anchor" href="#running">#</a></h3>
+<p>To run GateKeeper, you will need to create a configuration file (see <a href="#configuration">Configuration</a>). Once you have created the configuration file, you can run the binary with the following command:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>bin/gatekeeper-go -config /path/to/config.yml</span></span></code></pre></div><p>You can also include the <code>-debug</code> and <code>-trace</code> flags to enable debug and trace logging respectively.</p>
 </article>
  
       
@@ -245,8 +271,8 @@ Compose File# version: &#39;3.8&#39; services: gatekeeper: image: smokeycircles/
     </span>
     <span>
     
-      <a href="/gatekeeper-go/docs/modules/" class="flex align-center">
-        <span>Modules</span>
+      <a href="/gatekeeper-go/docs/configuration/" class="flex align-center">
+        <span>Configuration</span>
         <img src="/gatekeeper-go/icons/forward.svg" class="book-icon" alt="Forward" />
       </a>
     
@@ -291,7 +317,12 @@ Compose File# version: &#39;3.8&#39; services: gatekeeper: image: smokeycircles/
         <li><a href="#compose-file">Compose File</a></li>
       </ul>
     </li>
-    <li><a href="#binaries">Binaries</a></li>
+    <li><a href="#binaries">Binaries</a>
+      <ul>
+        <li><a href="#installing-from-source">Installing from Source</a></li>
+        <li><a href="#running">Running</a></li>
+      </ul>
+    </li>
   </ul>
 </nav>
 
