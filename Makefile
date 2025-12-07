@@ -39,13 +39,13 @@ docker-binary-multiarch: web test ## Builds docker binaries for all supported ar
 	env CGO_ENABLED=0 GOOS=linux GOARCH=386 go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/gatekeeper-linux-386 ./cmd/gatekeeper/
 
 docker: docker-binary ## Builds the docker binary, the web ui and the docker image
-	docker build -t gchr.io/thatjames/gatekeeper .
+	docker build -t ghcr.io/thatjames/gatekeeper .
 
 docker-multiarch: docker-binary-multiarch ## Builds and pushes multi-architecture docker images
 	@echo "Building multi-architecture docker images..."
 	@echo "Make sure docker buildx is enabled and you're logged into Docker Hub"
 	docker buildx create --use --name multiarch-builder --driver docker-container 2>/dev/null || docker buildx use multiarch-builder
-	docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7,linux/386 --push -t gchr.io/thatjames/gatekeeper:$(VERSION) -t gchr.io/thatjames/gatekeeper:latest -f Dockerfile.multiarch .
+	docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7,linux/386 --push -t ghcr.io/thatjames/gatekeeper:$(VERSION) -t ghcr.io/thatjames/gatekeeper:latest -f Dockerfile.multiarch .
 
 ##@ Test
 test: generate-mocks ## Runs the golang unit tests
@@ -66,7 +66,7 @@ test-report: generate-mocks ## Runs the golang unit tests and generates a test r
 
 ##@ Run
 docker-run: ## Runs the docker image
-	docker run --name gatekeeper --rm -ti -v $(PWD)/config/docker-config.yml:/app/config.yml -v /tmp/leases:/var/lib/gatekeeper -p 8085:8085 -p 53:53 -p 67:67 gchr.io/thatjames/gatekeeper -debug
+	docker run --name gatekeeper --rm -ti -v $(PWD)/config/docker-config.yml:/app/config.yml -v /tmp/leases:/var/lib/gatekeeper -p 8085:8085 -p 53:53 -p 67:67 ghcr.io/thatjames/gatekeeper -debug
 
 ##@ Web
 install: ## Installs the web ui

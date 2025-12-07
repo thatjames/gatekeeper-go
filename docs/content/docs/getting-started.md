@@ -19,7 +19,7 @@ GateKeeper is built as a Docker image against a variety of architectures. The su
 - armv8
 - i386
 
-The image is available on github packages as [gchr.io/thatjames/gatekeeper-go](https://github.com/thatjames?tab=packages&repo_name=gatekeeper-go)
+The image is available on github packages as [ghcr.io/thatjames/gatekeeper-go](https://github.com/thatjames/gatekeeper-go/pkgs/container/gatekeeper-go)
 
 ```bash
 docker run -d -p 53:53/udp -p 8085:8085 \
@@ -27,7 +27,7 @@ docker run -d -p 53:53/udp -p 8085:8085 \
     -v /path/to/config.yml:/app/config.yml \
     -v /path/to/.htpasswd:/app/.htpasswd \
     --cap-add=NET_BIND_SERVICE \
-    gchr.io/thatjames/gatekeeper-go:latest
+    ghcr.io/thatjames/gatekeeper-go:latest
 ```
 
 ### Compose File
@@ -35,7 +35,7 @@ docker run -d -p 53:53/udp -p 8085:8085 \
 ```yaml
 services:
   gatekeeper:
-    image: gchr.io/thatjames/gatekeeper-go:latest
+    image: ghcr.io/thatjames/gatekeeper-go:latest
     container_name: gatekeeper
     ports:
       - 53:53/udp # DNS
@@ -60,13 +60,13 @@ docker run -d \
     -v /path/to/config.yml:/app/config.yml \
     -v /path/to/.htpasswd:/app/.htpasswd \
     --network=host \
-    gchr.io/thatjames/gatekeeper-go:latest
+    ghcr.io/thatjames/gatekeeper-go:latest
 ```
 
 ```yaml
 services:
   gatekeeper:
-    image: gchr.io/thatjames/gatekeeper-go:latest
+    image: ghcr.io/thatjames/gatekeeper-go:latest
     container_name: gatekeeper
     volumes:
       - ./data/gatekeeper/data:/var/lib/gatekeeper/

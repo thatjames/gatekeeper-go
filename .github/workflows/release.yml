@@ -82,7 +82,7 @@ jobs:
     env:
       GOARCH: arm
       GOOS: linux
-      GOARM: "7"
+      GOARM: '7'
       BIN_NAME: gatekeeper-armv7
     steps:
       - uses: actions/checkout@v4
@@ -111,7 +111,7 @@ jobs:
     env:
       GOARCH: arm
       GOOS: linux
-      GOARM: "8"
+      GOARM: '8'
       BIN_NAME: gatekeeper-armv8
     steps:
       - uses: actions/checkout@v4
@@ -166,7 +166,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build_web
     env:
-      GOARCH: "386"
+      GOARCH: '386'
       GOOS: linux
       BIN_NAME: gatekeeper-i386
     steps:
