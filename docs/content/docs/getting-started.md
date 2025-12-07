@@ -21,6 +21,18 @@ GateKeeper is built as a Docker image against a variety of architectures. The su
 
 The image is available on github packages as [ghcr.io/thatjames/gatekeeper-go](https://github.com/thatjames/gatekeeper-go/pkgs/container/gatekeeper-go)
 
+### HTPasswd
+
+GateKeeper uses an `.htpasswd` file to authenticate users. This can be generated using openssl.
+
+```bash
+printf "username:$(openssl passwd -apr1 password)\n" > .htpasswd
+```
+
+Natrually, you need to replace `username` and `password` with the appropriate values.
+
+If you do not configure a password, then default username/password combination is admin/admin.
+
 ```bash
 docker run -d -p 53:53/udp -p 8085:8085 \
     -v /path/to/data:/var/lib/gatekeeper \
