@@ -14,6 +14,10 @@ endif
 
 all: web test build
 
+##@ Run
+local-run: ## Runs the binary locally with a random secret
+	env GATEKEEPER_OIDC_CLIENT_SECRET=$$(cat .client_secret) go run cmd/gatekeeper/main.go -config config/config.yml -debug
+
 ##@ Build
 build: test web ## Builds the native go binary
 	go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/$(BIN_NAME) -tags live ./cmd/gatekeeper/

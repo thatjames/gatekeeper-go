@@ -1,21 +1,88 @@
 package v1
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"fmt"
 	"net/http"
+	"os"
+	"sync"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"github.com/tg123/go-htpasswd"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
+	"golang.org/x/oauth2"
 )
 
+var (
+	oidcProvider     *oidc.Provider
+	oidcVerifier     *oidc.IDTokenVerifier
+	oidcOAuth2Config oauth2.Config
+	oidcOnce         sync.Once
+	oidcInitErr      error
+)
+
+func initOIDC() error {
+	oidcOnce.Do(func() {
+		cfg, ok := config.Config.Auth.(*config.OIDCAuth)
+		if !ok {
+			oidcInitErr = fmt.Errorf("auth config is not OIDCAuth")
+			return
+		}
+
+		provider, err := oidc.NewProvider(context.Background(), cfg.IssuerURL)
+		if err != nil {
+			oidcInitErr = fmt.Errorf("failed to create OIDC provider: %w", err)
+			return
+		}
+
+		scopes := []string{oidc.ScopeOpenID, "profile", "email"}
+		if len(cfg.Scopes) > 0 {
+			scopes = cfg.Scopes
+		}
+
+		oidcProvider = provider
+		oidcVerifier = provider.Verifier(&oidc.Config{ClientID: cfg.ClientID})
+		oidcOAuth2Config = oauth2.Config{
+			ClientID:     cfg.ClientID,
+			ClientSecret: os.Getenv(cfg.ClientSecretVar),
+			RedirectURL:  cfg.RedirectURL,
+			Endpoint:     provider.Endpoint(),
+			Scopes:       scopes,
+		}
+	})
+	return oidcInitErr
+}
+
 func SetupV1Endpoints(r *gin.RouterGroup) {
-	r.POST("/login", loginHandler)
+	r.POST("/login", defaultLoginHandler)
 	r.GET("/health", healthHandler)
 
 	v1Group := r.Group("/v1")
-	v1Group.POST("/login", loginHandler)
+
+	if config.Config.Auth != nil {
+		switch config.Config.Auth.Type() {
+		case "oidc":
+			if err := initOIDC(); err != nil {
+				log.WithError(err).Error("Failed to initialise OIDC, falling back to default login")
+				v1Group.POST("/login", defaultLoginHandler)
+			} else {
+				v1Group.GET("/login", oidcLoginHandler)
+				v1Group.GET("/auth/callback", oidcCallbackHandler)
+				log.Debug("OIDC login enabled")
+			}
+		default:
+			log.Debug("Using default login handler")
+			v1Group.POST("/login", defaultLoginHandler)
+		}
+	} else {
+		v1Group.POST("/login", defaultLoginHandler)
+	}
+
 	v1Group.GET("/health", healthHandler)
 	v1Group.GET("/version", getVersion)
 
@@ -24,7 +91,6 @@ func SetupV1Endpoints(r *gin.RouterGroup) {
 		log.Info("Registering DHCP endpoints")
 		setupDHCPRoutes(protected)
 	}
-
 	if service.IsRegistered(service.DNS) {
 		log.Info("Registering DNS endpoints")
 		setupDNSRoutes(protected)
@@ -63,7 +129,70 @@ func setupSystemRoutes(g *gin.RouterGroup) {
 	system.GET("/modules", getModules)
 }
 
-func loginHandler(c *gin.Context) {
+func oidcLoginHandler(c *gin.Context) {
+	state, err := generateState()
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate state"})
+		return
+	}
+	c.SetCookie("oauth_state", state, 600, "/", "", true, true)
+	c.Redirect(http.StatusFound, oidcOAuth2Config.AuthCodeURL(state))
+}
+
+func oidcCallbackHandler(c *gin.Context) {
+	// Validate state
+	cookieState, err := c.Cookie("oauth_state")
+	if err != nil || cookieState != c.Query("state") {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid state parameter"})
+		return
+	}
+	c.SetCookie("oauth_state", "", -1, "/", "", true, true)
+
+	// Exchange code for tokens
+	oauth2Token, err := oidcOAuth2Config.Exchange(c.Request.Context(), c.Query("code"))
+	if err != nil {
+		log.WithError(err).Error("Failed to exchange OIDC code")
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Failed to exchange token"})
+		return
+	}
+
+	// Extract and verify ID token
+	rawIDToken, ok := oauth2Token.Extra("id_token").(string)
+	if !ok {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Missing ID token"})
+		return
+	}
+
+	idToken, err := oidcVerifier.Verify(c.Request.Context(), rawIDToken)
+	if err != nil {
+		log.WithError(err).Error("Failed to verify ID token")
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid ID token"})
+		return
+	}
+
+	// Extract claims
+	var claims struct {
+		Email   string `json:"email"`
+		Name    string `json:"name"`
+		Subject string `json:"sub"`
+	}
+	if err := idToken.Claims(&claims); err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse claims"})
+		return
+	}
+
+	// Issue app token so authMiddleware is unchanged
+	token, err := CreateAuthToken(claims.Email)
+	if err != nil {
+		log.WithError(err).Error("Failed to create auth token after OIDC")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to create token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"token": token})
+}
+
+func defaultLoginHandler(c *gin.Context) {
 	var req UserLoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
@@ -91,8 +220,13 @@ func loginHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create token"})
 		return
 	}
+	c.JSON(http.StatusOK, gin.H{"token": token})
+}
 
-	c.JSON(http.StatusOK, gin.H{
-		"token": token,
-	})
+func generateState() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }

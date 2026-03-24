@@ -1,6 +1,8 @@
 package v1
 
 import (
+	"log"
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -25,8 +27,12 @@ func CreateAuthToken(username string) (string, error) {
 }
 
 func ParseAuthToken(tokenString string) (*UserClaims, error) {
+	secret := os.Getenv("GATEKEEPER_JWT_SECRET")
+	if secret == "" {
+		log.Fatal("GATEKEEPER_JWT_SECRET environment variable not set")
+	}
 	token, err := jwt.ParseWithClaims(tokenString, &UserClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte("secret"), nil
+		return []byte(secret), nil
 	})
 	if err != nil {
 		return nil, err

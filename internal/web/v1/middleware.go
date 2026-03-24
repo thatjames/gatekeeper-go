@@ -9,37 +9,7 @@ import (
 )
 
 func authMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
-			c.Abort()
-			return
-		}
-
-		clientToken := strings.TrimPrefix(authHeader, "Bearer ")
-		if clientToken == authHeader {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Bearer token required"})
-			c.Abort()
-			return
-		}
-
-		if clientToken == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-			c.Abort()
-			return
-		}
-
-		claims, err := ParseAuthToken(clientToken)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-			c.Abort()
-			return
-		}
-
-		c.Set("username", claims.Username)
-		c.Next()
-	}
+	return simpleAuthMiddleware
 }
 
 func loggingMiddleware() gin.HandlerFunc {
@@ -54,4 +24,32 @@ func loggingMiddleware() gin.HandlerFunc {
 		}).Info("HTTP Request")
 		return ""
 	})
+}
+
+func simpleAuthMiddleware(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
+		return
+	}
+
+	clientToken := strings.TrimPrefix(authHeader, "Bearer ")
+	if clientToken == authHeader {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Bearer token required"})
+		return
+	}
+
+	if clientToken == "" {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		return
+	}
+
+	claims, err := ParseAuthToken(clientToken)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		return
+	}
+
+	c.Set("username", claims.Username)
+	c.Next()
 }
