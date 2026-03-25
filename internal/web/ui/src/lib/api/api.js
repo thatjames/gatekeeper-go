@@ -26,6 +26,7 @@ export class API {
         method: method,
         body: data ? JSON.stringify(data) : null,
         headers: auth.token ? { Authorization: "Bearer " + auth.token } : {},
+        credentials: "include",
       });
       if (resp.status >= 200 && resp.status < 399) {
         // Clear any previous errors on successful request
@@ -34,6 +35,9 @@ export class API {
           return resp.json();
         }
         return resp;
+      } else if (resp.status == 401) {
+        window.location = "/#/auth/login";
+        window.location.reload();
       } else {
         // HTTP error (401, 404, 500, etc.)
         let error = await resp.json();

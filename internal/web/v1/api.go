@@ -59,34 +59,32 @@ func initOIDC() error {
 }
 
 func SetupV1Endpoints(r *gin.RouterGroup) {
-	r.POST("/login", defaultLoginHandler)
 	r.GET("/health", healthHandler)
 
 	v1Group := r.Group("/v1")
+	v1Group.GET("/features", getFeatures)
 
 	if config.Config.Auth != nil {
 		switch config.Config.Auth.Type() {
 		case "oidc":
 			if err := initOIDC(); err != nil {
-				log.WithError(err).Error("Failed to initialise OIDC, falling back to default login")
-				v1Group.POST("/login", defaultLoginHandler)
+				log.WithError(err).Error("Failed to initialise OIDC")
 			} else {
-				v1Group.GET("/login", oidcLoginHandler)
+				v1Group.GET("/oidc-login", oidcLoginHandler)
 				v1Group.GET("/auth/callback", oidcCallbackHandler)
+				v1Group.POST("/logout", logoutHandler)
 				log.Debug("OIDC login enabled")
 			}
 		default:
 			log.Debug("Using default login handler")
-			v1Group.POST("/login", defaultLoginHandler)
 		}
-	} else {
-		v1Group.POST("/login", defaultLoginHandler)
 	}
+	v1Group.POST("/login", defaultLoginHandler)
 
 	v1Group.GET("/health", healthHandler)
 	v1Group.GET("/version", getVersion)
 
-	protected := v1Group.Group("/", authMiddleware(), loggingMiddleware())
+	protected := v1Group.Group("/", loggingMiddleware(), authMiddleware())
 	if service.IsRegistered(service.DHCP) {
 		log.Info("Registering DHCP endpoints")
 		setupDHCPRoutes(protected)
@@ -146,7 +144,8 @@ func oidcCallbackHandler(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Invalid state parameter"})
 		return
 	}
-	c.SetCookie("oauth_state", "", -1, "/", "", true, true)
+	c.SetCookie("oauth_state", "", 600, "/", "", true, true)
+	log.Debug("OIDC callback received")
 
 	// Exchange code for tokens
 	oauth2Token, err := oidcOAuth2Config.Exchange(c.Request.Context(), c.Query("code"))
@@ -188,8 +187,18 @@ func oidcCallbackHandler(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to create token"})
 		return
 	}
+	log.Debug("OIDC callback returning token")
+	c.SetCookie(
+		"oauth_token",
+		token,
+		3600, // max age in seconds, match your JWT expiry
+		"/",
+		"",
+		false,
+		false,
+	)
 
-	c.JSON(http.StatusOK, gin.H{"token": token})
+	c.Redirect(http.StatusFound, "http://localhost:5173")
 }
 
 func defaultLoginHandler(c *gin.Context) {
@@ -221,6 +230,10 @@ func defaultLoginHandler(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"token": token})
+}
+
+func logoutHandler(c *gin.Context) {
+	c.SetCookie("oauth_token", "", -1, "/", "", false, false)
 }
 
 func generateState() (string, error) {

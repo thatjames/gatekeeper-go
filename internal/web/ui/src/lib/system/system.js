@@ -31,3 +31,11 @@ export const loadModules = () => {
     }
   });
 };
+
+export let features = writable([]);
+
+export const getExtraFeatures = () => {
+  api.get("/features").then((resp) => {
+    features.set(resp);
+  });
+};
