@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -10,30 +11,29 @@ import (
 
 func authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
-			c.Abort()
+		var rawToken string
+
+		if header := c.GetHeader("Authorization"); strings.HasPrefix(header, "Bearer ") {
+			log.Trace("Bearer token found in header")
+			rawToken = strings.TrimPrefix(header, "Bearer ")
+		} else if cookie, err := c.Cookie("oauth_token"); err == nil {
+			log.Trace("Bearer token found in cookie")
+			rawToken = cookie
+		} else {
+			fmt.Println(err)
+			log.Trace("No bearer token found")
+		}
+
+		if rawToken == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 			return
 		}
 
-		clientToken := strings.TrimPrefix(authHeader, "Bearer ")
-		if clientToken == authHeader {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Bearer token required"})
-			c.Abort()
-			return
-		}
-
-		if clientToken == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-			c.Abort()
-			return
-		}
-
-		claims, err := ParseAuthToken(clientToken)
+		claims, err := ParseAuthToken(rawToken)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-			c.Abort()
+			log.WithError(err).Error("Failed to parse token")
+			c.SetCookie("oauth_token", "", -1, "/", "", false, false)
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Invalid token"})
 			return
 		}
 

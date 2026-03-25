@@ -15,7 +15,7 @@
     }),
   };
 
-  if (!auth.token) {
+  if (!auth.token || !document.cookie.includes("auth_token")) {
     push("/auth/login");
   }
 </script>

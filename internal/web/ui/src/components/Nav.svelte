@@ -20,7 +20,6 @@
 
   const doLogout = () => {
     logout();
-    window.location.reload();
   };
 </script>
 

@@ -14,6 +14,12 @@ endif
 
 all: web test build
 
+##@ Run
+local-run: ## Runs the binary locally with a random secret
+	@JWT_SECRET=$$(head -c 32 /dev/urandom | base64); \
+	echo "JWT_SECRET: $$JWT_SECRET"; \
+	env GATEKEEPER_OIDC_CLIENT_SECRET=$$(cat .client_secret) GATEKEEPER_JWT_SECRET=$$JWT_SECRET go run cmd/gatekeeper/main.go -config config/config.yml -trace
+
 ##@ Build
 build: test web ## Builds the native go binary
 	go build -ldflags="-s -w -X main.version=$(VERSION)" -o bin/$(BIN_NAME) -tags live ./cmd/gatekeeper/

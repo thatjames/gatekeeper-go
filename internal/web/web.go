@@ -23,8 +23,9 @@ func Init(ver string, cfg *config.Web) error {
 	r.Use(gin.Recovery())
 
 	corsConfig := cors.DefaultConfig()
-	corsConfig.AllowAllOrigins = true
+	corsConfig.AllowOrigins = []string{"http://localhost:5173", "http://gatekeeper.thatjames.nl", "https://gatekeeper.thatjames.nl"}
 	corsConfig.AllowHeaders = append(corsConfig.AllowHeaders, "Authorization")
+	corsConfig.AllowCredentials = true
 	r.Use(cors.New(corsConfig))
 
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))

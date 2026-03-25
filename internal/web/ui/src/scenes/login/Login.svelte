@@ -1,6 +1,8 @@
 <script>
-  import { login } from "$lib/auth/auth.svelte";
+  import { env } from "$lib/api/api";
+  import { login, loginFromOIDCToken } from "$lib/auth/auth.svelte";
   import { Routes } from "$lib/common/routes";
+  import { getExtraFeatures, features } from "$lib/system/system";
   import {
     Button,
     FloatingLabelInput,
@@ -22,6 +24,16 @@
         errorText = err.error;
       });
   };
+  getExtraFeatures();
+
+  const handleOIDCRedirect = () => {
+    console.log("do redirect");
+    window.location = env.url + "oidc-login";
+  };
+
+  if (document.cookie.includes("oauth_token")) {
+    loginFromOIDCToken();
+  }
 </script>
 
 <div
@@ -60,6 +72,11 @@
         bind:value={loginData.password}>Password</FloatingLabelInput
       >
       <Button type="submit">Login</Button>
+      {#if $features.includes("oidc")}
+        <Button outline color="dark" onclick={handleOIDCRedirect}
+          >OIDC Login</Button
+        >
+      {/if}
     </div>
   </form>
   <P class="text-center text-primary-600">{errorText}</P>

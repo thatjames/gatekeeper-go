@@ -14,10 +14,67 @@ var loadedFilePath *string
 
 var Config *ConfigInstance
 
+type Auth interface {
+	Type() string
+}
+
+type BaseAuth struct {
+	AuthType string `yaml:"AuthType"`
+}
+
+func (b BaseAuth) Type() string {
+	return b.AuthType
+}
+
 type ConfigInstance struct {
 	DHCP *DHCP `yaml:"DHCP"`
 	Web  *Web  `yaml:"Web"`
 	DNS  *DNS  `yaml:"DNS"`
+	Auth Auth  `yaml:"Auth"`
+}
+
+func (c *ConfigInstance) UnmarshalYAML(value *yaml.Node) error {
+	// Alias that excludes Auth so inline doesn't conflict with our yaml.Node capture
+	type rawConfig struct {
+		DHCP *DHCP `yaml:"DHCP"`
+		Web  *Web  `yaml:"Web"`
+		DNS  *DNS  `yaml:"DNS"`
+	}
+
+	var base struct {
+		rawConfig `yaml:",inline"`
+		Auth      yaml.Node `yaml:"Auth"`
+	}
+
+	if err := value.Decode(&base); err != nil {
+		return err
+	}
+
+	c.DHCP = base.DHCP
+	c.Web = base.Web
+	c.DNS = base.DNS
+
+	if base.Auth.IsZero() {
+		return nil
+	}
+
+	var authBase BaseAuth
+	if err := base.Auth.Decode(&authBase); err != nil {
+		return err
+	}
+
+	switch authBase.AuthType {
+	case "oidc":
+		var oidcAuth OIDCAuth
+		if err := base.Auth.Decode(&oidcAuth); err != nil {
+			return err
+		}
+		c.Auth = &oidcAuth
+	default:
+		return fmt.Errorf("unknown AuthType: %q", authBase.AuthType)
+	}
+
+	return nil
 }
 
 func (c ConfigInstance) String() string {
@@ -26,37 +83,81 @@ func (c ConfigInstance) String() string {
 
 func printStruct(prefix string, iface interface{}) string {
 	buff := new(bytes.Buffer)
-	refType := reflect.TypeOf(iface)
+
 	refVal := reflect.ValueOf(iface)
-	for i := 0; i < refType.NumField(); i++ {
-		switch refVal.Field(i).Kind() {
-		case reflect.Ptr, reflect.Interface, reflect.Struct:
-			if refVal.Field(i).IsNil() {
-				continue
-			}
-			fmt.Fprintln(buff, refType.Field(i).Name)
-			val := reflect.Indirect(refVal.Field(i))
-			fmt.Fprintln(buff, printStruct(prefix+" ", val.Interface()))
-
-		case reflect.Map:
-			fmt.Fprintln(buff, prefix, "-", refType.Field(i).Name)
-			for _, mapVal := range refVal.Field(i).MapKeys() {
-				v := refVal.Field(i).MapIndex(mapVal)
-				fmt.Fprintln(buff, prefix, prefix, "-", mapVal.Interface(), ":", v.Interface())
-			}
-
-		case reflect.Slice:
-			fmt.Fprintln(buff, prefix, "-", refType.Field(i).Name)
-			for j := 0; j < refVal.Field(i).Len(); j++ {
-				fmt.Fprintln(buff, prefix, prefix, "-", refVal.Field(i).Index(j))
-			}
-
-		default:
-			fmt.Fprintf(buff, "%s - %s: %v\n", prefix, refType.Field(i).Name, refVal.Field(i).Interface())
+	for refVal.Kind() == reflect.Ptr || refVal.Kind() == reflect.Interface {
+		if refVal.IsNil() {
+			return ""
 		}
+		refVal = refVal.Elem()
 	}
 
+	if refVal.Kind() != reflect.Struct {
+		fmt.Fprintf(buff, "%s - %v\n", prefix, refVal.Interface())
+		return buff.String()
+	}
+
+	refType := refVal.Type()
+
+	for i := 0; i < refType.NumField(); i++ {
+		fieldType := refType.Field(i)
+		field := refVal.Field(i)
+
+		// Inline anonymous/embedded fields instead of nesting them
+		if fieldType.Anonymous {
+			for field.Kind() == reflect.Ptr || field.Kind() == reflect.Interface {
+				if field.IsNil() {
+					break
+				}
+				field = field.Elem()
+			}
+			if field.Kind() == reflect.Struct {
+				fmt.Fprint(buff, printStruct(prefix, field.Interface()))
+			}
+			continue
+		}
+
+		for field.Kind() == reflect.Ptr || field.Kind() == reflect.Interface {
+			if field.IsNil() {
+				break
+			}
+			field = field.Elem()
+		}
+
+		switch field.Kind() {
+		case reflect.Ptr, reflect.Interface:
+			continue
+		case reflect.Struct:
+			fmt.Fprintln(buff, prefix+fieldType.Name)
+			fmt.Fprintln(buff, printStruct(prefix+" ", field.Interface()))
+		case reflect.Map:
+			fmt.Fprintln(buff, prefix, "-", fieldType.Name)
+			for _, mapKey := range field.MapKeys() {
+				fmt.Fprintln(buff, prefix, prefix, "-", mapKey.Interface(), ":", field.MapIndex(mapKey).Interface())
+			}
+		case reflect.Slice:
+			fmt.Fprintln(buff, prefix, "-", fieldType.Name)
+			for j := 0; j < field.Len(); j++ {
+				fmt.Fprintln(buff, prefix, prefix, "-", field.Index(j))
+			}
+		default:
+			fmt.Fprintf(buff, "%s - %s: %v\n", prefix, fieldType.Name, field.Interface())
+		}
+	}
 	return buff.String()
+}
+
+type OIDCAuth struct {
+	BaseAuth        `yaml:",inline"`
+	IssuerURL       string   `yaml:"IssuerURL"`
+	ClientID        string   `yaml:"ClientID"`
+	ClientSecretVar string   `yaml:"ClientSecretVar"`
+	RedirectURL     string   `yaml:"RedirectURL"`
+	Scopes          []string `yaml:"Scopes"`
+}
+
+type DefaultAuth struct {
+	BaseAuth
 }
 
 type DHCP struct {
@@ -99,9 +200,13 @@ func LoadConfig(filePath string) error {
 		return err
 	}
 	loadedFilePath = &filePath
-
 	defer f.Close()
-	return yaml.NewDecoder(f).Decode(&Config)
+
+	if err := yaml.NewDecoder(f).Decode(&Config); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func UpdateConfig() error {

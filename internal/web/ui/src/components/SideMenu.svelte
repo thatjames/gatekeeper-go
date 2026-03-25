@@ -45,7 +45,6 @@
 
   const doLogout = () => {
     logout();
-    window.location.reload();
   };
 
   // Reactive statement to keep dropdown open if submenu is active

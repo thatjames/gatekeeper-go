@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	log "github.com/sirupsen/logrus"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
 )
 
 type ServiceKey string
@@ -66,6 +67,16 @@ func ActiveServices() []string {
 		services = append(services, string(name))
 	}
 	return services
+}
+
+func ExtraFeatures() []string {
+	lock.Lock()
+	defer lock.Unlock()
+	features := make([]string, 0)
+	if config.Config.Auth.Type() == "oidc" {
+		features = append(features, "oidc")
+	}
+	return features
 }
 
 func checkErrors(fns ...func() error) error {

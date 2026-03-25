@@ -44,3 +44,8 @@ func getModules(c *gin.Context) {
 	services := service.ActiveServices()
 	c.JSON(http.StatusOK, services)
 }
+
+func getFeatures(c *gin.Context) {
+	features := service.ExtraFeatures()
+	c.JSON(http.StatusOK, features)
+}
