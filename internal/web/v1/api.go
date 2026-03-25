@@ -161,7 +161,6 @@ func oidcCallbackHandler(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Missing ID token"})
 		return
 	}
-
 	idToken, err := oidcVerifier.Verify(c.Request.Context(), rawIDToken)
 	if err != nil {
 		log.WithError(err).Error("Failed to verify ID token")
@@ -171,9 +170,10 @@ func oidcCallbackHandler(c *gin.Context) {
 
 	// Extract claims
 	var claims struct {
-		Email   string `json:"email"`
-		Name    string `json:"name"`
-		Subject string `json:"sub"`
+		Email   string   `json:"email"`
+		Name    string   `json:"name"`
+		Subject string   `json:"sub"`
+		Roles   []string `json:"roles"`
 	}
 	if err := idToken.Claims(&claims); err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse claims"})
