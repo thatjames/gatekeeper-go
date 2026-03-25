@@ -70,6 +70,12 @@ func (c *ConfigInstance) UnmarshalYAML(value *yaml.Node) error {
 			return err
 		}
 		c.Auth = &oidcAuth
+	case "htpasswd":
+		var httpAuth HTTPAuth
+		if err := base.Auth.Decode(&httpAuth); err != nil {
+			return err
+		}
+		c.Auth = &httpAuth
 	default:
 		return fmt.Errorf("unknown AuthType: %q", authBase.AuthType)
 	}
@@ -156,8 +162,9 @@ type OIDCAuth struct {
 	Scopes          []string `yaml:"Scopes"`
 }
 
-type DefaultAuth struct {
-	BaseAuth
+type HTTPAuth struct {
+	BaseAuth     `yaml:",inline"`
+	HTPasswdFile string `yaml:"HTPasswdFile"`
 }
 
 type DHCP struct {
