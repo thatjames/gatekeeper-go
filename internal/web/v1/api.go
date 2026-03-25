@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	badrand "math/rand"
 	"net/http"
 	"os"
 	"sync"
@@ -214,8 +215,9 @@ func defaultLoginHandler(c *gin.Context) {
 		authenticated = passwd.Match(req.Username, req.Password)
 	} else {
 		log.Warn("Unable to read htpasswd file: ", err.Error())
-		log.Warn("Defaulting to default username/password")
-		authenticated = (req.Username == "admin" && req.Password == "admin")
+		password := generateRandomString(16)
+		log.Warn("Using random password: ", password)
+		authenticated = (req.Username == "admin" && req.Password == password)
 	}
 
 	if !authenticated {
@@ -242,4 +244,13 @@ func generateState() (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+func generateRandomString(length int) string {
+	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	ret := make([]byte, length)
+	for i := 0; i < length; i++ {
+		ret[i] = letters[badrand.Intn(len(letters))]
+	}
+	return string(ret)
 }
