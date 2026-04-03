@@ -81,6 +81,7 @@ func NewDNSServerWithOpts(opts DNSServerOpts, resolver Resolver, fetcher Blockli
 
 func (d *DNSServer) Start() error {
 	if d.resolver == nil {
+		log.Warn("resolver was nil, creating new one with upstreams: ", d.opts.Upstream)
 		d.resolver = NewDNSResolverWithOpts(ResolverOpts{
 			Upstreams:    d.opts.Upstream,
 			LocalDomains: make(map[string]net.IP),
