@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"encoding/binary"
 	"flag"
 	"fmt"
 	"net"
@@ -124,9 +123,7 @@ func (ts *DNSFeatureTestSuite) iShouldReceiveADNSPacketWithTheIP(ctx context.Con
 }
 
 func (ts *DNSFeatureTestSuite) thatServerHasACacheForWithIP(domain string, ip string) error {
-	keyBuff := bytes.NewBufferString(domain)
-	binary.Write(keyBuff, binary.BigEndian, DNSTypeA)
-	cacheKey := fmt.Sprintf("%x", keyBuff.Bytes())
+	cacheKey := domain + "|" + DNSTypeA.String()
 	records := make([]*DNSRecord, 0)
 	records = append(records, &DNSRecord{
 		Type:  DNSTypeA,

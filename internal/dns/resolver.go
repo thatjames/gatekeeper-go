@@ -1,9 +1,7 @@
 package dns
 
 import (
-	"bytes"
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -144,9 +142,7 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 	}
 
 	// Generate cache key
-	keyBuff := bytes.NewBufferString(domain)
-	binary.Write(keyBuff, binary.BigEndian, dnsType)
-	cacheKey := fmt.Sprintf("%x", keyBuff.Bytes())
+	cacheKey := domain + "|" + dnsType.String()
 
 	// Check cache
 	if cacheItem, ok := r.cache[cacheKey]; ok {
