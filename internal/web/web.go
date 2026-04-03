@@ -18,12 +18,15 @@ func Init(ver string, cfg *config.Web) error {
 	if cfg.Address == "" {
 		cfg.Address = ":8085"
 	}
+	if cfg.WebURL == "" {
+		cfg.WebURL = "http://localhost:5173"
+	}
 
 	r := gin.New()
 	r.Use(gin.Recovery())
 
 	corsConfig := cors.DefaultConfig()
-	corsConfig.AllowOrigins = []string{"http://localhost:5173", "http://gatekeeper.thatjames.nl", "https://gatekeeper.thatjames.nl"}
+	corsConfig.AllowOrigins = []string{cfg.WebURL, "http://gatekeeper.thatjames.nl", "https://gatekeeper.thatjames.nl"}
 	corsConfig.AllowHeaders = append(corsConfig.AllowHeaders, "Authorization")
 	corsConfig.AllowCredentials = true
 	r.Use(cors.New(corsConfig))

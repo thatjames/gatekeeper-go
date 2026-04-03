@@ -189,6 +189,10 @@ func oidcCallbackHandler(c *gin.Context) {
 		return
 	}
 	log.Debug("OIDC callback returning token")
+	webURL := "http://localhost:5173"
+	if config.Config.Web != nil && config.Config.Web.WebURL != "" {
+		webURL = config.Config.Web.WebURL
+	}
 	c.SetCookie(
 		"oauth_token",
 		token,
@@ -199,7 +203,7 @@ func oidcCallbackHandler(c *gin.Context) {
 		false,
 	)
 
-	c.Redirect(http.StatusFound, "http://localhost:5173")
+	c.Redirect(http.StatusFound, webURL)
 }
 
 func defaultLoginHandler(c *gin.Context) {

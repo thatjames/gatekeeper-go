@@ -25,6 +25,7 @@ Auth:
 #   LeaseFile: /var/lib/gatekeeper/leases
 Web:
   Address: :8085
+  WebURL: localhost:5173
   TLS: null
   HTPasswdFile: .htpasswd
   Prometheus: true

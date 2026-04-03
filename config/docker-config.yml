@@ -15,6 +15,7 @@ DHCP:
   LeaseFile: /var/lib/gatekeeper/leases
 Web:
   Address: :8085
+  WebURL: http://gatekeeper.thatjames.nl
   TLS: null
   HTPasswdFile: .htpasswd
   Prometheus: true

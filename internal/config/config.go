@@ -182,6 +182,7 @@ type DHCP struct {
 
 type Web struct {
 	Address      string     `yaml:"Address"`
+	WebURL       string     `yaml:"WebURL"`
 	TLS          *TLSConfig `yaml:"TLS"`
 	HTPasswdFile string     `yaml:"HTPasswdFile"`
 	Prometheus   bool       `yaml:"Prometheus"`
