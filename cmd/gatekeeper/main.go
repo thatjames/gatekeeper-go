@@ -70,7 +70,7 @@ func main() {
 				Upstreams:    config.Config.DNS.UpstreamServers,
 			},
 			Port: config.Config.DNS.Port,
-		})
+		}, nil, nil)
 		service.Register(dnsServer, service.DNS)
 	}
 

@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"slices"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -19,19 +17,29 @@ import (
 )
 
 var (
-	ErrNxDomain         = errors.New("domain unavailable/blocked")
-	ErrDNSFormatError   = errors.New("DNS packet format error")
-	ErrDNSServerFailure = errors.New("DNS packet server failure")
+	ErrNxDomain               = errors.New("domain unavailable/blocked")
+	ErrDNSFormatError         = errors.New("DNS packet format error")
+	ErrDNSServerFailure       = errors.New("DNS packet server failure")
+	ErrInvalidBlocklistFormat = errors.New("invalid blocklist format")
 )
 
 var (
 	compressedDomainVal = []byte{0xc0, 0x0c}
 )
 
+type Resolver interface {
+	Resolve(domain string, dnsType DNSType) (answers, authorities []*DNSRecord, err error)
+	AddLocalDomain(domain string, ip net.IP) error
+	DeleteLocalDomain(domain string)
+	AddBlocklistEntries(entries []string)
+	DeleteBlocklistEntry(domain string)
+	FlushBlocklist()
+}
+
 type DNSResolver struct {
 	cache        map[string]*DNSCacheItem
 	upstream     []net.IP
-	blacklist    []string
+	blacklist    map[string]struct{}
 	localDomains map[string]net.IP
 	domainLock   *sync.RWMutex
 }
@@ -70,7 +78,7 @@ func NewDNSResolverWithOpts(options ResolverOpts) *DNSResolver {
 		upstream:     upstreamAddrs,
 		localDomains: options.LocalDomains,
 		domainLock:   new(sync.RWMutex),
-		blacklist:    make([]string, 0),
+		blacklist:    make(map[string]struct{}),
 	}
 }
 
@@ -81,26 +89,24 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 	answers, authorities = make([]*DNSRecord, 0), make([]*DNSRecord, 0)
 	log.Debugf("resolving %s", domain)
 
-	if r.blacklist != nil && len(r.blacklist) > 0 {
-		if index := sort.SearchStrings(r.blacklist, domain); index < len(r.blacklist) && r.blacklist[index] == domain {
-			log.Infof("rejected %s in blacklist", domain)
-			var result []byte
-			if dnsType == DNSTypeA {
-				result = make([]byte, 4)
-			} else if dnsType == DNSTypeAAAA {
-				result = net.IPv6zero
-			}
-			blockedDomainCounter.With(prometheus.Labels{"domain": domain}).Inc()
-			answers = append(answers, &DNSRecord{
-				Name:       compressedDomainVal,
-				Type:       dnsType,
-				Class:      DNSClassIN,
-				TTL:        uint32((time.Second * 300).Seconds()),
-				ParsedName: domain,
-				RData:      result,
-			})
-			return answers, nil, nil
+	if _, blocked := r.blacklist[domain]; blocked {
+		log.Infof("rejected %s in blacklist", domain)
+		var result []byte
+		if dnsType == DNSTypeA {
+			result = make([]byte, 4)
+		} else if dnsType == DNSTypeAAAA {
+			result = net.IPv6zero
 		}
+		blockedDomainCounter.With(prometheus.Labels{"domain": domain}).Inc()
+		answers = append(answers, &DNSRecord{
+			Name:       compressedDomainVal,
+			Type:       dnsType,
+			Class:      DNSClassIN,
+			TTL:        uint32((time.Second * 300).Seconds()),
+			ParsedName: domain,
+			RData:      result,
+		})
+		return answers, nil, nil
 	}
 
 	// Generate cache key
@@ -235,29 +241,24 @@ func (r *DNSResolver) DeleteLocalDomain(domain string) {
 	delete(r.localDomains, domain)
 }
 
-func (r *DNSResolver) AddBlocklistEntries(blacklist []string) {
+func (r *DNSResolver) AddBlocklistEntries(entries []string) {
 	defer r.domainLock.Unlock()
 	r.domainLock.Lock()
-	r.blacklist = append(r.blacklist, blacklist...)
-	slices.Sort(r.blacklist)
+	for _, entry := range entries {
+		r.blacklist[entry] = struct{}{}
+	}
 }
 
 func (r *DNSResolver) DeleteBlocklistEntry(domain string) {
 	defer r.domainLock.Unlock()
 	r.domainLock.Lock()
-	if index := sort.SearchStrings(r.blacklist, domain); index < len(r.blacklist) && r.blacklist[index] == domain {
-		if index == len(r.blacklist)-1 {
-			r.blacklist = r.blacklist[:index]
-		} else {
-			r.blacklist = append(r.blacklist[:index], r.blacklist[index+1:]...)
-		}
-	}
+	delete(r.blacklist, domain)
 }
 
 func (r *DNSResolver) FlushBlocklist() {
 	defer r.domainLock.Unlock()
 	r.domainLock.Lock()
-	r.blacklist = make([]string, 0)
+	r.blacklist = make(map[string]struct{})
 }
 
 func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (answers, authorities []*DNSRecord, err error) {

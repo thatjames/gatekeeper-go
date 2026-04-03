@@ -1,19 +1,14 @@
 package dns
 
 import (
-	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/util"
 )
 
 type DNSServerOpts struct {
@@ -22,8 +17,8 @@ type DNSServerOpts struct {
 	Port           int
 	Upstream       []string
 	ResolverOpts   *ResolverOpts
-	BlocklistUrls  []string //represents a list of URLs to load blocklists from
-	BlockedDomains []string //represents a list of domains to block
+	BlocklistUrls  []string
+	BlockedDomains []string
 }
 
 var defaultDNSServerOpts = DNSServerOpts{
@@ -33,13 +28,14 @@ var defaultDNSServerOpts = DNSServerOpts{
 }
 
 type DNSServer struct {
-	opts         *DNSServerOpts
-	resolver     *DNSResolver
-	packetConn   net.PacketConn
-	receiverChan chan *dnsWorkItem
-	responseChan chan *dnsWorkItem
-	exitChan     chan struct{}
-	lock         sync.Mutex
+	opts             *DNSServerOpts
+	resolver         Resolver
+	blocklistFetcher BlocklistFetcher
+	packetConn       net.PacketConn
+	receiverChan     chan *dnsWorkItem
+	responseChan     chan *dnsWorkItem
+	exitChan         chan struct{}
+	lock             sync.Mutex
 }
 
 type dnsWorkItem struct {
@@ -49,21 +45,37 @@ type dnsWorkItem struct {
 }
 
 func NewDNSServer() *DNSServer {
-	return NewDNSServerWithOpts(defaultDNSServerOpts)
+	return NewDNSServerWithOpts(defaultDNSServerOpts, nil, nil)
 }
 
-func NewDNSServerWithOpts(opts DNSServerOpts) *DNSServer {
+func NewDNSServerWithOpts(opts DNSServerOpts, resolver Resolver, fetcher BlocklistFetcher) *DNSServer {
+	if resolver == nil {
+		resolver = NewDNSResolverWithOpts(ResolverOpts{
+			Upstreams:    opts.Upstream,
+			LocalDomains: make(map[string]net.IP),
+		})
+	}
+	if fetcher == nil {
+		fetcher = NewHTTPBlocklistFetcher()
+	}
 	return &DNSServer{
-		opts:         &opts,
-		packetConn:   nil,
-		receiverChan: make(chan *dnsWorkItem, 100),
-		responseChan: make(chan *dnsWorkItem, 100),
-		lock:         sync.Mutex{},
+		opts:             &opts,
+		resolver:         resolver,
+		blocklistFetcher: fetcher,
+		packetConn:       nil,
+		receiverChan:     make(chan *dnsWorkItem, 100),
+		responseChan:     make(chan *dnsWorkItem, 100),
+		lock:             sync.Mutex{},
 	}
 }
 
 func (d *DNSServer) Start() error {
-	d.resolver = NewDNSResolverWithOpts(*d.opts.ResolverOpts)
+	if d.resolver == nil {
+		d.resolver = NewDNSResolverWithOpts(ResolverOpts{
+			Upstreams:    d.opts.Upstream,
+			LocalDomains: make(map[string]net.IP),
+		})
+	}
 	if len(d.opts.BlockedDomains) > 0 {
 		log.Debugf("adding %d blocked domains", len(d.opts.BlockedDomains))
 		d.resolver.AddBlocklistEntries(d.opts.BlockedDomains)
@@ -103,7 +115,11 @@ func (d *DNSServer) UpdateOptions(opts *DNSServerOpts) {
 }
 
 func (d *DNSServer) AddLocalDomain(domain string, ip string) error {
-	return d.resolver.AddLocalDomain(domain, net.ParseIP(ip).To4())
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return fmt.Errorf("invalid IP address: %s", ip)
+	}
+	return d.resolver.AddLocalDomain(domain, parsedIP.To4())
 }
 
 func (d *DNSServer) DeleteLocalDomain(domain string) {
@@ -115,80 +131,37 @@ func (d *DNSServer) FlushBlocklist() {
 }
 
 func (d *DNSServer) AddBlocklistFromURL(url string) error {
-	var dat []byte
-	var err error
-	if strings.HasPrefix(url, "http") {
-		resp, err := http.DefaultClient.Get(url)
-		if err != nil {
-			log.Warnf("unable to fetch blocklist %s: %s", url, err.Error())
-			return err
-		}
-		defer resp.Body.Close()
-		dat, err = ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Warnf("unable to read blocklist %s: %s", url, err.Error())
-			return err
-		}
-	} else {
-		log.Debug("loading blocklist from file: ", url)
-		dat, err = ioutil.ReadFile(url)
-		if err != nil {
-			log.Warnf("unable to read blocklist %s: %s", url, err.Error())
-			return err
-		}
+	hosts, err := d.blocklistFetcher.Fetch(url)
+	if err != nil {
+		return err
 	}
-	if hosts, ok := util.ValidateIsHostFileFormat(string(dat)); ok {
-		d.resolver.AddBlocklistEntries(hosts)
-	} else {
-		return errors.New("invalid blocklist format")
-	}
+	d.resolver.AddBlocklistEntries(hosts)
 	return nil
 }
 
 func (d *DNSServer) LoadBlocklistFromURLS(urls []string) {
 	log.Debugf("loading blocklist from URLs %v", urls)
 	blockedDomains := make([]string, 0)
-	http.DefaultClient.Timeout = time.Second * 15
-	resultChan := make(chan []string, len(config.Config.DNS.BlockLists))
-	signalChan := make(chan interface{}, len(config.Config.DNS.BlockLists))
+	resultChan := make(chan []string, len(urls))
+	signalChan := make(chan struct{}, len(urls))
 	var workerCount = len(urls)
 	for _, urlToLoad := range urls {
 		go func() {
 			defer func() {
-				signalChan <- nil
+				signalChan <- struct{}{}
 			}()
-			var dat []byte
-			var err error
-			if strings.HasPrefix(urlToLoad, "http") {
-				resp, err := http.DefaultClient.Get(urlToLoad)
-				if err != nil {
-					log.Warnf("unable to fetch blocklist %s: %s", urlToLoad, err.Error())
-					return
-				}
-				defer resp.Body.Close()
-				dat, err = ioutil.ReadAll(resp.Body)
-				if err != nil {
-					log.Warnf("unable to read blocklist %s: %s", urlToLoad, err.Error())
-					return
-				}
-			} else {
-				log.Debug("loading blocklist from file: ", urlToLoad)
-				dat, err = ioutil.ReadFile(urlToLoad)
-				if err != nil {
-					log.Warnf("unable to read blocklist %s: %s", urlToLoad, err.Error())
-					return
-				}
+			hosts, err := d.blocklistFetcher.Fetch(urlToLoad)
+			if err != nil {
+				log.Warnf("unable to fetch blocklist %s: %s", urlToLoad, err.Error())
+				return
 			}
-			if hosts, ok := util.ValidateIsHostFileFormat(string(dat)); ok {
-				resultChan <- hosts
-			}
+			resultChan <- hosts
 		}()
 	}
 	for workerCount > 0 {
 		select {
 		case <-signalChan:
 			workerCount--
-
 		case results := <-resultChan:
 			blockedDomains = append(blockedDomains, results...)
 		}
