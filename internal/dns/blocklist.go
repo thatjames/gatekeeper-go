@@ -20,9 +20,16 @@ type HTTPBlocklistFetcher struct {
 }
 
 func NewHTTPBlocklistFetcher() *HTTPBlocklistFetcher {
+	return NewHTTPBlocklistFetcherWithTimeout(time.Second * 15)
+}
+
+func NewHTTPBlocklistFetcherWithTimeout(timeout time.Duration) *HTTPBlocklistFetcher {
+	if timeout == 0 {
+		timeout = time.Second * 15
+	}
 	return &HTTPBlocklistFetcher{
 		client: &http.Client{
-			Timeout: time.Second * 15,
+			Timeout: timeout,
 		},
 	}
 }

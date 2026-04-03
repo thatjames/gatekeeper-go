@@ -19,12 +19,14 @@ type DNSServerOpts struct {
 	ResolverOpts   *ResolverOpts
 	BlocklistUrls  []string
 	BlockedDomains []string
+	ReadDeadline   time.Duration
 }
 
 var defaultDNSServerOpts = DNSServerOpts{
-	Interface: "eth0",
-	Port:      53,
-	Upstream:  []string{"8.8.8.8", "1.1.1.1"},
+	Interface:    "eth0",
+	Port:         53,
+	Upstream:     []string{"8.8.8.8", "1.1.1.1"},
+	ReadDeadline: time.Second * 2,
 }
 
 type DNSServer struct {
@@ -36,6 +38,7 @@ type DNSServer struct {
 	responseChan     chan *dnsWorkItem
 	exitChan         chan struct{}
 	lock             sync.Mutex
+	readDeadline     time.Duration
 }
 
 type dnsWorkItem struct {
@@ -58,6 +61,12 @@ func NewDNSServerWithOpts(opts DNSServerOpts, resolver Resolver, fetcher Blockli
 	if fetcher == nil {
 		fetcher = NewHTTPBlocklistFetcher()
 	}
+
+	readDeadline := opts.ReadDeadline
+	if readDeadline == 0 {
+		readDeadline = time.Second * 2
+	}
+
 	return &DNSServer{
 		opts:             &opts,
 		resolver:         resolver,
@@ -66,6 +75,7 @@ func NewDNSServerWithOpts(opts DNSServerOpts, resolver Resolver, fetcher Blockli
 		receiverChan:     make(chan *dnsWorkItem, 100),
 		responseChan:     make(chan *dnsWorkItem, 100),
 		lock:             sync.Mutex{},
+		readDeadline:     readDeadline,
 	}
 }
 
@@ -193,7 +203,7 @@ func (d *DNSServer) listen() {
 			return
 		default:
 			buff := make([]byte, 1500)
-			d.packetConn.SetReadDeadline(time.Now().Add(time.Second * 2))
+			d.packetConn.SetReadDeadline(time.Now().Add(d.readDeadline))
 			n, addr, err := d.packetConn.ReadFrom(buff)
 			if err != nil {
 				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {

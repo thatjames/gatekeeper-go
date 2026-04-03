@@ -3,6 +3,7 @@ package dns
 import (
 	"net"
 	"testing"
+	"time"
 )
 
 type mockResolver struct {
@@ -198,5 +199,25 @@ func TestDNSServer_UpdateOptions(t *testing.T) {
 
 	if server.opts.Interface != "wlan0" {
 		t.Errorf("expected interface 'wlan0', got '%s'", server.opts.Interface)
+	}
+}
+
+func TestDNSServerOpts_ReadDeadline(t *testing.T) {
+	opts := DNSServerOpts{
+		ReadDeadline: time.Second * 5,
+	}
+	server := NewDNSServerWithOpts(opts, nil, nil)
+
+	if server.readDeadline != time.Second*5 {
+		t.Errorf("expected readDeadline 5s, got %v", server.readDeadline)
+	}
+}
+
+func TestDNSServerOpts_DefaultReadDeadline(t *testing.T) {
+	opts := DNSServerOpts{}
+	server := NewDNSServerWithOpts(opts, nil, nil)
+
+	if server.readDeadline != time.Second*2 {
+		t.Errorf("expected default readDeadline 2s, got %v", server.readDeadline)
 	}
 }

@@ -37,21 +37,33 @@ type Resolver interface {
 }
 
 type DNSResolver struct {
-	cache        map[string]*DNSCacheItem
-	upstream     []net.IP
-	blacklist    map[string]struct{}
-	localDomains map[string]net.IP
-	domainLock   *sync.RWMutex
+	cache           map[string]*DNSCacheItem
+	upstream        []net.IP
+	blacklist       map[string]struct{}
+	localDomains    map[string]net.IP
+	domainLock      *sync.RWMutex
+	cacheTTL        time.Duration
+	upstreamTimeout time.Duration
+	dialTimeout     time.Duration
+	readTimeout     time.Duration
 }
 
 type ResolverOpts struct {
-	Upstreams    []string
-	LocalDomains map[string]net.IP
+	Upstreams       []string
+	LocalDomains    map[string]net.IP
+	CacheTTL        time.Duration
+	UpstreamTimeout time.Duration
+	DialTimeout     time.Duration
+	ReadTimeout     time.Duration
 }
 
 var defaultResolverOpts = ResolverOpts{
-	Upstreams:    []string{"1.1.1.1", "9.9.9.9"},
-	LocalDomains: make(map[string]net.IP),
+	Upstreams:       []string{"1.1.1.1", "9.9.9.9"},
+	LocalDomains:    make(map[string]net.IP),
+	CacheTTL:        time.Minute * 5,
+	UpstreamTimeout: time.Second * 5,
+	DialTimeout:     time.Second * 2,
+	ReadTimeout:     time.Second * 2,
 }
 
 type DNSCacheItem struct {
@@ -73,12 +85,34 @@ func NewDNSResolverWithOpts(options ResolverOpts) *DNSResolver {
 		}
 		upstreamAddrs = append(upstreamAddrs, ip)
 	}
+
+	cacheTTL := options.CacheTTL
+	if cacheTTL == 0 {
+		cacheTTL = time.Minute * 5
+	}
+	upstreamTimeout := options.UpstreamTimeout
+	if upstreamTimeout == 0 {
+		upstreamTimeout = time.Second * 5
+	}
+	dialTimeout := options.DialTimeout
+	if dialTimeout == 0 {
+		dialTimeout = time.Second * 2
+	}
+	readTimeout := options.ReadTimeout
+	if readTimeout == 0 {
+		readTimeout = time.Second * 2
+	}
+
 	return &DNSResolver{
-		cache:        make(map[string]*DNSCacheItem),
-		upstream:     upstreamAddrs,
-		localDomains: options.LocalDomains,
-		domainLock:   new(sync.RWMutex),
-		blacklist:    make(map[string]struct{}),
+		cache:           make(map[string]*DNSCacheItem),
+		upstream:        upstreamAddrs,
+		localDomains:    options.LocalDomains,
+		domainLock:      new(sync.RWMutex),
+		blacklist:       make(map[string]struct{}),
+		cacheTTL:        cacheTTL,
+		upstreamTimeout: upstreamTimeout,
+		dialTimeout:     dialTimeout,
+		readTimeout:     readTimeout,
 	}
 }
 
@@ -102,7 +136,7 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 			Name:       compressedDomainVal,
 			Type:       dnsType,
 			Class:      DNSClassIN,
-			TTL:        uint32((time.Second * 300).Seconds()),
+			TTL:        uint32(r.cacheTTL.Seconds()),
 			ParsedName: domain,
 			RData:      result,
 		})
@@ -136,7 +170,7 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 			Name:       compressedDomainVal,
 			Type:       dnsType,
 			Class:      DNSClassIN,
-			TTL:        uint32((time.Second * 300).Seconds()),
+			TTL:        uint32(r.cacheTTL.Seconds()),
 			ParsedName: domain,
 			RData:      responseIP.To4(),
 		})
@@ -172,7 +206,7 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 		var res result
 		select {
 		case res = <-results:
-		case <-time.After(time.Second * 5):
+		case <-time.After(r.upstreamTimeout):
 			log.Warn("timeout waiting for an upstream response")
 			continue
 		}
@@ -281,7 +315,7 @@ func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (a
 						Name:       compressedDomainVal,
 						Type:       dnsType,
 						Class:      DNSClassIN,
-						TTL:        uint32((time.Second * 300).Seconds()),
+						TTL:        uint32(r.cacheTTL.Seconds()),
 						ParsedName: host,
 						RData:      stringToDNSWireFormat(host),
 					})
@@ -307,7 +341,7 @@ func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (a
 	}
 
 	dialer := net.Dialer{
-		Timeout: time.Second * 2,
+		Timeout: r.dialTimeout,
 	}
 
 	raddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", upstream, 53))
@@ -320,7 +354,7 @@ func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (a
 		return nil, nil, err
 	}
 	defer conn.Close()
-	conn.SetDeadline(time.Now().Add(time.Second * 2))
+	conn.SetDeadline(time.Now().Add(r.readTimeout))
 
 	_, err = conn.Write(dat)
 	if err != nil {
