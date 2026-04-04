@@ -27,6 +27,7 @@ DHCP:
   LeaseFile: /var/lib/gatekeeper/leases
 Web:
   Address: :8085
+  WebURL: https://gatekeeper.example.com
   TLS: null
   HTPasswdFile: .htpasswd
   Prometheus: true
@@ -35,10 +36,10 @@ DNS:
     - 1.1.1.1
     - 9.9.9.9
   Interface: eth0
+  Port: 53
   LocalDomains:
     gatekeeper: 10.0.0.1
     router: 10.0.0.1
-  Port: 53
   BlockLists:
     - 'https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts'
   BlockedDomains:

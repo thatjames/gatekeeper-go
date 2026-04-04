@@ -22,6 +22,7 @@ Below are the list of configuration options for the DNS module.
 | Key             | Description                                                                | Default          |
 | --------------- | -------------------------------------------------------------------------- | ---------------- |
 | Interface       | The interface the UDP socket will bind to                                  | eth0             |
+| Port            | The port the DNS server will listen on                                     | 53               |
 | LocalDomains    | A map of DNS names to IP addresses                                         |                  |
 | UpstreamServers | The upstream DNS servers to use                                            | 8.8.8.8, 1.1.1.1 |
 | Blocklists      | A list of host file formated files that will be used to block DNS requests |                  |
@@ -59,6 +60,7 @@ The Web module is loaded if the config file contains the `Web` key.
 | Key          | Description                                                                                                                             | Default |
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | Address      | Address and port for web server to listen on                                                                                            | :8085   |
+| WebURL       | Base URL for the web interface (used for OIDC redirects and CORS)                                                                      |         |
 | TLS          | TLS configuration for HTTPS                                                                                                             |         |
 | HTPasswdFile | Path to htpasswd file for authentication. If this is not included, the module defaults to username:password admin:admin                 |         |
 | Prometheus   | Enable Prometheus metrics endpoint. This is the same endpoint the DNS Statistics page uses, so disabling it here will disable that page | false   |

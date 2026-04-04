@@ -24,6 +24,13 @@ Auth:
   HTPasswdFile: /path/to/htpasswd
 ```
 
+#### HTPasswd Parameters
+
+| Key          | Description                                              | Default |
+| ------------ | -------------------------------------------------------- | ------- |
+| AuthType     | Must be set to `htpasswd`                               |         |
+| HTPasswdFile | Path to the htpasswd file                               |         |
+
 
 ### OIDC: OpenID Connect
 
@@ -37,7 +44,7 @@ Auth:
   IssuerURL: https://accounts.google.com
   ClientID: your-client-id
   ClientSecretVar: GOOGLE_CLIENT_SECRET
-  RedirectURL: http://localhost:5173/auth/callback
+  RedirectURL: https://your-domain.com/auth/callback
   Scopes:
     - openid
     - profile
@@ -45,3 +52,22 @@ Auth:
 ```
 
 Note that the callback slug is always `auth/callback`, so this MUST be present in the `RedirectURL` field.
+
+You will also need to configure the `WebURL` in the Web section of your config:
+
+```yaml
+Web:
+  Address: :8085
+  WebURL: https://your-domain.com
+```
+
+#### OIDC Parameters
+
+| Key               | Description                                                                                                    | Default |
+| ----------------- | ------------------------------------------------------------------------------------------------------------- | ------- |
+| AuthType          | Must be set to `oidc`                                                                                         |         |
+| IssuerURL         | The URL of your OpenID Connect provider                                                                      |         |
+| ClientID          | The client ID from your OIDC provider                                                                        |         |
+| ClientSecretVar   | Environment variable name containing the client secret                                                       |         |
+| RedirectURL       | The callback URL (must include `/auth/callback`)                                                             |         |
+| Scopes            | OAuth scopes to request (typically `openid`, `profile`, `email`)                                            | [openid, profile, email] |
