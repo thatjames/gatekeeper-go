@@ -2,7 +2,7 @@
 
 [![Test Coverage](https://img.shields.io/codecov/c/github/thatjames/gatekeeper-go?label=coverage)](https://codecov.io/gh/thatjames/gatekeeper-go)
 [![Latest Release](https://img.shields.io/github/v/release/thatjames/gatekeeper-go?include_prereleases)](https://github.com/thatjames/gatekeeper-go/releases/latest)
-[![Docker](https://img.shields.io/docker/v/ghcr.io/thatjames/gatekeeper-go?label=docker)](https://github.com/thatjames/gatekeeper-go/pkgs/container/gatekeeper)
+[![Docker Pulls](https://img.shields.io/docker/pulls/ghcr.io/thatjames/gatekeeper)](https://hub.docker.com/r/thatjames/gatekeeper-go)
 
 GateKeeper is a configurable hobbyist DNS and DHCP server written in Go.
 
