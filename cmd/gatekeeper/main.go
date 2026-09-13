@@ -58,7 +58,12 @@ func main() {
 		log.Info("Registering DNS server")
 		localDomains := make(map[string]net.IP)
 		for domain, ip := range config.Config.DNS.LocalDomains {
-			localDomains[domain] = net.ParseIP(ip).To4()
+			parsed := net.ParseIP(ip).To4()
+			if parsed == nil {
+				log.Warnf("skipping local domain %s: unable to parse IPv4 address %q", domain, ip)
+				continue
+			}
+			localDomains[domain] = parsed
 		}
 
 		dnsServer := dns.NewDNSServerWithOpts(dns.DNSServerOpts{

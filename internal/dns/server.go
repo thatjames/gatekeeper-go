@@ -51,12 +51,25 @@ func NewDNSServer() *DNSServer {
 	return NewDNSServerWithOpts(defaultDNSServerOpts, nil, nil)
 }
 
+// resolverOptsFrom derives the resolver options from the server options,
+// falling back to the server's upstreams when the caller didn't supply any.
+func resolverOptsFrom(opts *DNSServerOpts) ResolverOpts {
+	resolverOpts := ResolverOpts{}
+	if opts.ResolverOpts != nil {
+		resolverOpts = *opts.ResolverOpts
+	}
+	if len(resolverOpts.Upstreams) == 0 {
+		resolverOpts.Upstreams = opts.Upstream
+	}
+	if resolverOpts.LocalDomains == nil {
+		resolverOpts.LocalDomains = make(map[string]net.IP)
+	}
+	return resolverOpts
+}
+
 func NewDNSServerWithOpts(opts DNSServerOpts, resolver Resolver, fetcher BlocklistFetcher) *DNSServer {
 	if resolver == nil {
-		resolver = NewDNSResolverWithOpts(ResolverOpts{
-			Upstreams:    opts.Upstream,
-			LocalDomains: make(map[string]net.IP),
-		})
+		resolver = NewDNSResolverWithOpts(resolverOptsFrom(&opts))
 	}
 	if fetcher == nil {
 		fetcher = NewHTTPBlocklistFetcher()
@@ -82,10 +95,7 @@ func NewDNSServerWithOpts(opts DNSServerOpts, resolver Resolver, fetcher Blockli
 func (d *DNSServer) Start() error {
 	if d.resolver == nil {
 		log.Warn("resolver was nil, creating new one with upstreams: ", d.opts.Upstream)
-		d.resolver = NewDNSResolverWithOpts(ResolverOpts{
-			Upstreams:    d.opts.Upstream,
-			LocalDomains: make(map[string]net.IP),
-		})
+		d.resolver = NewDNSResolverWithOpts(resolverOptsFrom(d.opts))
 	}
 	if len(d.opts.BlockedDomains) > 0 {
 		log.Debugf("adding %d blocked domains", len(d.opts.BlockedDomains))

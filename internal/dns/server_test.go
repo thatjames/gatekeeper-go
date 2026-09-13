@@ -221,3 +221,36 @@ func TestDNSServerOpts_DefaultReadDeadline(t *testing.T) {
 		t.Errorf("expected default readDeadline 2s, got %v", server.readDeadline)
 	}
 }
+
+func TestNewDNSServerWithOptsPassesResolverOptsThrough(t *testing.T) {
+	server := NewDNSServerWithOpts(DNSServerOpts{
+		Upstream: []string{"9.9.9.9"},
+		ResolverOpts: &ResolverOpts{
+			LocalDomains: map[string]net.IP{
+				"router": net.ParseIP("192.168.1.1").To4(),
+			},
+		},
+	}, nil, nil)
+
+	resolver, ok := server.resolver.(*DNSResolver)
+	if !ok {
+		t.Fatalf("expected a *DNSResolver, got %T", server.resolver)
+	}
+
+	if got := resolver.localDomains["router"]; !got.Equal(net.ParseIP("192.168.1.1")) {
+		t.Fatalf("expected local domain router to resolve to 192.168.1.1, got %v", got)
+	}
+
+	// Upstreams fall back to the server's when the resolver opts omit them.
+	if len(resolver.upstream) != 1 || !resolver.upstream[0].Equal(net.ParseIP("9.9.9.9")) {
+		t.Fatalf("expected upstream 9.9.9.9, got %v", resolver.upstream)
+	}
+
+	answers, _, err := server.resolver.Resolve("router", DNSTypeA)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(answers) != 1 || !net.IP(answers[0].RData).Equal(net.ParseIP("192.168.1.1")) {
+		t.Fatalf("expected a local answer of 192.168.1.1, got %v", answers)
+	}
+}
