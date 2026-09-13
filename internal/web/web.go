@@ -2,6 +2,7 @@ package web
 
 import (
 	"strings"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/static"
@@ -25,10 +26,35 @@ func Init(ver string, cfg *config.Web) error {
 	r := gin.New()
 	r.Use(gin.Recovery())
 
-	corsConfig := cors.DefaultConfig()
-	corsConfig.AllowOrigins = []string{cfg.WebURL, "http://gatekeeper.thatjames.nl", "https://gatekeeper.thatjames.nl"}
-	corsConfig.AllowHeaders = append(corsConfig.AllowHeaders, "Authorization")
-	corsConfig.AllowCredentials = true
+	var corsConfig cors.Config
+	if cfg.CORS != nil {
+		corsConfig = cors.DefaultConfig()
+		if len(cfg.CORS.AllowOrigins) > 0 {
+			corsConfig.AllowOrigins = cfg.CORS.AllowOrigins
+		} else {
+			corsConfig.AllowOrigins = []string{"*"}
+		}
+		if len(cfg.CORS.AllowMethods) > 0 {
+			corsConfig.AllowMethods = cfg.CORS.AllowMethods
+		}
+		if len(cfg.CORS.AllowHeaders) > 0 {
+			corsConfig.AllowHeaders = cfg.CORS.AllowHeaders
+		} else {
+			corsConfig.AllowHeaders = append(corsConfig.AllowHeaders, "Authorization")
+		}
+		corsConfig.AllowCredentials = cfg.CORS.AllowCredentials
+		if len(cfg.CORS.ExposeHeaders) > 0 {
+			corsConfig.ExposeHeaders = cfg.CORS.ExposeHeaders
+		}
+		if cfg.CORS.MaxAge > 0 {
+			corsConfig.MaxAge = time.Duration(cfg.CORS.MaxAge) * time.Second
+		}
+	} else {
+		corsConfig = cors.DefaultConfig()
+		corsConfig.AllowOrigins = []string{cfg.WebURL}
+		corsConfig.AllowHeaders = append(corsConfig.AllowHeaders, "Authorization")
+		corsConfig.AllowCredentials = true
+	}
 	r.Use(cors.New(corsConfig))
 
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))

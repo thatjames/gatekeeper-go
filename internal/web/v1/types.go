@@ -98,6 +98,7 @@ func (z *DhcpLeaseRequest) Validate() []ValidationError {
 type DNSConfigResponse struct {
 	Upstreams      []string `json:"upstreams"`
 	Interface      string   `json:"interface"`
+	Port           int      `json:"port"`
 	Blocklist      []string `json:"blocklist"`
 	BlockedDomains []string `json:"blockedDomains"`
 }
@@ -319,6 +320,7 @@ func (opts *DhcpOptions) Validate() []ValidationError {
 
 type DNSConfigRequest struct {
 	Interface      string   `json:"interface"`
+	Port           int      `json:"port"`
 	Upstreams      []string `json:"upstreams"`
 	BlockedDomains []string `json:"blockedDomains"`
 }
@@ -329,6 +331,12 @@ func (z *DNSConfigRequest) Validate() []ValidationError {
 		validationErrors = append(validationErrors, ValidationError{
 			Field:   "interface",
 			Message: "Interface is required",
+		})
+	}
+	if z.Port > 0 && (z.Port < 1 || z.Port > 65535) {
+		validationErrors = append(validationErrors, ValidationError{
+			Field:   "port",
+			Message: "Port must be between 1 and 65535",
 		})
 	}
 	if z.Upstreams == nil || len(z.Upstreams) == 0 {

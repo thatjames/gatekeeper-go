@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"net"
@@ -76,6 +78,15 @@ func main() {
 	}
 
 	if config.Config.Web != nil {
+		if config.Config.Auth == nil || config.Config.Auth.Type() == "" || config.Config.Auth.Type() == "htpasswd" {
+			if _, err := os.Stat(config.Config.Web.HTPasswdFile); os.IsNotExist(err) {
+				password := generateRandomHex(16)
+				log.Warn("HTPasswd file not found. Using random password: ", password)
+				if err := os.WriteFile(config.Config.Web.HTPasswdFile, []byte("admin:"+password), 0644); err != nil {
+					log.Error("Failed to create htpasswd file: ", err)
+				}
+			}
+		}
 		log.Info("Registering web server")
 		go func() {
 			if err := web.Init(version, config.Config.Web); err != nil {
@@ -127,4 +138,10 @@ func formatLogEntry(e *log.Entry) ([]byte, error) {
 	}
 	msg.WriteString("\n")
 	return msg.Bytes(), nil
+}
+
+func generateRandomHex(length int) string {
+	bytes := make([]byte, length)
+	rand.Read(bytes)
+	return hex.EncodeToString(bytes)
 }

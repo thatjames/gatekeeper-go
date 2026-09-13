@@ -80,7 +80,16 @@ func SetupV1Endpoints(r *gin.RouterGroup) {
 			log.Debug("Using default login handler")
 		}
 	}
-	v1Group.POST("/login", defaultLoginHandler)
+
+	var authType string
+	if config.Config.Auth != nil {
+		authType = config.Config.Auth.Type()
+	} else {
+		authType = "htpasswd"
+	}
+	if authType == "htpasswd" {
+		v1Group.POST("/login", defaultLoginHandler)
+	}
 
 	v1Group.GET("/health", healthHandler)
 	v1Group.GET("/version", getVersion)
@@ -212,16 +221,26 @@ func defaultLoginHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
 		return
 	}
-	log.Info("Login request: ", req)
 
 	authenticated := false
-	if passwd, err := htpasswd.New(config.Config.Web.HTPasswdFile, htpasswd.DefaultSystems, nil); err == nil {
-		authenticated = passwd.Match(req.Username, req.Password)
+	var authType string
+	if config.Config.Auth != nil {
+		authType = config.Config.Auth.Type()
 	} else {
-		log.Warn("Unable to read htpasswd file: ", err.Error())
-		password := generateRandomString(16)
-		log.Warn("Using random password: ", password)
-		authenticated = (req.Username == "admin" && req.Password == password)
+		authType = "htpasswd"
+	}
+	if authType == "htpasswd" {
+		if passwd, err := htpasswd.New(config.Config.Web.HTPasswdFile, htpasswd.DefaultSystems, nil); err == nil {
+			authenticated = passwd.Match(req.Username, req.Password)
+		} else {
+			log.Error("Unable to read htpasswd file: ", err.Error())
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load htpasswd file"})
+			return
+		}
+	} else {
+		log.Warn("Login attempt but AuthType is not htpasswd")
+		c.JSON(http.StatusForbidden, gin.H{"error": "Login not available with current auth configuration"})
+		return
 	}
 
 	if !authenticated {

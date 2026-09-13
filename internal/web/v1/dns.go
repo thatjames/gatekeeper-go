@@ -15,6 +15,7 @@ func getDNSConfig(c *gin.Context) {
 	c.JSON(200, DNSConfigResponse{
 		Upstreams:      config.Config.DNS.UpstreamServers,
 		Interface:      config.Config.DNS.Interface,
+		Port:           config.Config.DNS.Port,
 		Blocklist:      config.Config.DNS.BlockLists,
 		BlockedDomains: config.Config.DNS.BlockedDomains,
 	})
@@ -38,21 +39,25 @@ func updateDNSConfig(c *gin.Context) {
 	oldOpts := new(dns.DNSServerOpts)
 	*oldOpts = *dnsService.Options()
 	dnsService.Options().Interface = req.Interface
+	dnsService.Options().Port = req.Port
 	dnsService.Options().ResolverOpts.Upstreams = req.Upstreams
 	dnsService.Options().BlockedDomains = req.BlockedDomains
 	if err := dnsService.Stop(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		dnsService.Options().Interface = oldOpts.Interface
+		dnsService.Options().Port = oldOpts.Port
 		dnsService.Options().ResolverOpts.Upstreams = oldOpts.ResolverOpts.Upstreams
 		return
 	} else if err = dnsService.Start(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		dnsService.Options().Interface = oldOpts.Interface
+		dnsService.Options().Port = oldOpts.Port
 		dnsService.Options().ResolverOpts.Upstreams = oldOpts.ResolverOpts.Upstreams
 		dnsService.Start()
 		return
 	}
 	config.Config.DNS.Interface = req.Interface
+	config.Config.DNS.Port = req.Port
 	config.Config.DNS.UpstreamServers = req.Upstreams
 	if err := config.UpdateConfig(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -61,6 +66,7 @@ func updateDNSConfig(c *gin.Context) {
 	c.JSON(200, DNSConfigResponse{
 		Upstreams:      config.Config.DNS.UpstreamServers,
 		Interface:      config.Config.DNS.Interface,
+		Port:           config.Config.DNS.Port,
 		Blocklist:      config.Config.DNS.BlockLists,
 		BlockedDomains: config.Config.DNS.BlockedDomains,
 	})

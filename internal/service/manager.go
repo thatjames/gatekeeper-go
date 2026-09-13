@@ -69,14 +69,23 @@ func ActiveServices() []string {
 	return services
 }
 
-func ExtraFeatures() []string {
+type Feature struct {
+	AuthType string `json:"authType"`
+}
+
+func ExtraFeatures() []Feature {
 	lock.Lock()
 	defer lock.Unlock()
-	features := make([]string, 0)
-	if config.Config.Auth.Type() == "oidc" {
-		features = append(features, "oidc")
+	var authType string
+	if config.Config.Auth != nil {
+		authType = config.Config.Auth.Type()
+	} else {
+		authType = "htpasswd"
 	}
-	return features
+	if authType == "" {
+		return []Feature{{AuthType: "htpasswd"}}
+	}
+	return []Feature{{AuthType: authType}}
 }
 
 func checkErrors(fns ...func() error) error {

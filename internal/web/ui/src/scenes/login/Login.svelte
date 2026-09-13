@@ -12,8 +12,10 @@
     P,
   } from "flowbite-svelte";
   import { push } from "svelte-spa-router";
+  
   let loginData = {};
   let errorText = $state("");
+  
   const doLogin = (e) => {
     e.preventDefault();
     login(loginData)
@@ -27,13 +29,18 @@
   getExtraFeatures();
 
   const handleOIDCRedirect = () => {
-    console.log("do redirect");
-    window.location = env.url + "oidc-login";
+    window.location.href = env.url + "oidc-login";
   };
 
   if (document.cookie.includes("oauth_token")) {
     loginFromOIDCToken();
   }
+  
+  $effect(() => {
+    if ($features && $features.length > 0 && $features[0]?.authType === "oidc" && !document.cookie.includes("oauth_token")) {
+      handleOIDCRedirect();
+    }
+  });
 </script>
 
 <div
@@ -55,6 +62,9 @@
   ></div>
 
   <form class="md:w-1/2 mx-auto" onsubmit={doLogin}>
+    {#if !$features || $features.length === 0}
+      <P class="text-center">Loading...</P>
+    {:else if $features[0].authType === 'htpasswd'}
     <div class="flex flex-col gap-2">
       <FloatingLabelInput
         variant="outlined"
@@ -72,12 +82,14 @@
         bind:value={loginData.password}>Password</FloatingLabelInput
       >
       <Button type="submit">Login</Button>
-      {#if $features.includes("oidc")}
-        <Button outline color="dark" onclick={handleOIDCRedirect}
-          >OIDC Login</Button
-        >
-      {/if}
     </div>
+    {:else if $features[0].authType === 'oidc'}
+      <Button outline color="dark" onclick={handleOIDCRedirect}
+        >OIDC Login</Button
+      >
+    {:else}
+      <P class="text-center">Login not available</P>
+    {/if}
   </form>
   <P class="text-center text-primary-600">{errorText}</P>
 </div>

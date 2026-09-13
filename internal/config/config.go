@@ -181,11 +181,21 @@ type DHCP struct {
 }
 
 type Web struct {
-	Address      string     `yaml:"Address"`
-	WebURL       string     `yaml:"WebURL"`
-	TLS          *TLSConfig `yaml:"TLS"`
-	HTPasswdFile string     `yaml:"HTPasswdFile"`
-	Prometheus   bool       `yaml:"Prometheus"`
+	Address      string      `yaml:"Address"`
+	WebURL       string      `yaml:"WebURL"`
+	CORS         *CORSConfig `yaml:"CORS"`
+	TLS          *TLSConfig  `yaml:"TLS"`
+	HTPasswdFile string      `yaml:"HTPasswdFile"`
+	Prometheus   bool        `yaml:"Prometheus"`
+}
+
+type CORSConfig struct {
+	AllowOrigins     []string `yaml:"AllowOrigins"`
+	AllowMethods     []string `yaml:"AllowMethods"`
+	AllowHeaders     []string `yaml:"AllowHeaders"`
+	AllowCredentials bool     `yaml:"AllowCredentials"`
+	ExposeHeaders    []string `yaml:"ExposeHeaders"`
+	MaxAge           int      `yaml:"MaxAge"`
 }
 
 type TLSConfig struct {
