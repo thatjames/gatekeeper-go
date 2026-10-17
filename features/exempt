@@ -1,0 +1,13 @@
+# Lockfiles
+go.sum
+internal/web/ui/package-lock.json
+# Ignore files and editor/formatter config
+.gitignore
+internal/web/ui/.gitignore
+.prettierrc
+internal/web/ui/.prettierrc
+internal/web/ui/.vscode/**
+# Images
+**/*.png
+**/*.ico
+internal/web/ui/src/assets/svelte.svg
