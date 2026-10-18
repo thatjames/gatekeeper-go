@@ -109,10 +109,9 @@ func (r *DNSResolver) forward(domain string, dnsType DNSType, forwarder *conditi
 	return answers, authorities, nil
 }
 
-// localPTR answers a reverse lookup from the local domains when one of them
-// has the IPv4 of the reverse name, or returns nil. When several share the
-// address, the alphabetically first name answers, so the answer is stable.
-func (r *DNSResolver) localPTR(domain string) []*DNSRecord {
+// reverseIPv4 is the IPv4 address of a four-label reverse name
+// (d.c.b.a.in-addr.arpa, with or without the trailing dot, any case), or nil.
+func reverseIPv4(domain string) net.IP {
 	reverse, ok := strings.CutSuffix(normaliseName(domain), ".in-addr.arpa")
 	if !ok {
 		return nil
@@ -121,7 +120,14 @@ func (r *DNSResolver) localPTR(domain string) []*DNSRecord {
 	if len(octets) != 4 {
 		return nil
 	}
-	ip := net.ParseIP(octets[3] + "." + octets[2] + "." + octets[1] + "." + octets[0])
+	return net.ParseIP(octets[3] + "." + octets[2] + "." + octets[1] + "." + octets[0]).To4()
+}
+
+// localPTR answers a reverse lookup from the local domains when one of them
+// has the IPv4 of the reverse name, or returns nil. When several share the
+// address, the alphabetically first name answers, so the answer is stable.
+func (r *DNSResolver) localPTR(domain string) []*DNSRecord {
+	ip := reverseIPv4(domain)
 	if ip == nil {
 		return nil
 	}

@@ -8,9 +8,10 @@ code:
   - internal/dns/types.go
   - internal/dns/server_test.go
   - internal/dns/dns_feature_test.go
+  - internal/dns/parity_feature_test.go
   - internal/dns/features/dns_request.feature
 tags: [dns]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T15:30:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T22:30:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -35,17 +36,24 @@ to it ([Pi-hole parity](/dns/pihole-parity.md)).
 - TCP: each connection is served by its own goroutine. Messages carry a
   2-byte big-endian length prefix (RFC 1035 4.2.2); the connection may send
   several queries, answered in order, and is closed after 10 s with no
-  query, on a short read, or on a message that does not parse or has no
-  question. TCP replies go through the same resolver and reply building as
+  query, on a short read, or on a message that does not parse (other than
+  one with several questions). A message with no question or several gets
+  its FORMERR reply and the connection stays open. TCP replies go through the same resolver and reply building as
   UDP and are never truncated.
 - Each datagram (up to 1500 bytes) is parsed; a packet that does not parse
-  is logged and dropped with no answer.
+  is logged and dropped with no answer, except one with more than one
+  question (`ErrDNSTooManyQuestions`), which gets a FORMERR reply built
+  from its 12-byte header.
 - The receive worker resolves each query in its own goroutine, at most 256
   at a time; with 256 in flight it waits for one to finish before it takes
   the next packet. Answers may leave in a different order than the queries
   came in.
-- Only the first question is resolved. A query with no question panics the
-  receive worker (bug).
+- A query must have exactly one question. One with none or several is not
+  resolved: the reply is FORMERR (RCODE 1) with the query's ID and flags
+  (opcode, RD), QR and RA set, and no question, answers or authorities.
+  It carries an OPT record only when the query parsed and had one (so a
+  zero-question query with EDNS gets one, a multi-question query never).
+  Nothing panics and the server keeps answering.
 - Resolver result → RCODE: success 0 with answers and authorities set;
   `ErrNxDomain` 3 with the resolver's authorities (the SOA); any other
   error 2 (server failure).
@@ -61,9 +69,9 @@ to it ([Pi-hole parity](/dns/pihole-parity.md)).
 - Metrics (defined in `types.go`): `dns_req_time`, `dns_query_count`,
   `dns_blocked_domain_count`, `dns_query_by_ip_count`. There is no cache-hit
   metric; cache hits count in `dns_query_count` with upstream `cache`.
-- `queryByIPCounter` per client IP with `result` (always
-  `success` in practice: resolution errors are not counted as failed) and
-  `reqDuration` in ms.
+- `queryByIPCounter` per client IP, over UDP and TCP, with `result`
+  `failed` when the reply is SERVFAIL or FORMERR and `success` otherwise
+  (NOERROR, NXDOMAIN, a blocked name); `reqDuration` in ms.
 - `Stop()` closes the UDP listener and waits for it, closes the TCP
   listener and every open TCP connection; the UDP workers keep running, so
   every restart adds another pair (leak).
@@ -81,6 +89,13 @@ to it ([Pi-hole parity](/dns/pihole-parity.md)).
 - Fixes agreed 2026-10-17: empty-question panic, the failed metric and the
   worker leak (plans), TCP/truncation/EDNS/interface binding under
   [Pi-hole parity](/dns/pihole-parity.md).
+- FORMERR for zero or several questions (plan, 2026-10-18): RFC 1035
+  expects one question, and an answer lets the client stop retrying. The
+  reply has no question section because there is no single question to
+  echo.
+- NXDOMAIN counts as `success` in `dns_query_by_ip_count`: the query was
+  answered, as `dns_query_count` already treats it (2026-10-18; open for
+  the user to confirm).
 - Parallel receive capped at 256 queries in flight: one slow lookup no
   longer holds up the LAN, and a flood of queries cannot start unbounded
   goroutines (user, 2026-10-18).

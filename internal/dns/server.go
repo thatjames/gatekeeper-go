@@ -259,7 +259,7 @@ func (d *DNSServer) listen() {
 			}
 			buff = buff[:n]
 			log.Tracef("received %d bytes from %s", n, addr.String())
-			msg, err := ParseDNSMessage(buff)
+			msg, err := parseQuery(buff)
 			if err != nil {
 				log.Error("unable to parse DNS message: ", err.Error())
 				workItem.err = err
@@ -303,21 +303,41 @@ func (d *DNSServer) receiverWorker() {
 	}
 }
 
-// answerUDP resolves the packet's first question and hands the reply to the
+// parseQuery parses a query. A query with more than one question does not
+// parse as a message, so it comes back with only its header, to be answered
+// FORMERR.
+func parseQuery(data []byte) (*DNSMessage, error) {
+	msg, err := ParseDNSMessage(data)
+	if errors.Is(err, ErrDNSTooManyQuestions) && len(data) >= 12 {
+		log.Debug("query with more than one question, answering FORMERR")
+		msg = NewDnsMessage()
+		msg.Header.ID = binary.BigEndian.Uint16(data[0:2])
+		msg.Header.Flags = binary.BigEndian.Uint16(data[2:4])
+		return msg, nil
+	}
+	return msg, err
+}
+
+// answerUDP resolves the packet's question and hands the reply to the
 // response worker.
 func (d *DNSServer) answerUDP(packet *dnsWorkItem) {
-	d.answer(packet.DNSMessage)
+	failed := d.answer(packet.DNSMessage)
 
 	log.Tracef("push packet to response worker")
 	d.responseChan <- packet
 	log.Tracef("packet pushed to response worker")
 
 	// we do this afterwards to not interfere with the response timing
-	if packet.err != nil {
-		queryByIPCounter.With(prometheus.Labels{"ip": strings.Split(packet.ResponseAddr.String(), ":")[0], "result": "failed"}).Inc()
-	} else {
-		queryByIPCounter.With(prometheus.Labels{"ip": strings.Split(packet.ResponseAddr.String(), ":")[0], "result": "success"}).Inc()
+	countQueryByIP(strings.Split(packet.ResponseAddr.String(), ":")[0], failed)
+}
+
+// countQueryByIP counts a query in dns_query_by_ip_count.
+func countQueryByIP(ip string, failed bool) {
+	result := "success"
+	if failed {
+		result = "failed"
 	}
+	queryByIPCounter.With(prometheus.Labels{"ip": ip, "result": result}).Inc()
 }
 
 func (d *DNSServer) responseWorker() {
@@ -360,18 +380,28 @@ func listenHost(iface string) (string, error) {
 	return "", fmt.Errorf("interface %s has no IPv4 address", iface)
 }
 
-// answer resolves the first question of msg and fills msg in as the reply:
-// RCODE, answers and authorities (the SOA with an NXDOMAIN).
-func (d *DNSServer) answer(msg *DNSMessage) {
+// answer resolves the question of msg and fills msg in as the reply: RCODE,
+// answers and authorities (the SOA with an NXDOMAIN). A query without
+// exactly one question is answered FORMERR with no records. It reports
+// whether the reply is a failure (SERVFAIL or FORMERR).
+func (d *DNSServer) answer(msg *DNSMessage) (failed bool) {
+	if len(msg.Questions) != 1 {
+		log.Debugf("query with %d questions, answering FORMERR", len(msg.Questions))
+		msg.Header.SetRCODE(RCODEFormatError)
+		msg.Questions = nil
+		msg.Answers = nil
+		msg.Authorities = nil
+		return true
+	}
 	responses, authorities, err := d.resolver.Resolve(msg.Questions[0].ParsedName, msg.Questions[0].Type)
 	if err != nil {
 		if err == ErrNxDomain {
 			msg.Header.SetRCODE(RCODENameFailure)
 			msg.Authorities = authorities
-		} else {
-			msg.Header.SetRCODE(RCODEServerFailure)
+			return false
 		}
-		return
+		msg.Header.SetRCODE(RCODEServerFailure)
+		return true
 	}
 	msg.Header.SetRCODE(RCODESuccess)
 	if responses != nil {
@@ -382,6 +412,7 @@ func (d *DNSServer) answer(msg *DNSMessage) {
 		msg.Authorities = authorities
 		log.Tracef("adding authority %s", authorities)
 	}
+	return false
 }
 
 // queryOPT is the EDNS OPT record of query, or nil.
@@ -465,18 +496,14 @@ func (d *DNSServer) serveTCP(conn net.Conn) {
 			return
 		}
 		startTime := time.Now()
-		msg, err := ParseDNSMessage(buff)
+		msg, err := parseQuery(buff)
 		if err != nil {
 			log.Error("unable to parse DNS message over TCP: ", err.Error())
 			return
 		}
-		if len(msg.Questions) == 0 {
-			log.Error("DNS message over TCP has no question")
-			return
-		}
 
 		log.Tracef("received DNS packet over TCP from %s", clientIP)
-		d.answer(msg)
+		failed := d.answer(msg)
 		data, err := prepareReply(msg, 0)
 		if err != nil {
 			log.Error("unable to marshal DNS packet: ", err.Error())
@@ -488,7 +515,7 @@ func (d *DNSServer) serveTCP(conn net.Conn) {
 		conn.SetWriteDeadline(time.Now().Add(tcpIdleTimeout))
 		_, err = conn.Write(reply)
 		reqDuration.Observe(float64(time.Since(startTime).Round(time.Millisecond).Milliseconds()))
-		queryByIPCounter.With(prometheus.Labels{"ip": clientIP, "result": "success"}).Inc()
+		countQueryByIP(clientIP, failed)
 		if err != nil {
 			log.Error("unable to send DNS packet over TCP: ", err.Error())
 			return

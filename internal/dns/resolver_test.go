@@ -445,3 +445,89 @@ func TestDNSResolver_NegativeCaching(t *testing.T) {
 		})
 	}
 }
+
+// ptrResolver has upstream as its only upstream, the given local domains and
+// no conditional forwarders.
+func ptrResolver(t *testing.T, upstream *fakeDNSServer, localDomains map[string]string) *DNSResolver {
+	t.Helper()
+	host, port, _ := net.SplitHostPort(upstream.addr)
+	locals := make(map[string]net.IP, len(localDomains))
+	for name, ip := range localDomains {
+		locals[name] = net.ParseIP(ip).To4()
+	}
+	r := NewDNSResolverWithOpts(ResolverOpts{
+		Upstreams:    []string{host},
+		LocalDomains: locals,
+		ReadTimeout:  time.Millisecond * 200,
+	})
+	fmt.Sscan(port, &r.upstreamPort)
+	t.Cleanup(r.Close)
+	return r
+}
+
+func TestPrivatePTRChecksEveryLocalDomain(t *testing.T) {
+	upstream := newFakeDNSServer(t, replyWith(RCODESuccess, ptrRecord("public.example", 60)))
+	locals := map[string]string{}
+	for i := 1; i <= 8; i++ {
+		locals[fmt.Sprintf("host%d.lan", i)] = fmt.Sprintf("192.168.1.%d", i)
+	}
+	r := ptrResolver(t, upstream, locals)
+
+	for i := 1; i <= 8; i++ {
+		for _, name := range []string{
+			fmt.Sprintf("%d.1.168.192.in-addr.arpa", i),
+			fmt.Sprintf("%d.1.168.192.IN-ADDR.ARPA.", i),
+		} {
+			answers, _, err := r.Resolve(name, DNSTypePTR)
+			want := fmt.Sprintf("host%d.lan", i)
+			if err != nil || len(answers) != 1 || answers[0].ParsedName != want {
+				t.Errorf("%s: expected %s, got %v %v", name, want, answers, err)
+			}
+		}
+	}
+	if n := upstream.queries.Load(); n != 0 {
+		t.Errorf("expected no upstream queries, got %d", n)
+	}
+}
+
+func TestUnmatchedPrivatePTRIsNXDOMAIN(t *testing.T) {
+	for name, locals := range map[string]map[string]string{
+		"no local domains":    {},
+		"other local domains": {"box.lan": "10.0.0.2", "nas.lan": "10.0.0.3"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			upstream := newFakeDNSServer(t, replyWith(RCODESuccess, ptrRecord("public.example", 60)))
+			r := ptrResolver(t, upstream, locals)
+			answers, authorities, err := r.Resolve("99.0.0.10.in-addr.arpa", DNSTypePTR)
+			if err != ErrNxDomain || len(answers) != 0 || len(authorities) != 0 {
+				t.Fatalf("expected NXDOMAIN without records, got %v %v %v", answers, authorities, err)
+			}
+			if n := upstream.queries.Load(); n != 0 {
+				t.Errorf("expected no upstream queries, got %d", n)
+			}
+		})
+	}
+}
+
+func TestOtherPTRNamesGoUpstream(t *testing.T) {
+	upstream := newFakeDNSServer(t, replyWith(RCODESuccess, ptrRecord("upstream.example", 60)))
+	r := ptrResolver(t, upstream, map[string]string{"box.lan": "192.168.0.1"})
+
+	names := []string{
+		"8.8.8.8.in-addr.arpa",                    // public address
+		"1.0.0.127.in-addr.arpa",                  // loopback, not private
+		"0.168.192.in-addr.arpa",                  // a zone, not an address
+		"b._dns-sd._udp.0.0.168.192.in-addr.arpa", // DNS-SD browse
+		"1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.ip6.arpa",
+		"lb._dns-sd._udp.lan",
+	}
+	for i, name := range names {
+		answers, _, err := r.Resolve(name, DNSTypePTR)
+		if err != nil || len(answers) != 1 || string(answers[0].RData) != string(stringToDNSWireFormat("upstream.example")) {
+			t.Errorf("%s: expected the upstream answer, got %v %v", name, answers, err)
+		}
+		if n := upstream.queries.Load(); int(n) != i+1 {
+			t.Errorf("%s: expected %d upstream queries, got %d", name, i+1, n)
+		}
+	}
+}

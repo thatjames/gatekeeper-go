@@ -97,6 +97,26 @@ func (ps *parityTestSuite) iAskFor(recordType, name, transport, edns string) err
 	if edns != "" {
 		query.Additionals = append(query.Additionals, NewOPTRecord(maxUDPSize))
 	}
+	return ps.send(query, transport)
+}
+
+// iSendAQueryWithQuestions sends a query with count A questions (a0.test,
+// a1.test, ...), which the server must answer FORMERR unless count is 1.
+func (ps *parityTestSuite) iSendAQueryWithQuestions(count int, transport string) error {
+	if err := ps.startServer(); err != nil {
+		return err
+	}
+	query := NewDnsMessage()
+	query.Header.ID = uint16(rand.Intn(65535))
+	query.Header.SetRD(true)
+	for i := 0; i < count; i++ {
+		query.Questions = append(query.Questions, &DNSQuestion{Name: stringToDNSWireFormat(fmt.Sprintf("a%d.test", i)), Type: DNSTypeA, Class: DNSClassIN})
+	}
+	return ps.send(query, transport)
+}
+
+// send sends query to the server over transport and keeps the reply.
+func (ps *parityTestSuite) send(query *DNSMessage, transport string) error {
 	data, err := MarshalDNSMessage(query)
 	if err != nil {
 		return err
@@ -152,7 +172,7 @@ func (ps *parityTestSuite) iAskFor(recordType, name, transport, edns string) err
 }
 
 func (ps *parityTestSuite) theReplyHasRCODEAndAnswers(rcode string, count int) error {
-	rcodes := map[string]RCODE{"NOERROR": RCODESuccess, "SERVFAIL": RCODEServerFailure, "NXDOMAIN": RCODENameFailure}
+	rcodes := map[string]RCODE{"NOERROR": RCODESuccess, "FORMERR": RCODEFormatError, "SERVFAIL": RCODEServerFailure, "NXDOMAIN": RCODENameFailure}
 	if got := ps.reply.Header.RCODE(); got != rcodes[rcode] {
 		return fmt.Errorf("expected RCODE %s, got %d", rcode, got)
 	}
@@ -220,7 +240,8 @@ func initializeParityScenario(ctx *godog.ScenarioContext) {
 	ctx.Given(`^the zone "([^"]*)" is forwarded to a server answering PTR "([^"]*)"$`, ps.zoneForwardedAnsweringPTR)
 	ctx.Given(`^the zone "([^"]*)" is forwarded to a server that does not answer$`, ps.zoneForwardedToSilentServer)
 	ctx.When(`^I ask for (A|PTR) "([^"]*)" over (UDP|TCP)( with EDNS)?$`, ps.iAskFor)
-	ctx.Then(`^the reply has RCODE (NOERROR|NXDOMAIN|SERVFAIL) and (\d+) answers?$`, ps.theReplyHasRCODEAndAnswers)
+	ctx.When(`^I send a query with (\d+) questions? over (UDP|TCP)$`, ps.iSendAQueryWithQuestions)
+	ctx.Then(`^the reply has RCODE (NOERROR|FORMERR|NXDOMAIN|SERVFAIL) and (\d+) answers?$`, ps.theReplyHasRCODEAndAnswers)
 	ctx.Then(`^the reply is truncated with (\d+) answers?$`, ps.theReplyIsTruncatedWithAnswers)
 	ctx.Then(`^the reply is not truncated$`, ps.theReplyIsNotTruncated)
 	ctx.Then(`^the reply has an OPT record$`, ps.theReplyHasAnOPTRecord)

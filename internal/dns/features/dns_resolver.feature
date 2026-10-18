@@ -57,3 +57,26 @@ Feature: DNS Resolver
     Then I should receive a DNS response with the following answers
       | type | class | addr     |
       | PTR  | 1     | test.com |
+
+  Scenario: A reverse lookup checks every local domain
+    Given the local domain "first.lan" with IP "10.0.0.2"
+    And the local domain "second.lan" with IP "10.0.0.3"
+    When I ask for PTR "3.0.0.10.in-addr.arpa" over UDP
+    Then the reply has RCODE NOERROR and 1 answer
+    And the first answer is PTR "second.lan"
+    When I ask for PTR "2.0.0.10.in-addr.arpa" over TCP
+    Then the reply has RCODE NOERROR and 1 answer
+    And the first answer is PTR "first.lan"
+
+  Scenario: A private address with no local domain has no name
+    Given the local domain "first.lan" with IP "10.0.0.2"
+    When I ask for PTR "9.0.0.10.in-addr.arpa" over UDP
+    Then the reply has RCODE NXDOMAIN and 0 answers
+
+  Scenario: An unmatched private address goes to the forwarder for its zone
+    Given the local domain "first.lan" with IP "10.0.0.2"
+    And the zone "0.0.10.in-addr.arpa" is forwarded to a server answering PTR "dhcp-client.styx"
+    When I ask for PTR "9.0.0.10.in-addr.arpa" over UDP
+    Then the reply has RCODE NOERROR and 1 answer
+    And the first answer is PTR "dhcp-client.styx"
+    And the forwarder for "0.0.10.in-addr.arpa" was asked 1 time

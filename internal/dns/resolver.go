@@ -8,7 +8,6 @@ import (
 	"io"
 	"math/rand"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
@@ -210,6 +209,18 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 		return r.forward(domain, dnsType, forwarder, cacheKey)
 	}
 
+	// A private reverse name is answered here and never asked upstream.
+	if dnsType == DNSTypePTR {
+		if ip := reverseIPv4(domain); ip != nil && ip.IsPrivate() {
+			if answers := r.localPTR(domain); answers != nil {
+				queryCounter.With(prometheus.Labels{"domain": domain, "upstream": "local-domain", "result": "success"}).Inc()
+				return answers, nil, nil
+			}
+			log.Debugf("no local domain for private reverse name %s", domain)
+			return nil, nil, ErrNxDomain
+		}
+	}
+
 	type result struct {
 		answers     []*DNSRecord
 		authorities []*DNSRecord
@@ -353,38 +364,6 @@ func (r *DNSResolver) FlushBlocklist() {
 
 func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (answers, authorities []*DNSRecord, err error) {
 	log.Debugf("looking up %s in %s", domain, upstream.String())
-	if dnsType == DNSTypePTR {
-		reverseDNS := strings.TrimSuffix(domain, ".in-addr.arpa.")
-		reverseDNS = strings.TrimSuffix(domain, ".in-addr.arpa")
-		octets := strings.Split(reverseDNS, ".")
-		if len(octets) != 4 {
-			return nil, nil, errors.New("invalid reverse DNS")
-		}
-		ip := octets[3] + "." + octets[2] + "." + octets[1] + "." + octets[0]
-		log.Debugf("reverse lookup %s", ip)
-		if net.ParseIP(ip).IsPrivate() {
-			r.domainLock.RLock()
-			for host, localIp := range r.localDomains {
-				log.Tracef("checking %s against %v", host, localIp)
-				if localIp.String() == ip {
-					log.Tracef("found %s in local domains", host)
-					answers = append(answers, &DNSRecord{
-						Name:       compressedDomainVal,
-						Type:       dnsType,
-						Class:      DNSClassIN,
-						TTL:        uint32(r.cacheTTL.Seconds()),
-						ParsedName: host,
-						RData:      stringToDNSWireFormat(host),
-					})
-					r.domainLock.RUnlock()
-					return answers, nil, nil
-				}
-				r.domainLock.RUnlock()
-				return nil, nil, ErrNxDomain // we don't have this local domain defined, so we treat it as a bad name
-			}
-			r.domainLock.RUnlock()
-		}
-	}
 	return r.exchange(domain, dnsType, fmt.Sprintf("%s:%d", upstream, r.upstreamPort))
 }
 
