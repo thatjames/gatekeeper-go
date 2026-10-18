@@ -39,8 +39,12 @@ to it ([Pi-hole parity](/dns/pihole-parity.md)).
   receive worker (bug).
 - Resolver result → RCODE: success 0 with answers and authorities set;
   `ErrNxDomain` 3; any other error 2 (server failure).
-- The reply sets QR and RA, drops all additional records (EDNS OPT too) and
-  goes back to the sender. There is no truncation.
+- The reply sets QR and RA, clears TC, drops all additional records (EDNS
+  OPT too) and goes back to the sender.
+- Truncation (UDP only): the client's limit is 512 bytes, or the UDP size
+  in the query's OPT record, raised to 512 and capped at 1232. A reply over
+  the limit is sent with TC set, the question kept and all answers and
+  authorities removed, so the client asks again over TCP.
 - Metrics (defined in `types.go`): `dns_req_time`, `dns_query_count`,
   `dns_blocked_domain_count`, `dns_query_by_ip_count`. There is no cache-hit
   metric; cache hits count in `dns_query_count` with upstream `cache`.

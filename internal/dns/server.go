@@ -25,6 +25,13 @@ type DNSServerOpts struct {
 	ReadDeadline   time.Duration
 }
 
+// A UDP reply fits minUDPSize bytes, or the client's EDNS UDP size up to
+// maxUDPSize; a bigger one is truncated.
+const (
+	minUDPSize = 512
+	maxUDPSize = 1232
+)
+
 // tcpIdleTimeout closes a TCP connection that sends no query for this long.
 const tcpIdleTimeout = time.Second * 10
 
@@ -297,7 +304,7 @@ func (d *DNSServer) receiverWorker() {
 func (d *DNSServer) responseWorker() {
 	for packet := range d.responseChan {
 		log.Tracef("sending DNS response packet to %s", packet.ResponseAddr.String())
-		data, err := prepareReply(packet.DNSMessage)
+		data, err := prepareReply(packet.DNSMessage, udpSizeLimit(packet.DNSMessage))
 		if err != nil {
 			log.Error("unable to marshal DNS packet: ", err.Error())
 			continue
@@ -335,11 +342,32 @@ func (d *DNSServer) answer(msg *DNSMessage) {
 	}
 }
 
+// udpSizeLimit is the largest UDP reply the client of query accepts.
+func udpSizeLimit(query *DNSMessage) int {
+	for _, record := range query.Additionals {
+		if record.Type == DNSTypeOPT {
+			return min(max(int(record.Class), minUDPSize), maxUDPSize)
+		}
+	}
+	return minUDPSize
+}
+
 // prepareReply sets the reply flags on an answered query and marshals it.
-func prepareReply(msg *DNSMessage) ([]byte, error) {
+// With a sizeLimit (UDP) a reply that does not fit loses its answers and
+// authorities and is sent with TC set; 0 means no limit (TCP).
+func prepareReply(msg *DNSMessage, sizeLimit int) ([]byte, error) {
 	msg.Header.SetQR(true)
 	msg.Header.SetRA(true)
+	msg.Header.SetTC(false)
 	msg.Additionals = nil
+	data, err := MarshalDNSMessage(msg)
+	if err != nil || sizeLimit == 0 || len(data) <= sizeLimit {
+		return data, err
+	}
+	log.Debugf("truncating %d byte reply to fit %d bytes", len(data), sizeLimit)
+	msg.Answers = nil
+	msg.Authorities = nil
+	msg.Header.SetTC(true)
 	return MarshalDNSMessage(msg)
 }
 
@@ -395,7 +423,7 @@ func (d *DNSServer) serveTCP(conn net.Conn) {
 
 		log.Tracef("received DNS packet over TCP from %s", clientIP)
 		d.answer(msg)
-		data, err := prepareReply(msg)
+		data, err := prepareReply(msg, 0)
 		if err != nil {
 			log.Error("unable to marshal DNS packet: ", err.Error())
 			return

@@ -254,3 +254,65 @@ func TestNewDNSServerWithOptsPassesResolverOptsThrough(t *testing.T) {
 		t.Fatalf("expected a local answer of 192.168.1.1, got %v", answers)
 	}
 }
+
+// answeredQuery is a query for big.test with count A answers filled in.
+func answeredQuery(count int, additionals ...*DNSRecord) *DNSMessage {
+	msg := NewDnsMessage()
+	msg.Questions = append(msg.Questions, &DNSQuestion{Name: stringToDNSWireFormat("big.test"), Type: DNSTypeA, Class: DNSClassIN, ParsedName: "big.test"})
+	for i := 0; i < count; i++ {
+		msg.Answers = append(msg.Answers, &DNSRecord{Name: compressedDomainVal, Type: DNSTypeA, Class: DNSClassIN, TTL: 60, RData: []byte{10, 0, byte(i >> 8), byte(i)}})
+	}
+	msg.Additionals = append(msg.Additionals, additionals...)
+	return msg
+}
+
+func TestUDPSizeLimit(t *testing.T) {
+	cases := map[string]struct {
+		additionals []*DNSRecord
+		want        int
+	}{
+		"no EDNS":    {nil, 512},
+		"EDNS small": {[]*DNSRecord{{Type: DNSTypeOPT, Class: 256}}, 512},
+		"EDNS 1000":  {[]*DNSRecord{{Type: DNSTypeOPT, Class: 1000}}, 1000},
+		"EDNS 4096":  {[]*DNSRecord{{Type: DNSTypeOPT, Class: 4096}}, 1232},
+	}
+	for name, c := range cases {
+		if got := udpSizeLimit(answeredQuery(0, c.additionals...)); got != c.want {
+			t.Errorf("%s: expected %d, got %d", name, c.want, got)
+		}
+	}
+}
+
+func TestPrepareReplyTruncatesOversizedUDP(t *testing.T) {
+	// 12 header + 14 question + 40 answers of 16 bytes = 666 bytes
+	data, err := prepareReply(answeredQuery(40), 512)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reply, err := ParseDNSMessage(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reply.Header.Flags&0x0200 == 0 {
+		t.Error("expected TC set")
+	}
+	if len(reply.Answers) != 0 || len(reply.Questions) != 1 {
+		t.Errorf("expected question only, got %d questions and %d answers", len(reply.Questions), len(reply.Answers))
+	}
+}
+
+func TestPrepareReplyKeepsFittingAndTCPReplies(t *testing.T) {
+	for name, limit := range map[string]int{"fits UDP": 1232, "TCP": 0} {
+		data, err := prepareReply(answeredQuery(40), limit)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reply, err := ParseDNSMessage(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if reply.Header.Flags&0x0200 != 0 || len(reply.Answers) != 40 {
+			t.Errorf("%s: expected 40 answers without TC, got %d (flags %#x)", name, len(reply.Answers), reply.Header.Flags)
+		}
+	}
+}
