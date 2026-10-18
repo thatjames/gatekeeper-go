@@ -1,11 +1,15 @@
 package dns
 
 import (
+	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 type mockResolver struct {
@@ -461,5 +465,190 @@ func TestStartBindsToInterfaceAddress(t *testing.T) {
 	if err := missing.Start(); err == nil {
 		missing.Stop()
 		t.Error("expected Start to fail for a missing interface")
+	}
+}
+
+// outcomeResolver answers fail.test with SERVFAIL, missing.test with
+// NXDOMAIN and every other name with 192.0.2.1.
+type outcomeResolver struct {
+	*mockResolver
+}
+
+func (o *outcomeResolver) Resolve(domain string, dnsType DNSType) (answers, authorities []*DNSRecord, err error) {
+	switch domain {
+	case "fail.test":
+		return nil, nil, ErrDNSServerFailure
+	case "missing.test":
+		return nil, nil, ErrNxDomain
+	}
+	return []*DNSRecord{aRecord("192.0.2.1", 60)}, nil, nil
+}
+
+func startOutcomeServer(t *testing.T) *DNSServer {
+	t.Helper()
+	server := NewDNSServerWithOpts(DNSServerOpts{Interface: "lo", Port: 0, ReadDeadline: 50 * time.Millisecond}, &outcomeResolver{newMockResolver()}, nil)
+	if err := server.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { server.Stop() })
+	return server
+}
+
+// rawQuery marshals a query with the given ID, RD set, one A question per
+// name and the given additional records.
+func rawQuery(t *testing.T, id uint16, names []string, additionals ...*DNSRecord) []byte {
+	t.Helper()
+	query := NewDnsMessage()
+	query.Header.ID = id
+	query.Header.SetRD(true)
+	for _, name := range names {
+		query.Questions = append(query.Questions, &DNSQuestion{Name: stringToDNSWireFormat(name), Type: DNSTypeA, Class: DNSClassIN})
+	}
+	query.Additionals = additionals
+	data, err := MarshalDNSMessage(query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+func exchangeUDP(t *testing.T, server *DNSServer, data []byte) *DNSMessage {
+	t.Helper()
+	conn, err := net.Dial("udp4", server.packetConn.LocalAddr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	conn.SetDeadline(time.Now().Add(time.Second))
+	if _, err := conn.Write(data); err != nil {
+		t.Fatal(err)
+	}
+	buff := make([]byte, 1500)
+	n, err := conn.Read(buff)
+	if err != nil {
+		t.Fatalf("no reply: %v", err)
+	}
+	reply, err := ParseDNSMessage(buff[:n])
+	if err != nil {
+		t.Fatalf("parse reply: %v", err)
+	}
+	return reply
+}
+
+func exchangeTCP(t *testing.T, conn net.Conn, data []byte) *DNSMessage {
+	t.Helper()
+	conn.SetDeadline(time.Now().Add(time.Second))
+	if _, err := conn.Write(append(binary.BigEndian.AppendUint16(nil, uint16(len(data))), data...)); err != nil {
+		t.Fatal(err)
+	}
+	prefix := make([]byte, 2)
+	if _, err := io.ReadFull(conn, prefix); err != nil {
+		t.Fatalf("no reply: %v", err)
+	}
+	buff := make([]byte, binary.BigEndian.Uint16(prefix))
+	if _, err := io.ReadFull(conn, buff); err != nil {
+		t.Fatal(err)
+	}
+	reply, err := ParseDNSMessage(buff)
+	if err != nil {
+		t.Fatalf("parse reply: %v", err)
+	}
+	return reply
+}
+
+func checkFormErr(t *testing.T, reply *DNSMessage, id uint16) {
+	t.Helper()
+	if reply.Header.ID != id || reply.Header.RCODE() != RCODEFormatError {
+		t.Errorf("expected FORMERR for ID %d, got ID %d RCODE %d", id, reply.Header.ID, reply.Header.RCODE())
+	}
+	if reply.Header.Flags&(1<<15) == 0 || reply.Header.Flags&(1<<8) == 0 {
+		t.Errorf("expected QR and RD set, flags %016b", reply.Header.Flags)
+	}
+	if len(reply.Questions)+len(reply.Answers)+len(reply.Authorities) != 0 {
+		t.Errorf("expected no question or records, got %d/%d/%d", len(reply.Questions), len(reply.Answers), len(reply.Authorities))
+	}
+}
+
+func TestMalformedQueriesGetFormErrOverUDP(t *testing.T) {
+	server := startOutcomeServer(t)
+
+	reply := exchangeUDP(t, server, rawQuery(t, 0x1234, nil))
+	checkFormErr(t, reply, 0x1234)
+	if len(reply.Additionals) != 0 {
+		t.Errorf("expected no OPT without EDNS, got %v", reply.Additionals)
+	}
+
+	reply = exchangeUDP(t, server, rawQuery(t, 0x1235, nil, NewOPTRecord(4096)))
+	checkFormErr(t, reply, 0x1235)
+	if opt := queryOPT(reply); opt == nil || opt.Class != maxUDPSize {
+		t.Errorf("expected our OPT on a zero-question EDNS query, got %v", reply.Additionals)
+	}
+
+	reply = exchangeUDP(t, server, rawQuery(t, 0x1236, []string{"a.test", "b.test"}, NewOPTRecord(4096)))
+	checkFormErr(t, reply, 0x1236)
+	if len(reply.Additionals) != 0 {
+		t.Errorf("expected no OPT on a multi-question query, got %v", reply.Additionals)
+	}
+
+	reply = exchangeUDP(t, server, rawQuery(t, 0x1237, []string{"ok.test"}))
+	if reply.Header.RCODE() != RCODESuccess || len(reply.Answers) != 1 {
+		t.Errorf("expected the server to keep answering, got RCODE %d with %d answers", reply.Header.RCODE(), len(reply.Answers))
+	}
+}
+
+func TestMalformedQueriesGetFormErrOverTCP(t *testing.T) {
+	server := startOutcomeServer(t)
+	conn, err := net.Dial("tcp4", server.tcpListener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	checkFormErr(t, exchangeTCP(t, conn, rawQuery(t, 1, nil)), 1)
+	checkFormErr(t, exchangeTCP(t, conn, rawQuery(t, 2, []string{"a.test", "b.test"})), 2)
+	reply := exchangeTCP(t, conn, rawQuery(t, 3, []string{"ok.test"}))
+	if reply.Header.ID != 3 || reply.Header.RCODE() != RCODESuccess || len(reply.Answers) != 1 {
+		t.Errorf("expected the connection to keep answering, got ID %d RCODE %d with %d answers", reply.Header.ID, reply.Header.RCODE(), len(reply.Answers))
+	}
+}
+
+func TestQueryByIPCountsFailures(t *testing.T) {
+	server := startOutcomeServer(t)
+	count := func(result string) float64 {
+		return testutil.ToFloat64(queryByIPCounter.WithLabelValues("127.0.0.1", result))
+	}
+	conn, err := net.Dial("tcp4", server.tcpListener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	tests := []struct {
+		names  []string
+		result string
+	}{
+		{[]string{"ok.test"}, "success"},
+		{[]string{"missing.test"}, "success"},
+		{[]string{"fail.test"}, "failed"},
+		{nil, "failed"},
+		{[]string{"a.test", "b.test"}, "failed"},
+	}
+	for _, transport := range []string{"UDP", "TCP"} {
+		for i, tt := range tests {
+			before := count(tt.result)
+			if transport == "UDP" {
+				exchangeUDP(t, server, rawQuery(t, uint16(i), tt.names))
+			} else {
+				exchangeTCP(t, conn, rawQuery(t, uint16(i), tt.names))
+			}
+			// UDP counts just after the reply is handed on
+			deadline := time.Now().Add(time.Second)
+			for count(tt.result) == before && time.Now().Before(deadline) {
+				time.Sleep(5 * time.Millisecond)
+			}
+			if got := count(tt.result) - before; got != 1 {
+				t.Errorf("%s %v: expected %s counted once, got %v", transport, tt.names, tt.result, got)
+			}
+		}
 	}
 }

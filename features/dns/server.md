@@ -8,6 +8,7 @@ code:
   - internal/dns/types.go
   - internal/dns/server_test.go
   - internal/dns/dns_feature_test.go
+  - internal/dns/parity_feature_test.go
   - internal/dns/features/dns_request.feature
 tags: [dns]
 generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T22:30:00Z }
