@@ -17,8 +17,8 @@ A hand-written RFC 1035 codec, part of the point of the project.
 
 # Behavior
 - `ParseDNSMessage`: under 12 bytes → `ErrDNSPacketTooShort`; more than one
-  question → `ErrDNSTooManyQuestions` (the server then drops the query; the
-  code comment's FORMERR is not sent); zero questions parse fine.
+  question → `ErrDNSTooManyQuestions` (the server answers it FORMERR from
+  the header, see [DNS server](/dns/server.md)); zero questions parse fine.
 - Names: labels up to 63 bytes, compression pointers followed and checked
   against the packet length; parse errors name the offset.
 - OPT (EDNS) records are parsed with their own RDATA bounds check; the

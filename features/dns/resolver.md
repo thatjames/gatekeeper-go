@@ -13,7 +13,7 @@ code:
   - internal/dns/cache_test.go
   - internal/dns/features/dns_resolver.feature
 tags: [dns, cache]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T15:30:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T22:30:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -34,11 +34,17 @@ Ad-blocking, local-name-aware recursion for the home LAN, as Pi-hole did.
   not cached.
 - Local domain: A query → its IPv4 with the cache TTL; any other type →
   empty NOERROR answer.
-- PTR `a.b.c.d.in-addr.arpa` for a private IP: only the first local domain
-  in map order is checked; a match answers its name, otherwise NXDOMAIN
-  without asking upstream (bug). With no local domains the query goes
-  upstream. A trailing `.` is not stripped (typo: the second TrimSuffix
-  uses the original name).
+- PTR for a private IPv4 (`d.c.b.a.in-addr.arpa`, with or without the
+  trailing dot, any case; private is 10/8, 172.16/12 and 192.168/16) that
+  no conditional forwarder covers: every local domain is checked; a match
+  answers its name with the cache TTL (when several share the address, the
+  alphabetically first name), counted as `local-domain` and not cached;
+  no match is NXDOMAIN without an SOA, also with no local domains at all.
+  The upstreams are never asked for a private reverse name.
+- A PTR for a public address, or for a name that is not a four-label IPv4
+  reverse name (`ip6.arpa`, a zone such as `1.168.192.in-addr.arpa`, a
+  DNS-SD name such as `b._dns-sd._udp.0.1.168.192.in-addr.arpa`), goes to
+  the upstreams like any other query.
 - Conditional forwarders (`ConditionalForwarders`, zone → server): a name
   equal to a zone or under it goes to that zone's server only; the longest
   matching zone wins; zone and name are compared lower-case without a
@@ -84,7 +90,7 @@ Ad-blocking, local-name-aware recursion for the home LAN, as Pi-hole did.
   for the same name each go upstream (no coalescing).
 - Local domains reject `0.0.0.0` and non-IPv4 addresses.
 - Metrics: `queryCounter` per domain, upstream (or `cache`,
-  `local-domain`) and result. NXDOMAIN is not counted, from an upstream or the
+  `local-domain`, which includes local PTR answers) and result. NXDOMAIN is not counted, from an upstream or the
   cache.
 
 # Interfaces
@@ -93,8 +99,15 @@ Ad-blocking, local-name-aware recursion for the home LAN, as Pi-hole did.
 - [Wire format](/dns/wire-format.md).
 
 # Decisions
-- Fixes agreed 2026-10-17 (plans): the PTR bug, folded together with the
-  `feature/ptr_records` branch.
+- An unmatched private PTR goes to the conditional forwarder that covers
+  its reverse zone, else NXDOMAIN: private reverse names never leak to the
+  public upstreams (user, 2026-10-18). This replaces the old code, which
+  checked only the first local domain in map order. The
+  `feature/ptr_records` branch (2025-11-19) had the same intent; its step
+  regexes were already on main, so it was redone, not merged.
+- A PTR name that is not a four-label IPv4 reverse name goes upstream; the
+  old code answered SERVFAIL ("invalid reverse DNS") to it, which broke
+  DNS-SD browsing and `ip6.arpa` lookups (2026-10-18).
 - Cache limit 10 000 entries, nearest expiry evicted first: bounded memory
   on atlas, and the entry that is evicted would have been the next to
   expire anyway (user, 2026-10-18).
