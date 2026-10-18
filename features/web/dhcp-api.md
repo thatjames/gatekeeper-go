@@ -6,7 +6,7 @@ status: stable
 code:
   - internal/web/v1/dhcp.go
 tags: [web, api, dhcp]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T21:52:15Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T22:10:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -16,8 +16,9 @@ Manage leases and DHCP settings from the UI.
 # Behavior
 - `GET /dhcp/leases` → `{active, reserved}` lists of
   `{clientId, hostname, ip, state, expiry}`.
-- `DELETE /dhcp/leases/:clientId` releases the lease (a reservation is
-  deleted, also from the config); unknown client → 400. Answers the lists.
+- `DELETE /dhcp/leases/:clientId` deletes the lease through the pool's
+  `DeleteLease` (a reservation is deleted, also from the config, unlike a
+  client's RELEASE); unknown client → 400. Answers the lists.
 - `POST /dhcp/leases/reserve {clientId, ip}` reserves, saves the config and
   answers the lists; an IP reserved for another client → 400.
 - `PUT /dhcp/leases {clientId, ip}` changes a reservation or lease IP and
