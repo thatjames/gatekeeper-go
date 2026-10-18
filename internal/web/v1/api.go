@@ -3,11 +3,13 @@ package v1
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
-	badrand "math/rand"
+	"math/big"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -25,6 +27,10 @@ var (
 	oidcOAuth2Config oauth2.Config
 	oidcOnce         sync.Once
 	oidcInitErr      error
+
+	// fallbackPassword is set at startup when no htpasswd file can be read;
+	// admin logs in with it for the life of the process.
+	fallbackPassword string
 )
 
 func initOIDC() error {
@@ -80,12 +86,14 @@ func SetupV1Endpoints(r *gin.RouterGroup) {
 			log.Debug("Using default login handler")
 		}
 	}
+	initLogin()
 	v1Group.POST("/login", defaultLoginHandler)
 
 	v1Group.GET("/health", healthHandler)
 	v1Group.GET("/version", getVersion)
 
-	protected := v1Group.Group("/", loggingMiddleware(), authMiddleware())
+	protected := v1Group.Group("/", loggingMiddleware(), AuthMiddleware())
+	protected.GET("/me", meHandler)
 	if service.IsRegistered(service.DHCP) {
 		log.Info("Registering DHCP endpoints")
 		setupDHCPRoutes(protected)
@@ -181,7 +189,7 @@ func oidcCallbackHandler(c *gin.Context) {
 		return
 	}
 
-	// Issue app token so authMiddleware is unchanged
+	// Issue app token so AuthMiddleware is unchanged
 	token, err := CreateAuthToken(claims.Email)
 	if err != nil {
 		log.WithError(err).Error("Failed to create auth token after OIDC")
@@ -193,17 +201,31 @@ func oidcCallbackHandler(c *gin.Context) {
 	if config.Config.Web != nil && config.Config.Web.WebURL != "" {
 		webURL = config.Config.Web.WebURL
 	}
-	c.SetCookie(
-		"oauth_token",
-		token,
-		3600, // max age in seconds, match your JWT expiry
-		"/",
-		"",
-		false,
-		false,
-	)
+	setTokenCookie(c, token, int(tokenLife.Seconds()))
 
 	c.Redirect(http.StatusFound, webURL)
+}
+
+// initLogin checks once whether the htpasswd file can be used. Without one,
+// it makes a password for admin and logs it, once.
+func initLogin() {
+	fallbackPassword = ""
+	file := ""
+	if config.Config.Web != nil {
+		file = config.Config.Web.HTPasswdFile
+	}
+	_, err := htpasswd.New(file, htpasswd.DefaultSystems, nil)
+	if err == nil {
+		return
+	}
+	log.Warn("Unable to read htpasswd file: ", err.Error())
+	password, err := generateRandomString(16)
+	if err != nil {
+		log.WithError(err).Error("Failed to generate fallback password; password login is disabled")
+		return
+	}
+	fallbackPassword = password
+	log.Warn("No htpasswd file; log in as admin with password: ", fallbackPassword)
 }
 
 func defaultLoginHandler(c *gin.Context) {
@@ -212,34 +234,49 @@ func defaultLoginHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
 		return
 	}
-	log.Info("Login request: ", req)
+	logger := log.WithField("username", req.Username)
+	logger.Info("Login attempt")
 
 	authenticated := false
-	if passwd, err := htpasswd.New(config.Config.Web.HTPasswdFile, htpasswd.DefaultSystems, nil); err == nil {
+	if fallbackPassword != "" {
+		authenticated = req.Username == "admin" &&
+			subtle.ConstantTimeCompare([]byte(req.Password), []byte(fallbackPassword)) == 1
+	} else if passwd, err := htpasswd.New(config.Config.Web.HTPasswdFile, htpasswd.DefaultSystems, nil); err == nil {
 		authenticated = passwd.Match(req.Username, req.Password)
 	} else {
-		log.Warn("Unable to read htpasswd file: ", err.Error())
-		password := generateRandomString(16)
-		log.Warn("Using random password: ", password)
-		authenticated = (req.Username == "admin" && req.Password == password)
+		logger.Error("Unable to read htpasswd file: ", err.Error())
 	}
 
 	if !authenticated {
+		logger.Warn("Login failed")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
 
 	token, err := CreateAuthToken(req.Username)
 	if err != nil {
-		log.Error("Failed to create auth token: ", err)
+		logger.Error("Failed to create auth token: ", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create token"})
 		return
 	}
+	logger.Info("Login succeeded")
 	c.JSON(http.StatusOK, gin.H{"token": token})
 }
 
+func meHandler(c *gin.Context) {
+	c.JSON(http.StatusOK, c.MustGet("user"))
+}
+
 func logoutHandler(c *gin.Context) {
-	c.SetCookie("oauth_token", "", -1, "/", "", false, false)
+	setTokenCookie(c, "", -1)
+}
+
+// setTokenCookie sets the oauth_token cookie. Scripts cannot read it; it is
+// Secure when the UI is served over https.
+func setTokenCookie(c *gin.Context, value string, maxAge int) {
+	secure := config.Config.Web != nil && strings.HasPrefix(config.Config.Web.WebURL, "https://")
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("oauth_token", value, maxAge, "/", "", secure, true)
 }
 
 func generateState() (string, error) {
@@ -250,11 +287,15 @@ func generateState() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
-func generateRandomString(length int) string {
+func generateRandomString(length int) (string, error) {
 	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	ret := make([]byte, length)
-	for i := 0; i < length; i++ {
-		ret[i] = letters[badrand.Intn(len(letters))]
+	for i := range ret {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
+		if err != nil {
+			return "", err
+		}
+		ret[i] = letters[n.Int64()]
 	}
-	return string(ret)
+	return string(ret), nil
 }

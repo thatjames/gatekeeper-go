@@ -22,6 +22,18 @@ func Init(ver string, cfg *config.Web) error {
 		cfg.WebURL = "http://localhost:5173"
 	}
 
+	r := newRouter(cfg)
+
+	if cfg.TLS != nil {
+		log.Info("Starting TLS server on ", cfg.Address)
+		return r.RunTLS(cfg.Address, cfg.TLS.PublicKey, cfg.TLS.PrivateKey)
+	} else {
+		log.Info("Starting HTTP server on ", cfg.Address)
+		return r.Run(cfg.Address)
+	}
+}
+
+func newRouter(cfg *config.Web) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 
@@ -31,7 +43,9 @@ func Init(ver string, cfg *config.Web) error {
 	corsConfig.AllowCredentials = true
 	r.Use(cors.New(corsConfig))
 
-	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	if cfg.Prometheus {
+		r.GET("/metrics", v1.AuthMiddleware(), gin.WrapH(promhttp.Handler()))
+	}
 
 	api := r.Group("/api")
 	v1.SetupV1Endpoints(api)
@@ -39,13 +53,7 @@ func Init(ver string, cfg *config.Web) error {
 	r.Use(spaMiddleware())
 	r.Use(static.Serve("/", NewEmbeddedFS()))
 
-	if cfg.TLS != nil {
-		log.Info("Starting TLS server on ", cfg.Address)
-		return r.RunTLS(cfg.Address, cfg.TLS.PublicKey, cfg.TLS.PrivateKey)
-	} else {
-		log.Info("Starting HTTP server on ", cfg.Address)
-		return r.Run(cfg.Address)
-	}
+	return r
 }
 
 func spaMiddleware() gin.HandlerFunc {

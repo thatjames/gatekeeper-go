@@ -1,4 +1,5 @@
 import { env } from "$lib/api/api";
+import { auth } from "$lib/auth/auth.svelte";
 
 class PrometheusMetricsService {
   constructor() {
@@ -9,7 +10,10 @@ class PrometheusMetricsService {
    * Fetches raw Prometheus metrics from the endpoint
    */
   async fetchMetrics() {
-    const response = await fetch(`${this.url}`);
+    const response = await fetch(`${this.url}`, {
+      headers: auth.token ? { Authorization: "Bearer " + auth.token } : {},
+      credentials: "include",
+    });
     if (!response.ok) {
       throw new Error(`Failed to fetch metrics: ${response.statusText}`);
     }

@@ -1,9 +1,15 @@
 package web
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
+	v1 "gitlab.com/thatjames-go/gatekeeper-go/internal/web/v1"
 )
 
 func TestInitDefaultAddress(t *testing.T) {
@@ -40,5 +46,45 @@ func TestSpaMiddlewareExists(t *testing.T) {
 	middleware := spaMiddleware()
 	if middleware == nil {
 		t.Error("expected spaMiddleware to not be nil")
+	}
+}
+
+func TestMetrics(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Setenv("GATEKEEPER_JWT_SECRET", "test-secret")
+	if err := v1.LoadJWTSecret(); err != nil {
+		t.Fatal(err)
+	}
+	oldConfig := config.Config
+	t.Cleanup(func() { config.Config = oldConfig })
+
+	get := func(r *gin.Engine, token string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		return w
+	}
+	token, err := v1.CreateAuthToken("admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	on := &config.Web{WebURL: "http://localhost:5173", Prometheus: true}
+	config.Config = &config.ConfigInstance{Web: on}
+	r := newRouter(on)
+	if w := get(r, ""); w.Code != http.StatusUnauthorized {
+		t.Errorf("no token: expected 401, got %d", w.Code)
+	}
+	if w := get(r, token); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "# HELP") {
+		t.Errorf("with token: expected 200 with metrics, got %d", w.Code)
+	}
+
+	off := &config.Web{WebURL: "http://localhost:5173"}
+	config.Config = &config.ConfigInstance{Web: off}
+	if w := get(newRouter(off), token); w.Code != http.StatusNotFound {
+		t.Errorf("Prometheus off: expected 404, got %d", w.Code)
 	}
 }
