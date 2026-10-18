@@ -28,7 +28,7 @@ okf_version: "0.2"
 
 # Web API
 
-* [HTTP server](/web/http-server.md) - A gin server on Web.Address (default :8085, optional TLS) that serves the API under /api, Prometheus metrics at /metrics and the embedded UI for every other path, with CORS for WebURL.
+* [HTTP server](/web/http-server.md) - A gin server on Web.Address (default :8085, optional TLS) that serves the API under /api, authenticated Prometheus metrics at /metrics when Web.Prometheus is true, and the embedded UI for every other path, with CORS for WebURL.
 * [API v1 routes](/web/api-routes.md) - The /api/v1 route table - open health, version, features and login routes; DHCP, DNS and system routes behind auth, registered only for running modules - with request types and validation.
 * [Login and tokens](/web/auth.md) - Users log in with htpasswd credentials or OIDC (Authentik) and get a 7-day HS256 JWT signed with GATEKEEPER_JWT_SECRET, sent as a Bearer header or the oauth_token cookie.
 * [OIDC roles](/web/auth-roles.md) - draft - map the OIDC roles claim to gatekeeper roles (admin, user and more) and allow API actions by role, so not every Authentik user can change DNS.

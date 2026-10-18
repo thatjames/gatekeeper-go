@@ -1,14 +1,14 @@
 ---
 type: Feature
 title: HTTP server
-description: A gin server on Web.Address (default :8085, optional TLS) that serves the API under /api, Prometheus metrics at /metrics and the embedded UI for every other path, with CORS for WebURL.
+description: A gin server on Web.Address (default :8085, optional TLS) that serves the API under /api, authenticated Prometheus metrics at /metrics when Web.Prometheus is true, and the embedded UI for every other path, with CORS for WebURL.
 status: stable
 code:
   - internal/web/web.go
   - internal/web/embedfs.go
   - internal/web/web_test.go
 tags: [web, http, metrics]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T21:52:15Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T12:50:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -21,9 +21,10 @@ One port for the admin UI, its API and the metrics.
   plain HTTP.
 - CORS allows `WebURL` and, hardcoded, `http(s)://gatekeeper.thatjames.nl`,
   with credentials and the Authorization header.
-- `/metrics` serves the Prometheus registry with no auth, whatever
-  `Web.Prometheus` says. It shows client IPs, MACs, hostnames and queried
-  domains.
+- `/metrics` serves the Prometheus registry only when `Web.Prometheus` is
+  true; otherwise it is not registered and answers 404. It is behind the
+  [auth middleware](/web/auth.md) (401 without a token, 403 with a bad
+  one), because it shows client IPs, MACs, hostnames and queried domains.
 - Paths outside `/api/` and `/metrics` with no `.` are rewritten to `/`, so
   the single-page app handles them; files come from `ui/dist` embedded at
   build time (the build fails without `internal/web/ui/dist`).
@@ -33,5 +34,7 @@ One port for the admin UI, its API and the metrics.
 - [API routes](/web/api-routes.md), [UI shell](/ui/app-shell.md).
 
 # Decisions
-- Fixes agreed 2026-10-17 (plans): CORS from WebURL only; `/metrics` behind
-  auth (or honour `Web.Prometheus`).
+- `/metrics` always needs auth and is off unless `Prometheus: true` (user,
+  2026-10-18): it leaks LAN detail, the bool's zero value is the documented
+  default, and a scraper can send a token.
+- Fix agreed 2026-10-17 (web handler plan): CORS from WebURL only.

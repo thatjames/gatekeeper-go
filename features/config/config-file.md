@@ -8,7 +8,7 @@ code:
   - config/config.yml
   - config/docker-config.yml
 tags: [config, yaml]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T21:52:15Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T12:50:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -28,7 +28,8 @@ without hand edits.
 - `DNS`: UpstreamServers, Interface, LocalDomains (name → IPv4), Port,
   BlockLists (URLs or file paths), BlockedDomains.
 - `Web`: Address, WebURL, TLS (PublicKey, PrivateKey paths), HTPasswdFile,
-  Prometheus. `Prometheus` is parsed but not read: `/metrics` is always on.
+  Prometheus. `Prometheus` (default false) turns on `/metrics`
+  ([HTTP server](/web/http-server.md)).
 - `UpdateConfig()` truncates the loaded file and writes the whole global back
   (2-space indent); comments and key order in the file are lost. With no
   file loaded it returns an error.
