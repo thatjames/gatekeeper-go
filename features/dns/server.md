@@ -19,15 +19,19 @@ The LAN's DNS server on atlas, replacing Pi-hole: hecate's dnsmasq forwards
 to it ([Pi-hole parity](/dns/pihole-parity.md)).
 
 # Behavior
-- Defaults: port 53, upstreams 8.8.8.8 and 1.1.1.1, read deadline 2 s. The
+- Defaults: port 53, no interface (all addresses), upstreams 8.8.8.8 and
+  1.1.1.1, read deadline 2 s. The
   resolver gets the server's upstreams when its own list is empty. Startup
   passes `DNS.ConditionalForwarders` to the resolver.
 - `Start()` adds `BlockedDomains` to the resolver, listens on UDP4 and
-  TCP4 `:<port>` on all interfaces (the `Interface` option is not used),
-  starts the UDP listener with one receive worker and one response worker
+  TCP4 `<address>:<port>`, starts the UDP listener with one receive worker and one response worker
   and the TCP accept loop, then fetches the blocklist URLs
   ([blocklists](/dns/blocklist.md)) before it returns. When either listen
   fails, `Start` closes what it opened and returns the error.
+- Binding: with `Interface` empty the address is empty (all addresses).
+  Otherwise it is the first IPv4 address of that interface, looked up at
+  each `Start`; an unknown interface, or one with no IPv4 address, fails
+  `Start` with an error naming it. An address change takes a restart.
 - TCP: each connection is served by its own goroutine. Messages carry a
   2-byte big-endian length prefix (RFC 1035 4.2.2); the connection may send
   several queries, answered in order, and is closed after 10 s with no

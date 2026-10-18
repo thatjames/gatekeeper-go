@@ -58,6 +58,9 @@ DNS:
 ```
 
 `Server` is an IPv4 address, optionally with `:port` (default 53).
+`Interface` names an interface as gatekeeper sees it: with Docker's bridge
+network that is the container's `eth0`, so binding to atlas's LAN NIC needs
+host networking (or leave `Interface` empty).
 Built in [DNS server](/dns/server.md), [DNS resolver](/dns/resolver.md),
 [DNS wire format](/dns/wire-format.md) and [Config file](/config/config-file.md).
 

@@ -2,6 +2,7 @@ package dns
 
 import (
 	"net"
+	"strings"
 	"testing"
 	"time"
 )
@@ -56,8 +57,8 @@ func TestNewDNSServer_DefaultOpts(t *testing.T) {
 		t.Error("expected opts to be set")
 	}
 
-	if server.opts.Interface != "eth0" {
-		t.Errorf("expected interface 'eth0', got '%s'", server.opts.Interface)
+	if server.opts.Interface != "" {
+		t.Errorf("expected no interface, got '%s'", server.opts.Interface)
 	}
 
 	if server.opts.Port != 53 {
@@ -349,5 +350,37 @@ func TestPrepareReplyAnswersEDNS(t *testing.T) {
 		if (reply.Header.Flags&0x0200 != 0) != c.wantTC || len(reply.Answers) != c.wantAnsw {
 			t.Errorf("%s: expected TC %v and %d answers, got flags %#x and %d answers", name, c.wantTC, c.wantAnsw, reply.Header.Flags, len(reply.Answers))
 		}
+	}
+}
+
+func TestListenHost(t *testing.T) {
+	if host, err := listenHost(""); err != nil || host != "" {
+		t.Errorf("no interface: expected all addresses, got %q %v", host, err)
+	}
+	if host, err := listenHost("lo"); err != nil || host != "127.0.0.1" {
+		t.Errorf("lo: expected 127.0.0.1, got %q %v", host, err)
+	}
+	if _, err := listenHost("gk-missing0"); err == nil {
+		t.Error("missing interface: expected an error")
+	}
+}
+
+func TestStartBindsToInterfaceAddress(t *testing.T) {
+	server := NewDNSServerWithOpts(DNSServerOpts{Interface: "lo", Port: 0}, NewDNSResolverWithDefaultOpts(), nil)
+	if err := server.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer server.Stop()
+	if addr := server.packetConn.LocalAddr().String(); !strings.HasPrefix(addr, "127.0.0.1:") {
+		t.Errorf("expected UDP on 127.0.0.1, got %s", addr)
+	}
+	if addr := server.tcpListener.Addr().String(); addr != server.packetConn.LocalAddr().String() {
+		t.Errorf("expected TCP on the UDP address %s, got %s", server.packetConn.LocalAddr(), addr)
+	}
+
+	missing := NewDNSServerWithOpts(DNSServerOpts{Interface: "gk-missing0", Port: 0}, NewDNSResolverWithDefaultOpts(), nil)
+	if err := missing.Start(); err == nil {
+		missing.Stop()
+		t.Error("expected Start to fail for a missing interface")
 	}
 }

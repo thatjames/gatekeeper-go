@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -36,7 +37,6 @@ const (
 const tcpIdleTimeout = time.Second * 10
 
 var defaultDNSServerOpts = DNSServerOpts{
-	Interface:    "eth0",
 	Port:         53,
 	Upstream:     []string{"8.8.8.8", "1.1.1.1"},
 	ReadDeadline: time.Second * 2,
@@ -117,13 +117,18 @@ func (d *DNSServer) Start() error {
 	}
 	log.Info("starting DNS server")
 	log.Tracef("starting DNS server on port %d", d.opts.Port)
-	var err error
-	listenAddr := fmt.Sprintf(":%d", d.opts.Port)
+	host, err := listenHost(d.opts.Interface)
+	if err != nil {
+		log.Error("unable to start DNS server: ", err.Error())
+		return err
+	}
+	listenAddr := net.JoinHostPort(host, strconv.Itoa(d.opts.Port))
 	if d.packetConn, err = net.ListenPacket("udp4", listenAddr); err != nil {
 		log.Error("unable to start DNS server: ", err.Error())
 		return err
 	}
-	if d.tcpListener, err = net.Listen("tcp4", listenAddr); err != nil {
+	// the UDP address, so port 0 gives both the same port
+	if d.tcpListener, err = net.Listen("tcp4", d.packetConn.LocalAddr().String()); err != nil {
 		log.Error("unable to start DNS server over TCP: ", err.Error())
 		d.packetConn.Close()
 		return err
@@ -317,6 +322,28 @@ func (d *DNSServer) responseWorker() {
 			log.Error("unable to send DNS packet: ", err.Error())
 		}
 	}
+}
+
+// listenHost is the first IPv4 address of iface, or "" (all addresses)
+// when no interface is set.
+func listenHost(iface string) (string, error) {
+	if iface == "" {
+		return "", nil
+	}
+	netIface, err := net.InterfaceByName(iface)
+	if err != nil {
+		return "", fmt.Errorf("interface %s: %w", iface, err)
+	}
+	addrs, err := netIface.Addrs()
+	if err != nil {
+		return "", fmt.Errorf("interface %s: %w", iface, err)
+	}
+	for _, addr := range addrs {
+		if ipNet, ok := addr.(*net.IPNet); ok && ipNet.IP.To4() != nil {
+			return ipNet.IP.String(), nil
+		}
+	}
+	return "", fmt.Errorf("interface %s has no IPv4 address", iface)
 }
 
 // answer resolves the first question of msg and fills msg in as the reply:
