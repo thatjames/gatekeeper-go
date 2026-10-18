@@ -2,8 +2,10 @@ package dns
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"net"
 	"strings"
@@ -350,6 +352,7 @@ func (r *DNSResolver) exchange(domain string, dnsType DNSType, addr string) (ans
 	question.Type = dnsType
 	question.Class = DNSClassIN //probably going to regret hardcoding this one day
 	message.Questions = append(message.Questions, question)
+	message.Additionals = append(message.Additionals, NewOPTRecord(maxUDPSize))
 
 	dat, err := MarshalDNSMessage(message)
 	if err != nil {
@@ -377,7 +380,7 @@ func (r *DNSResolver) exchange(domain string, dnsType DNSType, addr string) (ans
 		return nil, nil, err
 	}
 
-	buff := make([]byte, 1500)
+	buff := make([]byte, 65535)
 	n, err := conn.Read(buff)
 	if err != nil {
 		return nil, nil, err
@@ -386,6 +389,12 @@ func (r *DNSResolver) exchange(domain string, dnsType DNSType, addr string) (ans
 	msg, err := ParseDNSMessage(buff[:n])
 	if err != nil {
 		return nil, nil, err
+	}
+	if msg.Header.TC() {
+		log.Debugf("truncated reply from %s, asking again over TCP", addr)
+		if msg, err = r.exchangeTCP(dat, addr); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	log.Tracef("received DNS packet from %s", conn.RemoteAddr().String())
@@ -412,4 +421,30 @@ func (r *DNSResolver) exchange(domain string, dnsType DNSType, addr string) (ans
 	}
 
 	return
+}
+
+// exchangeTCP sends the marshaled query to addr over TCP and returns the reply.
+func (r *DNSResolver) exchangeTCP(query []byte, addr string) (*DNSMessage, error) {
+	dialer := net.Dialer{
+		Timeout: r.dialTimeout,
+	}
+	conn, err := dialer.Dial("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	conn.SetDeadline(time.Now().Add(r.readTimeout))
+
+	if _, err := conn.Write(append(binary.BigEndian.AppendUint16(nil, uint16(len(query))), query...)); err != nil {
+		return nil, err
+	}
+	lengthPrefix := make([]byte, 2)
+	if _, err := io.ReadFull(conn, lengthPrefix); err != nil {
+		return nil, err
+	}
+	reply := make([]byte, binary.BigEndian.Uint16(lengthPrefix))
+	if _, err := io.ReadFull(conn, reply); err != nil {
+		return nil, err
+	}
+	return ParseDNSMessage(reply)
 }

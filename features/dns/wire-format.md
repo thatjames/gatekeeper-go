@@ -28,6 +28,7 @@ A hand-written RFC 1035 codec, part of the point of the project.
   `NewOPTRecord(udpSize)` builds one with version 0 and no options.
 - `MarshalDNSMessage` writes the header counts from the slices; answers use
   the `0xc00c` pointer to the question name.
-- Header helpers set and read QR, opcode, AA, TC, RD, RA, Z and RCODE.
+- Header helpers set QR, opcode, AA, TC, RD, RA, Z and RCODE, and read TC
+  and RCODE.
 - Named types: A, NS, CNAME, SOA, PTR, MX, TXT, AAAA, OPT; others pass
   through as numbers.

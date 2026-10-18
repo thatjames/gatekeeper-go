@@ -46,8 +46,13 @@ Ad-blocking, local-name-aware recursion for the home LAN, as Pi-hole did.
   upstreams are never asked for a forwarded zone. A forwarder whose server
   is not IPv4[:port] or whose zone is empty is logged and skipped. Counted
   in `queryCounter` with the forwarder's `ip:port` as upstream.
-- Upstreams: every upstream (IPv4 only, port 53, UDP) is asked at once with
-  a new random ID and RD set; dial timeout 2 s, read timeout 2 s. The first
+- Asking a server (upstream or forwarder): a new random ID, RD set and an
+  EDNS OPT record with UDP size 1232; the reply is read over UDP (up to
+  64 KiB). When it has TC set, the same query goes to the same server over
+  TCP (2-byte length prefix, its own dial and read timeouts) and that reply
+  is used. Additional records in the reply are not returned.
+- Upstreams: every upstream (IPv4 only, port 53) is asked at once; dial
+  timeout 2 s, read timeout 2 s. The first
   answer with records wins and is cached with the first record's TTL.
   Each wait has its own 5 s upstream timeout. All failed → last error, or
   `ErrNxDomain` when none returned records.

@@ -178,6 +178,10 @@ func (h *DNSHeader) SetTC(tc bool) {
 	}
 }
 
+func (h *DNSHeader) TC() bool {
+	return h.Flags&0x0200 != 0
+}
+
 func (h *DNSHeader) SetRD(rd bool) {
 	if rd {
 		h.Flags |= 0x0100

@@ -2,6 +2,7 @@ package dns
 
 import (
 	"net"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -149,5 +150,37 @@ func TestUnforwardedNamesGoUpstream(t *testing.T) {
 	}
 	if n := forwarder.queries.Load(); n != 0 {
 		t.Errorf("expected no forwarder queries, got %d", n)
+	}
+}
+
+func TestExchangeSendsEDNSAndRetriesTruncatedOverTCP(t *testing.T) {
+	many := make([]*DNSRecord, 0, 100)
+	for i := 0; i < 100; i++ {
+		many = append(many, aRecord(net.IPv4(10, 0, 0, byte(i)).String(), 60))
+	}
+	var sawOPT atomic.Bool
+	server := newFakeDNSServer(t, func(query *DNSMessage, tcp bool) *DNSMessage {
+		if opt := queryOPT(query); opt != nil && opt.Class == maxUDPSize {
+			sawOPT.Store(true)
+		}
+		reply := &DNSMessage{Header: &DNSHeader{}, Questions: query.Questions}
+		if tcp {
+			reply.Answers = many
+		} else {
+			reply.Header.SetTC(true)
+		}
+		return reply
+	})
+	r := NewDNSResolverWithOpts(ResolverOpts{ReadTimeout: time.Second})
+
+	answers, _, err := r.exchange("big.test", DNSTypeA, server.addr)
+	if err != nil || len(answers) != 100 {
+		t.Fatalf("expected 100 answers over TCP, got %d %v", len(answers), err)
+	}
+	if !sawOPT.Load() {
+		t.Error("expected an EDNS OPT with UDP size 1232 in the query")
+	}
+	if n := server.queries.Load(); n != 2 {
+		t.Errorf("expected a UDP and a TCP query, got %d", n)
 	}
 }
