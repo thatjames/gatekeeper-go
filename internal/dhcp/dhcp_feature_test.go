@@ -13,6 +13,7 @@ import (
 	"github.com/cucumber/godog"
 	"github.com/cucumber/godog/colors"
 	"github.com/golang/mock/gomock"
+	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
 )
 
 type TestSuite struct {
@@ -24,6 +25,8 @@ type TestSuite struct {
 	clientID     string
 	filename     string
 	leaseFile    string
+	savedConfig  *config.ConfigInstance
+	configSet    bool
 }
 
 func (ts *TestSuite) reset() {
@@ -38,6 +41,11 @@ func (ts *TestSuite) reset() {
 	ts.clientID = ""
 	ts.filename = ""
 	ts.leaseFile = ""
+	if ts.configSet {
+		config.Config = ts.savedConfig
+		ts.savedConfig = nil
+		ts.configSet = false
+	}
 }
 
 type mockTestingT struct{}
@@ -308,6 +316,65 @@ func (ts *TestSuite) theIPAddressShouldBe(expectedIP string) error {
 	return nil
 }
 
+func (ts *TestSuite) theConfigReservesIPForClient(ipAddress, clientID string) error {
+	if !ts.configSet {
+		ts.savedConfig = config.Config
+		ts.configSet = true
+		config.Config = &config.ConfigInstance{DHCP: &config.DHCP{ReservedAddresses: map[string]string{}}}
+	}
+	config.Config.DHCP.ReservedAddresses[clientID] = ipAddress
+	return nil
+}
+
+func (ts *TestSuite) theConfigShouldReserveIPForClient(ipAddress, clientID string) error {
+	if got, ok := config.Config.DHCP.ReservedAddresses[clientID]; !ok || got != ipAddress {
+		return fmt.Errorf("expected config to reserve %s for %s, got %q", ipAddress, clientID, got)
+	}
+	return nil
+}
+
+func (ts *TestSuite) theConfigShouldHaveNoReservationForClient(clientID string) error {
+	if got, ok := config.Config.DHCP.ReservedAddresses[clientID]; ok {
+		return fmt.Errorf("expected no config reservation for %s, got %s", clientID, got)
+	}
+	return nil
+}
+
+func (ts *TestSuite) clientReleasesItsLease(clientID string) error {
+	lease := ts.leasePool.GetLease(clientID)
+	if lease == nil {
+		return fmt.Errorf("client %s has no lease to release", clientID)
+	}
+	ts.leasePool.ReleaseLease(lease)
+	return nil
+}
+
+func (ts *TestSuite) theAdminDeletesTheLeaseOfClient(clientID string) error {
+	lease := ts.leasePool.GetLease(clientID)
+	if lease == nil {
+		return fmt.Errorf("client %s has no lease to delete", clientID)
+	}
+	ts.leasePool.DeleteLease(lease)
+	return nil
+}
+
+func (ts *TestSuite) noClientButHoldsIP(clientID, ipAddress string) error {
+	ip := net.ParseIP(ipAddress)
+	for _, lease := range ts.leasePool.leases {
+		if lease.IP.Equal(ip) && lease.State != LeaseAvailable && lease.ClientId != clientID {
+			return fmt.Errorf("client %s holds reserved IP %s", lease.ClientId, ipAddress)
+		}
+	}
+	return nil
+}
+
+func (ts *TestSuite) clientShouldHaveNoLease(clientID string) error {
+	if lease := ts.leasePool.GetLease(clientID); lease != nil {
+		return fmt.Errorf("expected no lease for %s, got %s", clientID, lease.IP.String())
+	}
+	return nil
+}
+
 func InitializeScenario(ctx *godog.ScenarioContext) {
 	ts := &TestSuite{}
 
@@ -351,6 +418,14 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 
 	ctx.Step(`^I request (\d+) leases for different clients$`, ts.iRequestNLeasesForDifferentClients)
 	ctx.Step(`^the lease pool should contain (\d+) active leases$`, ts.theLeasePoolShouldContainNActiveLeases)
+
+	ctx.Step(`^the config reserves IP "([^"]*)" for client "([^"]*)"$`, ts.theConfigReservesIPForClient)
+	ctx.Step(`^the config should reserve IP "([^"]*)" for client "([^"]*)"$`, ts.theConfigShouldReserveIPForClient)
+	ctx.Step(`^the config should have no reservation for client "([^"]*)"$`, ts.theConfigShouldHaveNoReservationForClient)
+	ctx.Step(`^client "([^"]*)" releases its lease$`, ts.clientReleasesItsLease)
+	ctx.Step(`^the admin deletes the lease of client "([^"]*)"$`, ts.theAdminDeletesTheLeaseOfClient)
+	ctx.Step(`^no client but "([^"]*)" holds IP "([^"]*)"$`, ts.noClientButHoldsIP)
+	ctx.Step(`^client "([^"]*)" should have no lease$`, ts.clientShouldHaveNoLease)
 }
 
 var opts = godog.Options{

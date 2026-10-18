@@ -124,6 +124,7 @@ func (l *LeasePool) UpdateLease(clientId string, ip net.IP) error {
 	defer l.lock.Unlock()
 	if reservedLease, ok := l.reservedAddresses[clientId]; ok {
 		reservedLease.IP = ip
+		l.evictOthers(clientId, ip)
 		return config.UpdateConfig()
 	}
 	for _, lease := range l.leases {
@@ -140,6 +141,9 @@ func (l *LeasePool) NextAvailableLease(clientId string) *Lease {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	for _, lease := range l.leases {
+		if l.isReserved(lease.IP) {
+			continue
+		}
 		switch lease.State {
 		case LeaseAvailable:
 			lease.ClientId = clientId
@@ -172,6 +176,12 @@ func (l *LeasePool) NextAvailableLease(clientId string) *Lease {
 func (l *LeasePool) ReserveLease(clientID string, reservedIP net.IP) error {
 	l.lock.Lock()
 	defer l.lock.Unlock()
+	for _, lease := range l.reservedAddresses {
+		if lease.ClientId != clientID && lease.IP.Equal(reservedIP) {
+			log.Errorf("ip %s already reserved for client %s", reservedIP.String(), lease.ClientId)
+			return errors.New("ip already reserved")
+		}
+	}
 	for _, lease := range l.leases {
 		if lease.ClientId == clientID && lease.State != LeaseAvailable {
 			log.Debugf("client %s already has an active lease with IP %s", clientID, lease.IP.String())
@@ -179,14 +189,29 @@ func (l *LeasePool) ReserveLease(clientID string, reservedIP net.IP) error {
 			break
 		}
 	}
-	for _, lease := range l.reservedAddresses {
-		if lease.ClientId != clientID && lease.IP.Equal(reservedIP) {
-			log.Errorf("ip %s already reserved for client %s", reservedIP.String(), lease.ClientId)
-			return errors.New("ip already reserved")
-		}
-	}
+	l.evictOthers(clientID, reservedIP)
 	l.reservedAddresses[clientID] = &Lease{ClientId: clientID, IP: reservedIP, State: LeaseReserved}
 	return nil
+}
+
+// isReserved reports whether ip is reserved for any client. The caller holds the lock.
+func (l *LeasePool) isReserved(ip net.IP) bool {
+	for _, reserved := range l.reservedAddresses {
+		if reserved.IP.Equal(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// evictOthers clears the pool lease of any client other than clientID on ip. The caller holds the lock.
+func (l *LeasePool) evictOthers(clientID string, ip net.IP) {
+	for _, lease := range l.leases {
+		if lease.IP.Equal(ip) && lease.State != LeaseAvailable && !strings.EqualFold(lease.ClientId, clientID) {
+			log.Infof("clearing lease of %s on %s, now reserved for %s", lease.ClientId, ip.String(), clientID)
+			lease.Clear()
+		}
+	}
 }
 
 func (l *LeasePool) PeristLeases(file string) error {
@@ -313,17 +338,34 @@ func (l *LeasePool) ReservedLeases() []Lease {
 	return leases
 }
 
+// ReleaseLease handles a client's DHCPRELEASE: the pool lease is cleared, a reservation is kept.
 func (l *LeasePool) ReleaseLease(relLease *Lease) {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	if _, ok := l.reservedAddresses[relLease.ClientId]; ok {
-		delete(l.reservedAddresses, relLease.ClientId)
-		delete(config.Config.DHCP.ReservedAddresses, relLease.ClientId)
+		log.Debugf("client %s released, keeping its reservation", relLease.ClientId)
+		return
+	}
+	l.clearClient(relLease.ClientId)
+}
+
+// DeleteLease is the admin's delete: a reservation is removed, also from the config file.
+func (l *LeasePool) DeleteLease(delLease *Lease) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	if _, ok := l.reservedAddresses[delLease.ClientId]; ok {
+		delete(l.reservedAddresses, delLease.ClientId)
+		delete(config.Config.DHCP.ReservedAddresses, delLease.ClientId)
 		config.UpdateConfig()
 		return
 	}
+	l.clearClient(delLease.ClientId)
+}
+
+// clearClient clears the pool lease of clientID. The caller holds the lock.
+func (l *LeasePool) clearClient(clientID string) {
 	for _, lease := range l.leases {
-		if strings.EqualFold(relLease.ClientId, lease.ClientId) {
+		if strings.EqualFold(clientID, lease.ClientId) {
 			lease.Clear()
 		}
 	}
