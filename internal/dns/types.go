@@ -581,10 +581,21 @@ func MarshalDNSMessage(msg *DNSMessage) ([]byte, error) {
 	return buf, nil
 }
 
+// NewOPTRecord is an EDNS OPT record advertising udpSize, version 0, no options.
+func NewOPTRecord(udpSize uint16) *DNSRecord {
+	return &DNSRecord{
+		Type:  DNSTypeOPT,
+		Class: udpSize,
+		RData: []byte{},
+	}
+}
+
 func marshalResourceRecord(record *DNSRecord) ([]byte, error) {
 	var buf []byte
 	if record.Name != nil {
 		buf = append(buf, record.Name...)
+	} else if record.Type == DNSTypeOPT {
+		buf = append(buf, 0) // the root name
 	}
 	rrHeader := make([]byte, 10)
 	binary.BigEndian.PutUint16(rrHeader[0:2], uint16(record.Type))

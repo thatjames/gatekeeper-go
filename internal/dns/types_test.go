@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"bytes"
 	"testing"
 )
 
@@ -164,5 +165,18 @@ func TestDNSTypeString(t *testing.T) {
 	}
 	if DNSType(99).String() != "unknown" {
 		t.Error("expected 'unknown' for unknown type")
+	}
+}
+
+func TestMarshalOPTRecordUsesRootName(t *testing.T) {
+	msg := NewDnsMessage()
+	msg.Additionals = append(msg.Additionals, NewOPTRecord(1232))
+	data, err := MarshalDNSMessage(msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []byte{0, 0, 41, 0x04, 0xd0, 0, 0, 0, 0, 0, 0}
+	if got := data[12:]; !bytes.Equal(got, want) {
+		t.Errorf("expected OPT %v, got %v", want, got)
 	}
 }

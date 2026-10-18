@@ -342,24 +342,36 @@ func (d *DNSServer) answer(msg *DNSMessage) {
 	}
 }
 
-// udpSizeLimit is the largest UDP reply the client of query accepts.
-func udpSizeLimit(query *DNSMessage) int {
+// queryOPT is the EDNS OPT record of query, or nil.
+func queryOPT(query *DNSMessage) *DNSRecord {
 	for _, record := range query.Additionals {
 		if record.Type == DNSTypeOPT {
-			return min(max(int(record.Class), minUDPSize), maxUDPSize)
+			return record
 		}
+	}
+	return nil
+}
+
+// udpSizeLimit is the largest UDP reply the client of query accepts.
+func udpSizeLimit(query *DNSMessage) int {
+	if opt := queryOPT(query); opt != nil {
+		return min(max(int(opt.Class), minUDPSize), maxUDPSize)
 	}
 	return minUDPSize
 }
 
-// prepareReply sets the reply flags on an answered query and marshals it.
-// With a sizeLimit (UDP) a reply that does not fit loses its answers and
+// prepareReply sets the reply flags on an answered query, answers its EDNS
+// OPT record with our own and marshals it. With a sizeLimit (UDP) a reply that does not fit loses its answers and
 // authorities and is sent with TC set; 0 means no limit (TCP).
 func prepareReply(msg *DNSMessage, sizeLimit int) ([]byte, error) {
 	msg.Header.SetQR(true)
 	msg.Header.SetRA(true)
 	msg.Header.SetTC(false)
+	hasOPT := queryOPT(msg) != nil
 	msg.Additionals = nil
+	if hasOPT {
+		msg.Additionals = append(msg.Additionals, NewOPTRecord(maxUDPSize))
+	}
 	data, err := MarshalDNSMessage(msg)
 	if err != nil || sizeLimit == 0 || len(data) <= sizeLimit {
 		return data, err

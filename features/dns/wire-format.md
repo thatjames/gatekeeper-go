@@ -8,7 +8,7 @@ code:
   - internal/dns/types_test.go
   - internal/dns/features/dns_packet.feature
 tags: [dns, protocol]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T21:52:15Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T13:00:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -21,7 +21,11 @@ A hand-written RFC 1035 codec, part of the point of the project.
   code comment's FORMERR is not sent); zero questions parse fine.
 - Names: labels up to 63 bytes, compression pointers followed and checked
   against the packet length; parse errors name the offset.
-- OPT (EDNS) records are parsed with their own RDATA bounds check.
+- OPT (EDNS) records are parsed with their own RDATA bounds check; the
+  UDP size lands in `Class` and the extended RCODE, version and flags in
+  `TTL`. An OPT record with no `Name` is marshaled with the root name
+  (one zero byte), so parsed OPT records marshal back unchanged.
+  `NewOPTRecord(udpSize)` builds one with version 0 and no options.
 - `MarshalDNSMessage` writes the header counts from the slices; answers use
   the `0xc00c` pointer to the question name.
 - Header helpers set and read QR, opcode, AA, TC, RD, RA, Z and RCODE.

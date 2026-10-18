@@ -316,3 +316,38 @@ func TestPrepareReplyKeepsFittingAndTCPReplies(t *testing.T) {
 		}
 	}
 }
+
+func TestPrepareReplyAnswersEDNS(t *testing.T) {
+	cases := map[string]struct {
+		query    *DNSMessage
+		limit    int
+		wantOPT  bool
+		wantTC   bool
+		wantAnsw int
+	}{
+		"EDNS query":       {answeredQuery(1, &DNSRecord{Type: DNSTypeOPT, Class: 4096, TTL: 0x8000}), 1232, true, false, 1},
+		"plain query":      {answeredQuery(1), 512, false, false, 1},
+		"EDNS truncated":   {answeredQuery(100, &DNSRecord{Type: DNSTypeOPT, Class: 1232}), 1232, true, true, 0},
+		"other additional": {answeredQuery(1, &DNSRecord{Name: compressedDomainVal, Type: DNSTypeA, Class: DNSClassIN, RData: []byte{1, 2, 3, 4}}), 512, false, false, 1},
+	}
+	for name, c := range cases {
+		data, err := prepareReply(c.query, c.limit)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reply, err := ParseDNSMessage(data)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		opt := queryOPT(reply)
+		if (opt != nil) != c.wantOPT || len(reply.Additionals) > 1 {
+			t.Errorf("%s: expected OPT %v, got additionals %v", name, c.wantOPT, reply.Additionals)
+		}
+		if opt != nil && (opt.Class != 1232 || opt.TTL != 0 || len(opt.RData) != 0) {
+			t.Errorf("%s: unexpected OPT size %d ttl %#x rdata %v", name, opt.Class, opt.TTL, opt.RData)
+		}
+		if (reply.Header.Flags&0x0200 != 0) != c.wantTC || len(reply.Answers) != c.wantAnsw {
+			t.Errorf("%s: expected TC %v and %d answers, got flags %#x and %d answers", name, c.wantTC, c.wantAnsw, reply.Header.Flags, len(reply.Answers))
+		}
+	}
+}
