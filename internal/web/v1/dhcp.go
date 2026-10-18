@@ -99,6 +99,9 @@ func updateDHCPOptions(c *gin.Context) {
 		dhcpService.Start()
 		return
 	}
+	config.Lock()
+	defer config.Unlock()
+	oldSection := config.Config.DHCP
 	config.Config.DHCP = &config.DHCP{
 		Interface:         opts.Interface,
 		StartAddr:         opts.StartAddr,
@@ -112,6 +115,7 @@ func updateDHCPOptions(c *gin.Context) {
 		ReservedAddresses: dhcpService.Options().ReservedLeases,
 	}
 	if err := config.UpdateConfig(); err != nil {
+		config.Config.DHCP = oldSection
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		dhcpService.UpdateOptions(oldOpts)
 		return
@@ -154,8 +158,11 @@ func reserveLease(c *gin.Context) {
 		})
 		return
 	}
+	config.Lock()
 	config.Config.DHCP.ReservedAddresses[lease.ClientId] = lease.IP
-	if err := config.UpdateConfig(); err != nil {
+	err := config.UpdateConfig()
+	config.Unlock()
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

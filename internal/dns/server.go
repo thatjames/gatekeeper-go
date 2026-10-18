@@ -181,12 +181,22 @@ func (d *DNSServer) FlushBlocklist() {
 }
 
 func (d *DNSServer) AddBlocklistFromURL(url string) error {
-	hosts, err := d.blocklistFetcher.Fetch(url)
+	hosts, err := d.FetchBlocklist(url)
 	if err != nil {
 		return err
 	}
-	d.resolver.AddBlocklistEntries(hosts)
+	d.AddBlockedDomains(hosts)
 	return nil
+}
+
+// FetchBlocklist fetches the domains of one blocklist without adding them.
+func (d *DNSServer) FetchBlocklist(url string) ([]string, error) {
+	return d.blocklistFetcher.Fetch(url)
+}
+
+// AddBlockedDomains adds domains to the running blocklist.
+func (d *DNSServer) AddBlockedDomains(domains []string) {
+	d.resolver.AddBlocklistEntries(domains)
 }
 
 func (d *DNSServer) LoadBlocklistFromURLS(urls []string) {

@@ -11,7 +11,7 @@ code:
   - internal/dns/parity_feature_test.go
   - internal/dns/features/dns_request.feature
 tags: [dns]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T22:30:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T22:05:44Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -75,8 +75,9 @@ to it ([Pi-hole parity](/dns/pihole-parity.md)).
 - `Stop()` closes the UDP listener and waits for it, closes the TCP
   listener and every open TCP connection; the UDP workers keep running, so
   every restart adds another pair (leak).
-- API helpers: add/delete local domain, add/delete blocked domain, flush the
-  blocklist, add a blocklist from a URL, reload all blocklist URLs,
+- API helpers: add/delete local domain, add/delete blocked domain, add a
+  list of blocked domains, flush the blocklist, fetch one blocklist URL
+  without adding it, add a blocklist from a URL, reload all blocklist URLs,
   `Options()` / `UpdateOptions()`.
 
 # Interfaces

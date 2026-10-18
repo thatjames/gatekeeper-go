@@ -5,8 +5,9 @@ description: Authenticated /api/v1/dns routes to read and change upstreams and i
 status: stable
 code:
   - internal/web/v1/dns.go
+  - internal/web/v1/dns_test.go
 tags: [web, api, dns]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T21:59:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T22:05:44Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -38,11 +39,17 @@ Manage DNS from the UI, as Pi-hole's admin pages did.
 - Every error answers once, with `{error}` or `ErrorResponse`, and the
   handler stops there.
 - A failed save (500) puts the config back as it was: slices and maps are
-  copied before they change, and a live change already made to the resolver
-  is undone.
+  copied before they change, never changed in place. For local domains the
+  resolver change is undone too; blocked domains and blocklists reach the
+  resolver only after the save. (`PUT /dns/config` restores the config
+  only; the server keeps the restart.)
 - Handlers read the config under the [config lock](/config/config-file.md)
-  and hold it for each read-modify-write including the save. Blocklist
-  fetches run outside the lock.
+  and hold it for each read-modify-write, through the save and the answer.
+  `POST /dns/blocklist` fetches before it takes the lock; `DELETE
+  /dns/blocklist` reloads the remaining lists under it, so no other change
+  lands between the flush and the reload.
+- `dns_test.go` drives the handlers against a fake resolver and fetcher and
+  a temp config file, and runs them concurrently for `go test -race`.
 
 # Decisions
 - Fixes agreed 2026-10-17 (plans): apply config changes to the running

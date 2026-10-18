@@ -75,6 +75,7 @@ The Web module is loaded if the config file contains the `Web` key.
 | ------------ | --------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | Address      | Address and port for web server to listen on                                                                                            | :8085   |
 | WebURL       | Base URL for the web interface (used for OIDC redirects and CORS)                                                                      |         |
+| AllowedOrigins | Extra origins allowed by CORS besides WebURL, e.g. `http://localhost:5173` for a UI dev server. The built-in UI needs none           |         |
 | TLS          | TLS configuration for HTTPS                                                                                                             |         |
 | HTPasswdFile | Path to htpasswd file for authentication. If it cannot be read at startup, a random password for `admin` is printed to the log once     |         |
 | Prometheus   | Enable the Prometheus metrics endpoint (it needs a login token). The DNS Statistics page reads it, so leaving it off disables that page | false   |
