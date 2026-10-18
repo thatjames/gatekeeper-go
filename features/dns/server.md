@@ -94,8 +94,7 @@ to it ([Pi-hole parity](/dns/pihole-parity.md)).
   reply has no question section because there is no single question to
   echo.
 - NXDOMAIN counts as `success` in `dns_query_by_ip_count`: the query was
-  answered, as `dns_query_count` already treats it (2026-10-18; open for
-  the user to confirm).
+  answered, as `dns_query_count` already treats it (user, 2026-10-18).
 - Parallel receive capped at 256 queries in flight: one slow lookup no
   longer holds up the LAN, and a flood of queries cannot start unbounded
   goroutines (user, 2026-10-18).
