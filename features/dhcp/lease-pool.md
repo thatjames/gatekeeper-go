@@ -10,7 +10,7 @@ code:
   - internal/dhcp/features/lease_initialization.feature
   - internal/dhcp/features/reserved_leases.feature
 tags: [dhcp, leases]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T22:10:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T21:59:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -44,6 +44,8 @@ known devices, and remember leases across restarts.
 - `DeleteLease` (the admin's DELETE in the [DHCP API](/web/dhcp-api.md)):
   for a reservation, deletes it and its config entry and writes the config;
   otherwise clears the pool lease.
+- Config changes and writes from the pool hold the
+  [config lock](/config/config-file.md), taken inside the pool lock.
 - `ActiveLeases()` returns unexpired active leases; `ReservedLeases()` all
   reservations.
 - Lease file: one count byte, then per active lease

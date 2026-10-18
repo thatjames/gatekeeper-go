@@ -6,7 +6,7 @@ status: stable
 code:
   - internal/web/v1/dhcp.go
 tags: [web, api, dhcp]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T22:10:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T21:59:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -27,8 +27,13 @@ Manage leases and DHCP settings from the UI.
   file, DNS servers.
 - `PUT /dhcp/options` validates, swaps the server options, restarts the
   server (old options back on a failed stop or start), then replaces the
-  config's DHCP section and saves it. The new range does not reach the pool
-  until a process restart ([DHCP server](/dhcp/server.md)).
+  config's DHCP section and saves it; a failed save puts the old section and
+  options back. The new range does not reach the pool until a process
+  restart ([DHCP server](/dhcp/server.md)).
+- Config writes (reserve, update, options) hold the
+  [config lock](/config/config-file.md) from the change through the save.
+  Lease pool calls run outside it: the pool takes the config lock itself
+  when it saves, so the order is pool lock, then config lock.
 
 # Interfaces
 - [Lease pool](/dhcp/lease-pool.md), [config file](/config/config-file.md).
