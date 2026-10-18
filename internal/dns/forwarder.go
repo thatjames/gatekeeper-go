@@ -3,6 +3,7 @@ package dns
 import (
 	"fmt"
 	"net"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -103,7 +104,8 @@ func (r *DNSResolver) forward(domain string, dnsType DNSType, forwarder *conditi
 }
 
 // localPTR answers a reverse lookup from the local domains when one of them
-// has the IPv4 of the reverse name, or returns nil.
+// has the IPv4 of the reverse name, or returns nil. When several share the
+// address, the alphabetically first name answers, so the answer is stable.
 func (r *DNSResolver) localPTR(domain string) []*DNSRecord {
 	reverse, ok := strings.CutSuffix(normaliseName(domain), ".in-addr.arpa")
 	if !ok {
@@ -117,17 +119,22 @@ func (r *DNSResolver) localPTR(domain string) []*DNSRecord {
 	if ip == nil {
 		return nil
 	}
+	hosts := make([]string, 0)
 	for host, localIP := range r.localDomains {
 		if localIP.Equal(ip) {
-			return []*DNSRecord{{
-				Name:       compressedDomainVal,
-				Type:       DNSTypePTR,
-				Class:      DNSClassIN,
-				TTL:        uint32(r.cacheTTL.Seconds()),
-				ParsedName: host,
-				RData:      stringToDNSWireFormat(host),
-			}}
+			hosts = append(hosts, host)
 		}
 	}
-	return nil
+	if len(hosts) == 0 {
+		return nil
+	}
+	host := slices.Min(hosts)
+	return []*DNSRecord{{
+		Name:       compressedDomainVal,
+		Type:       DNSTypePTR,
+		Class:      DNSClassIN,
+		TTL:        uint32(r.cacheTTL.Seconds()),
+		ParsedName: host,
+		RData:      stringToDNSWireFormat(host),
+	}}
 }

@@ -38,7 +38,8 @@ Ad-blocking, local-name-aware recursion for the home LAN, as Pi-hole did.
   equal to a zone or under it goes to that zone's server only; the longest
   matching zone wins; zone and name are compared lower-case without a
   trailing dot. For a PTR query, a local domain whose IPv4 matches the
-  reverse name is answered first (every local domain is checked). The
+  reverse name is answered first (every local domain is checked; when
+  several share the address, the alphabetically first name). The
   forwarder is asked like an upstream (new random ID, RD, dial and read
   timeouts); its answers and authorities are returned and cached like
   upstream ones, NXDOMAIN is passed on, NOERROR with no records is an empty

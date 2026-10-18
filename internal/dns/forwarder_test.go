@@ -184,3 +184,19 @@ func TestExchangeSendsEDNSAndRetriesTruncatedOverTCP(t *testing.T) {
 		t.Errorf("expected a UDP and a TCP query, got %d", n)
 	}
 }
+
+func TestLocalPTRPicksAlphabeticallyFirstName(t *testing.T) {
+	ip := net.ParseIP("10.20.1.11").To4()
+	r := NewDNSResolverWithOpts(ResolverOpts{LocalDomains: map[string]net.IP{
+		"seerr.example": ip, "jellyfin.example": ip, "authentik.example": ip, "git.example": ip,
+	}})
+	for i := 0; i < 20; i++ {
+		answers := r.localPTR("11.1.20.10.in-addr.arpa")
+		if len(answers) != 1 || answers[0].ParsedName != "authentik.example" {
+			t.Fatalf("expected authentik.example, got %v", answers)
+		}
+	}
+	if answers := r.localPTR("12.1.20.10.in-addr.arpa"); answers != nil {
+		t.Errorf("expected no local answer for an unknown address, got %v", answers)
+	}
+}
