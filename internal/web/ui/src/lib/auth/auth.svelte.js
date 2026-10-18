@@ -1,4 +1,4 @@
-import { api } from "$lib/api/api";
+import { api, env } from "$lib/api/api";
 import { Routes } from "$lib/common/routes";
 import { jwtDecode } from "jwt-decode";
 import { push } from "svelte-spa-router";
@@ -40,12 +40,14 @@ export const verify = () => {
   return api.get("/verify");
 };
 
-export const loginFromOIDCToken = () => {
-  const token = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("oauth_token="))
-    ?.split("=")[1];
-  const user = jwtDecode(token);
-  auth.user = user;
+// The oauth_token cookie is HttpOnly, so ask the server who it belongs to.
+// Plain fetch: a 401 here means "not logged in", not "reload to login".
+export const loginFromSession = async () => {
+  const resp = await fetch(env.url + "me", { credentials: "include" });
+  if (!resp.ok) {
+    return false;
+  }
+  auth.user = await resp.json();
   push(Routes.Home);
+  return true;
 };

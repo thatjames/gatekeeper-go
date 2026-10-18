@@ -91,7 +91,13 @@ func (r *DNSResolver) forward(domain string, dnsType DNSType, forwarder *conditi
 	log.Debugf("forwarding %s to %s", domain, forwarder.addr)
 	answers, authorities, err = r.exchange(domain, dnsType, forwarder.addr)
 	if err == ErrNxDomain {
-		return nil, nil, ErrNxDomain
+		nxSOA, nxTTL := soaMinimum(authorities)
+		if nxSOA == nil {
+			return nil, nil, ErrNxDomain
+		}
+		authorities = []*DNSRecord{nxSOA}
+		r.cacheResult(cacheKey, &DNSCacheItem{authorities: authorities, nxDomain: true}, nxTTL)
+		return nil, authorities, ErrNxDomain
 	}
 	if err != nil {
 		log.Errorf("conditional forwarder %s for %s failed: %v", forwarder.addr, forwarder.zone, err)
@@ -99,7 +105,7 @@ func (r *DNSResolver) forward(domain string, dnsType DNSType, forwarder *conditi
 		return nil, nil, ErrDNSServerFailure
 	}
 	queryCounter.With(prometheus.Labels{"domain": domain, "upstream": forwarder.addr, "result": "success"}).Inc()
-	r.cacheRecords(cacheKey, answers, authorities)
+	r.cacheAnswer(cacheKey, answers, authorities)
 	return answers, authorities, nil
 }
 
@@ -120,11 +126,13 @@ func (r *DNSResolver) localPTR(domain string) []*DNSRecord {
 		return nil
 	}
 	hosts := make([]string, 0)
+	r.domainLock.RLock()
 	for host, localIP := range r.localDomains {
 		if localIP.Equal(ip) {
 			hosts = append(hosts, host)
 		}
 	}
+	r.domainLock.RUnlock()
 	if len(hosts) == 0 {
 		return nil
 	}

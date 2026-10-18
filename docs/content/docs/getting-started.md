@@ -17,9 +17,19 @@ GateKeeper uses an `.htpasswd` file to authenticate users. This can be generated
 printf "username:$(openssl passwd -apr1 password)\n" > .htpasswd
 ```
 
-Natrually, you need to replace `username` and `password` with the appropriate values.
+Naturally, you need to replace `username` and `password` with the appropriate values, and point `Web.HTPasswdFile` at the file.
 
-If you do not configure a password, then default username/password combination is admin/admin.
+If GateKeeper cannot read an htpasswd file at startup, it makes a random password for the user `admin` and prints it to the log once. See [Authentication]({{< relref "/docs/auth#fallback-password" >}}).
+
+## JWT Secret
+
+The web interface signs its login tokens with the `GATEKEEPER_JWT_SECRET` environment variable. GateKeeper will not start with the `Web` module configured and this variable unset:
+
+```bash
+export GATEKEEPER_JWT_SECRET="$(openssl rand -base64 32)"
+```
+
+Every example below passes it to the container.
 
 ## Docker
 
@@ -38,6 +48,7 @@ docker run -d -p 53:53/udp -p 8085:8085 \
     -v /path/to/data:/var/lib/gatekeeper \
     -v /path/to/config.yml:/app/config.yml \
     -v /path/to/.htpasswd:/app/.htpasswd \
+    -e GATEKEEPER_JWT_SECRET \
     --cap-add=NET_BIND_SERVICE \
     ghcr.io/thatjames/gatekeeper-go:latest
 ```
@@ -56,6 +67,8 @@ services:
       - ./data/gatekeeper/data:/var/lib/gatekeeper/
       - ./data/gatekeeper/config.yml:/app/config.yml
       - ./data/gatekeeper/.htpasswd:/app/.htpasswd
+    environment:
+      - GATEKEEPER_JWT_SECRET
     cap_add:
       - NET_BIND_SERVICE
 ```
@@ -71,6 +84,7 @@ docker run -d \
     -v /path/to/data:/var/lib/gatekeeper \
     -v /path/to/config.yml:/app/config.yml \
     -v /path/to/.htpasswd:/app/.htpasswd \
+    -e GATEKEEPER_JWT_SECRET \
     --network=host \
     ghcr.io/thatjames/gatekeeper-go:latest
 ```
@@ -84,6 +98,8 @@ services:
       - ./data/gatekeeper/data:/var/lib/gatekeeper/
       - ./data/gatekeeper/config.yml:/app/config.yml
       - ./data/gatekeeper/.htpasswd:/app/.htpasswd
+    environment:
+      - GATEKEEPER_JWT_SECRET
     network_mode: host
 ```
 

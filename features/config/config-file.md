@@ -22,7 +22,9 @@ without hand edits.
   module off.
 - `Auth.AuthType` picks the auth block: `oidc` (IssuerURL, ClientID,
   ClientSecretVar, RedirectURL, Scopes) or `htpasswd` (HTPasswdFile). Any
-  other type fails the load. No `Auth:` leaves it nil.
+  other type fails the load. No `Auth:` leaves it nil. `Auth.HTPasswdFile`
+  is parsed but never read: password login uses `Web.HTPasswdFile`
+  ([auth](/web/auth.md)); the duplicate key is on the backlog.
 - `DHCP`: Interface, StartAddr, EndAddr, DomainName, NameServers, LeaseTTL
   (seconds), SubnetMask, Gateway, ReservedAddresses (MAC → IP), LeaseFile.
 - `DNS`: UpstreamServers, Interface, LocalDomains (name → IPv4), Port,
@@ -30,7 +32,8 @@ without hand edits.
   (list of `Zone`, `Server`: IPv4 with optional `:port`;
   [resolver](/dns/resolver.md)).
 - `Web`: Address, WebURL, TLS (PublicKey, PrivateKey paths), HTPasswdFile,
-  Prometheus. `Prometheus` is parsed but not read: `/metrics` is always on.
+  Prometheus. `Prometheus` (default false) turns on `/metrics`
+  ([HTTP server](/web/http-server.md)).
 - `UpdateConfig()` truncates the loaded file and writes the whole global back
   (2-space indent); comments and key order in the file are lost. With no
   file loaded it returns an error.

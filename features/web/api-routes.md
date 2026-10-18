@@ -9,7 +9,7 @@ code:
   - internal/web/v1/types.go
   - internal/web/v1/types_test.go
 tags: [web, api]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T21:52:15Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T12:50:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -22,8 +22,9 @@ The contract between the embedded UI and the server.
   `GET /api/v1/oidc-login`, `GET /api/v1/auth/callback`,
   `POST /api/v1/logout` ([auth](/web/auth.md)).
 - Behind the auth middleware and request logging:
-  `/dhcp/*` when DHCP runs ([DHCP API](/web/dhcp-api.md)), `/dns/*` when DNS
-  runs ([DNS API](/web/dns-api.md)), and `/system/*`
+  `GET /api/v1/me` ([auth](/web/auth.md)), `/dhcp/*` when DHCP runs
+  ([DHCP API](/web/dhcp-api.md)), `/dns/*` when DNS runs
+  ([DNS API](/web/dns-api.md)), and `/system/*`
   ([system API](/web/system-api.md)).
 - Validation errors answer 400 `{error, fields: [{field, message}]}`; a body
   that does not bind answers 400 `{error: "Invalid request format"}`.
@@ -31,7 +32,8 @@ The contract between the embedded UI and the server.
   DHCP options (interface, IPv4 range, mask, gateway, DNS servers, TTL);
   DNS config (interface, at least one IPv4 upstream); blocklist (non-empty
   `url`).
-- There is no `/verify` route although the UI calls it.
+- There is no `/verify` route although the UI calls it; `/me` is its
+  replacement (UI auth flow plan).
 
 # Decisions
 - The API shape is not a hard constraint (2026-10-17): only the embedded UI

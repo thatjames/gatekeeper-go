@@ -27,7 +27,7 @@ code:
   - internal/web/ui/src/scenes/login/**
   - internal/web/ui/src/scenes/error/**
 tags: [ui, svelte, auth]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T21:52:15Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T12:50:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -48,8 +48,9 @@ The admin UI, embedded in the binary, for the one admin.
   lands on login (bug).
 - Login: username/password → `POST /login`, token kept in
   `sessionStorage`. When `/features` lists `oidc` a provider button goes
-  to `/oidc-login`; on return the `oauth_token` cookie is decoded and the
-  user lands on home.
+  to `/oidc-login`, and the login page asks `GET /me` (with cookies, no
+  reload on 401): a user there lands on home, otherwise the form stays.
+  The `oauth_token` cookie is HttpOnly, so the UI never reads it.
 - Logout clears the session, calls `/logout` and reloads.
 - `verify()` calls `/verify`, which the server lacks.
 - The side menu shows DHCP (Leases, Settings) and DNS (Local Domains,

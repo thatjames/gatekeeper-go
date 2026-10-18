@@ -1,7 +1,6 @@
 package v1
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -9,7 +8,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func authMiddleware() gin.HandlerFunc {
+// AuthMiddleware lets a request through only with a valid token, from the
+// Authorization header or the oauth_token cookie.
+func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var rawToken string
 
@@ -20,7 +21,6 @@ func authMiddleware() gin.HandlerFunc {
 			log.Trace("Bearer token found in cookie")
 			rawToken = cookie
 		} else {
-			fmt.Println(err)
 			log.Trace("No bearer token found")
 		}
 
@@ -32,12 +32,13 @@ func authMiddleware() gin.HandlerFunc {
 		claims, err := ParseAuthToken(rawToken)
 		if err != nil {
 			log.WithError(err).Error("Failed to parse token")
-			c.SetCookie("oauth_token", "", -1, "/", "", false, false)
+			setTokenCookie(c, "", -1)
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Invalid token"})
 			return
 		}
 
 		c.Set("username", claims.Username)
+		c.Set("user", claims.User)
 		c.Next()
 	}
 }

@@ -2,6 +2,7 @@ package dns
 
 import (
 	"net"
+	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -139,17 +140,41 @@ func TestForwardFailures(t *testing.T) {
 	}
 }
 
+func TestForwardedNXDOMAINKeepsSOA(t *testing.T) {
+	// SOA RDATA: root mname and rname, then serial, refresh, retry, expire, minimum 30
+	soa := &DNSRecord{Name: []byte{0}, Type: DNSTypeSOA, Class: DNSClassIN, TTL: 300,
+		RData: []byte{0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 30}}
+	forwarder := newFakeDNSServer(t, func(query *DNSMessage, _ bool) *DNSMessage {
+		reply := &DNSMessage{Header: &DNSHeader{}, Questions: query.Questions, Authorities: []*DNSRecord{soa}}
+		reply.Header.SetRCODE(RCODENameFailure)
+		return reply
+	})
+	upstream := newFakeDNSServer(t, replyWith(RCODESuccess, aRecord("1.2.3.4", 60)))
+	r := forwardingResolver(forwarder, upstream)
+	for i := 0; i < 2; i++ {
+		_, authorities, err := r.Resolve("gone.styx", DNSTypeA)
+		if err != ErrNxDomain || len(authorities) != 1 || authorities[0].Type != DNSTypeSOA {
+			t.Fatalf("expected NXDOMAIN with the SOA, got %v %v", authorities, err)
+		}
+	}
+	if n := forwarder.queries.Load(); n != 1 {
+		t.Errorf("expected the NXDOMAIN cached after one forwarder query, got %d", n)
+	}
+}
+
 func TestUnforwardedNamesGoUpstream(t *testing.T) {
 	forwarder := newFakeDNSServer(t, replyWith(RCODESuccess, aRecord("10.20.1.10", 60)))
 	upstream := newFakeDNSServer(t, replyWith(RCODESuccess, aRecord("1.2.3.4", 60)))
 	r := forwardingResolver(forwarder, upstream)
-	// the fake upstream listens on a random port, but upstreams are asked on 53
-	r.upstream = nil
-	if _, _, err := r.Resolve("example.com", DNSTypeA); err != ErrNxDomain {
-		t.Errorf("expected the upstream path (no upstreams: NXDOMAIN), got %v", err)
+	_, port, _ := net.SplitHostPort(upstream.addr)
+	r.upstreamPort, _ = strconv.Atoi(port)
+
+	answers, _, err := r.Resolve("example.com", DNSTypeA)
+	if err != nil || len(answers) != 1 || net.IP(answers[0].RData).String() != "1.2.3.4" {
+		t.Fatalf("expected 1.2.3.4 from the upstream, got %v %v", answers, err)
 	}
-	if n := forwarder.queries.Load(); n != 0 {
-		t.Errorf("expected no forwarder queries, got %d", n)
+	if forwarder.queries.Load() != 0 || upstream.queries.Load() != 1 {
+		t.Errorf("expected only the upstream asked, got forwarder %d upstream %d", forwarder.queries.Load(), upstream.queries.Load())
 	}
 }
 

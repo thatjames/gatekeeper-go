@@ -6,7 +6,7 @@ status: stable
 code:
   - cmd/gatekeeper/**
 tags: [runtime, logging]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T21:52:15Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T12:50:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -27,6 +27,9 @@ binary serves DNS on atlas (with DHCP left to hecate) or DNS+DHCP elsewhere.
 - `DNS:` present → `LocalDomains` values that are not IPv4 are skipped with
   a warning; the DNS server is registered with interface, port, upstreams,
   blocklist URLs, blocked domains and local domains from the config.
+- `Web:` present and `GATEKEEPER_JWT_SECRET` unset or empty → gatekeeper
+  logs `GATEKEEPER_JWT_SECRET must be set when Web is configured` and exits
+  with status 1 before any service starts ([auth](/web/auth.md)).
 - `Web:` present → the web server starts in its own goroutine; an error
   there is logged and does not stop DNS or DHCP.
 - Registered services start in map order; the first start error is fatal.

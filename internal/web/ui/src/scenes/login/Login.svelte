@@ -1,6 +1,6 @@
 <script>
   import { env } from "$lib/api/api";
-  import { login, loginFromOIDCToken } from "$lib/auth/auth.svelte";
+  import { login, loginFromSession } from "$lib/auth/auth.svelte";
   import { Routes } from "$lib/common/routes";
   import { getExtraFeatures, features } from "$lib/system/system";
   import {
@@ -24,16 +24,17 @@
         errorText = err.error;
       });
   };
-  getExtraFeatures();
+  getExtraFeatures().then((extra) => {
+    if (extra?.includes("oidc")) {
+      loginFromSession();
+    }
+  });
 
   const handleOIDCRedirect = () => {
     console.log("do redirect");
     window.location = env.url + "oidc-login";
   };
 
-  if (document.cookie.includes("oauth_token")) {
-    loginFromOIDCToken();
-  }
 </script>
 
 <div

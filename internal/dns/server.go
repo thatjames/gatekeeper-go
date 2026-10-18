@@ -278,7 +278,11 @@ func (d *DNSServer) listen() {
 	}
 }
 
+// maxQueriesInFlight caps the queries the receive worker resolves at once.
+const maxQueriesInFlight = 256
+
 func (d *DNSServer) receiverWorker() {
+	inFlight := make(chan struct{}, maxQueriesInFlight)
 	for packet := range d.receiverChan {
 		if packet.err != nil {
 			log.Errorf("skipping malformed packet: %v", packet.err)
@@ -291,18 +295,28 @@ func (d *DNSServer) receiverWorker() {
 		}
 
 		log.Tracef("received DNS packet from %s", packet.ResponseAddr.String())
-		d.answer(packet.DNSMessage)
+		inFlight <- struct{}{}
+		go func(packet *dnsWorkItem) {
+			defer func() { <-inFlight }()
+			d.answerUDP(packet)
+		}(packet)
+	}
+}
 
-		log.Tracef("push packet to response worker")
-		d.responseChan <- packet
-		log.Tracef("packet pushed to response worker")
+// answerUDP resolves the packet's first question and hands the reply to the
+// response worker.
+func (d *DNSServer) answerUDP(packet *dnsWorkItem) {
+	d.answer(packet.DNSMessage)
 
-		// we do this afterwards to not interfere with the response timing
-		if packet.err != nil {
-			queryByIPCounter.With(prometheus.Labels{"ip": strings.Split(packet.ResponseAddr.String(), ":")[0], "result": "failed"}).Inc()
-		} else {
-			queryByIPCounter.With(prometheus.Labels{"ip": strings.Split(packet.ResponseAddr.String(), ":")[0], "result": "success"}).Inc()
-		}
+	log.Tracef("push packet to response worker")
+	d.responseChan <- packet
+	log.Tracef("packet pushed to response worker")
+
+	// we do this afterwards to not interfere with the response timing
+	if packet.err != nil {
+		queryByIPCounter.With(prometheus.Labels{"ip": strings.Split(packet.ResponseAddr.String(), ":")[0], "result": "failed"}).Inc()
+	} else {
+		queryByIPCounter.With(prometheus.Labels{"ip": strings.Split(packet.ResponseAddr.String(), ":")[0], "result": "success"}).Inc()
 	}
 }
 
@@ -347,12 +361,13 @@ func listenHost(iface string) (string, error) {
 }
 
 // answer resolves the first question of msg and fills msg in as the reply:
-// RCODE, answers and authorities.
+// RCODE, answers and authorities (the SOA with an NXDOMAIN).
 func (d *DNSServer) answer(msg *DNSMessage) {
 	responses, authorities, err := d.resolver.Resolve(msg.Questions[0].ParsedName, msg.Questions[0].Type)
 	if err != nil {
 		if err == ErrNxDomain {
 			msg.Header.SetRCODE(RCODENameFailure)
+			msg.Authorities = authorities
 		} else {
 			msg.Header.SetRCODE(RCODEServerFailure)
 		}

@@ -131,10 +131,10 @@ func (ts *DNSFeatureTestSuite) thatServerHasACacheForWithIP(domain string, ip st
 		TTL:   300,
 		RData: net.ParseIP(ip).To4(),
 	})
-	ts.resolver.cache[cacheKey] = &DNSCacheItem{
-		ttl:     time.Now().Add(time.Second * 300),
-		records: records,
-	}
+	ts.resolver.cache.set(cacheKey, &DNSCacheItem{
+		expires: time.Now().Add(time.Second * 300),
+		answers: records,
+	})
 	return nil
 }
 

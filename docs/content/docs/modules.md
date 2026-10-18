@@ -11,7 +11,7 @@ This is because the Router module is heavily reliant on the Netlink API, which i
 
 ## DNS
 
-The DNS module is a simple recursive DNS server that can be used to resolve DNS locally. It includes a local domain list that can be used to resolve local DNS entries (such as router, mediapc, etc) or just a way to override DNS entries as this local list is considered before a recursive request is made upstream.
+The DNS module is a simple recursive DNS server that can be used to resolve DNS locally. It answers over UDP and TCP on the same port, answers EDNS, and truncates UDP replies that do not fit so clients retry over TCP. It includes a local domain list that can be used to resolve local DNS entries (such as router, mediapc, etc) or just a way to override DNS entries as this local list is considered before a recursive request is made upstream.
 
 ### Configuration
 
@@ -21,12 +21,26 @@ Below are the list of configuration options for the DNS module.
 
 | Key             | Description                                                                | Default          |
 | --------------- | -------------------------------------------------------------------------- | ---------------- |
-| Interface       | The interface the UDP socket will bind to                                  | eth0             |
+| Interface       | Listen only on this interface's first IPv4 address (UDP and TCP)           | all addresses    |
 | Port            | The port the DNS server will listen on                                     | 53               |
 | LocalDomains    | A map of DNS names to IP addresses                                         |                  |
 | UpstreamServers | The upstream DNS servers to use                                            | 8.8.8.8, 1.1.1.1 |
 | Blocklists      | A list of host file formated files that will be used to block DNS requests |                  |
 | BlockedDomains  | A list of domains to outright block                                        |                  |
+| ConditionalForwarders | Zones answered by their own server, see below                        |                  |
+
+### Conditional forwarding
+
+Queries for a zone, or any name under it, go only to that zone's server; the upstream servers are never asked, and a server that fails gives SERVFAIL. The longest matching zone wins. Write reverse zones out in full. `Server` is an IPv4 address with an optional `:port` (default 53).
+
+```yaml
+DNS:
+  ConditionalForwarders:
+    - Zone: lan
+      Server: 192.168.1.1
+    - Zone: 1.168.192.in-addr.arpa
+      Server: 192.168.1.1
+```
 
 ## DHCP
 
@@ -62,5 +76,5 @@ The Web module is loaded if the config file contains the `Web` key.
 | Address      | Address and port for web server to listen on                                                                                            | :8085   |
 | WebURL       | Base URL for the web interface (used for OIDC redirects and CORS)                                                                      |         |
 | TLS          | TLS configuration for HTTPS                                                                                                             |         |
-| HTPasswdFile | Path to htpasswd file for authentication. If this is not included, the module defaults to username:password admin:admin                 |         |
-| Prometheus   | Enable Prometheus metrics endpoint. This is the same endpoint the DNS Statistics page uses, so disabling it here will disable that page | false   |
+| HTPasswdFile | Path to htpasswd file for authentication. If it cannot be read at startup, a random password for `admin` is printed to the log once     |         |
+| Prometheus   | Enable the Prometheus metrics endpoint (it needs a login token). The DNS Statistics page reads it, so leaving it off disables that page | false   |

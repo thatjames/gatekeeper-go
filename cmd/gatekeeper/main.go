@@ -18,6 +18,7 @@ import (
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/system"
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/web"
+	v1 "gitlab.com/thatjames-go/gatekeeper-go/internal/web/v1"
 )
 
 // Flags
@@ -46,6 +47,12 @@ func main() {
 	log.Info("Version ", version)
 	system.Version = version
 	log.Debugf("Config: %v", config.Config)
+
+	if config.Config.Web != nil {
+		if err := v1.LoadJWTSecret(); err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	if config.Config.DHCP != nil {
 		log.Info("Registering DHCP server")

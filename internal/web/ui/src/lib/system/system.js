@@ -35,7 +35,8 @@ export const loadModules = () => {
 export let features = writable([]);
 
 export const getExtraFeatures = () => {
-  api.get("/features").then((resp) => {
+  return api.get("/features").then((resp) => {
     features.set(resp);
+    return resp;
   });
 };
