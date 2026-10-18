@@ -1,7 +1,7 @@
 ---
 type: Feature
 title: DNS server
-description: A UDP DNS server on the configured port that hands each query to the resolver and answers with its records, and can be reconfigured from the API.
+description: A UDP and TCP DNS server on the configured port that hands each query to the resolver and answers with its records, and can be reconfigured from the API.
 status: stable
 code:
   - internal/dns/server.go
@@ -10,7 +10,7 @@ code:
   - internal/dns/dns_feature_test.go
   - internal/dns/features/dns_request.feature
 tags: [dns]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T21:52:15Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T12:40:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -21,10 +21,18 @@ to it ([Pi-hole parity](/dns/pihole-parity.md)).
 # Behavior
 - Defaults: port 53, upstreams 8.8.8.8 and 1.1.1.1, read deadline 2 s. The
   resolver gets the server's upstreams when its own list is empty.
-- `Start()` adds `BlockedDomains` to the resolver, listens on UDP4 `:<port>`
-  on all interfaces (the `Interface` option is not used), starts one
-  listener, one receive worker and one response worker, then fetches the
-  blocklist URLs ([blocklists](/dns/blocklist.md)) before it returns.
+- `Start()` adds `BlockedDomains` to the resolver, listens on UDP4 and
+  TCP4 `:<port>` on all interfaces (the `Interface` option is not used),
+  starts the UDP listener with one receive worker and one response worker
+  and the TCP accept loop, then fetches the blocklist URLs
+  ([blocklists](/dns/blocklist.md)) before it returns. When either listen
+  fails, `Start` closes what it opened and returns the error.
+- TCP: each connection is served by its own goroutine. Messages carry a
+  2-byte big-endian length prefix (RFC 1035 4.2.2); the connection may send
+  several queries, answered in order, and is closed after 10 s with no
+  query, on a short read, or on a message that does not parse or has no
+  question. TCP replies go through the same resolver and reply building as
+  UDP and are never truncated.
 - Each datagram (up to 1500 bytes) is parsed; a packet that does not parse
   is logged and dropped with no answer.
 - Only the first question is resolved. A query with no question panics the
@@ -32,15 +40,16 @@ to it ([Pi-hole parity](/dns/pihole-parity.md)).
 - Resolver result → RCODE: success 0 with answers and authorities set;
   `ErrNxDomain` 3; any other error 2 (server failure).
 - The reply sets QR and RA, drops all additional records (EDNS OPT too) and
-  goes back to the sender. There is no TCP and no truncation.
+  goes back to the sender. There is no truncation.
 - Metrics (defined in `types.go`): `dns_req_time`, `dns_query_count`,
   `dns_blocked_domain_count`, `dns_query_by_ip_count`. There is no cache-hit
   metric; cache hits count in `dns_query_count` with upstream `cache`.
 - `queryByIPCounter` per client IP with `result` (always
   `success` in practice: resolution errors are not counted as failed) and
   `reqDuration` in ms.
-- `Stop()` closes the listener and waits for it; the workers keep running,
-  so every restart adds another pair (leak).
+- `Stop()` closes the UDP listener and waits for it, closes the TCP
+  listener and every open TCP connection; the UDP workers keep running, so
+  every restart adds another pair (leak).
 - API helpers: add/delete local domain, add/delete blocked domain, flush the
   blocklist, add a blocklist from a URL, reload all blocklist URLs,
   `Options()` / `UpdateOptions()`.

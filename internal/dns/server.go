@@ -1,7 +1,10 @@
 package dns
 
 import (
+	"encoding/binary"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 	"sync"
@@ -22,6 +25,9 @@ type DNSServerOpts struct {
 	ReadDeadline   time.Duration
 }
 
+// tcpIdleTimeout closes a TCP connection that sends no query for this long.
+const tcpIdleTimeout = time.Second * 10
+
 var defaultDNSServerOpts = DNSServerOpts{
 	Interface:    "eth0",
 	Port:         53,
@@ -34,6 +40,7 @@ type DNSServer struct {
 	resolver         Resolver
 	blocklistFetcher BlocklistFetcher
 	packetConn       net.PacketConn
+	tcpListener      net.Listener
 	receiverChan     chan *dnsWorkItem
 	responseChan     chan *dnsWorkItem
 	exitChan         chan struct{}
@@ -104,12 +111,19 @@ func (d *DNSServer) Start() error {
 	log.Info("starting DNS server")
 	log.Tracef("starting DNS server on port %d", d.opts.Port)
 	var err error
-	if d.packetConn, err = net.ListenPacket("udp4", fmt.Sprintf(":%d", d.opts.Port)); err != nil {
+	listenAddr := fmt.Sprintf(":%d", d.opts.Port)
+	if d.packetConn, err = net.ListenPacket("udp4", listenAddr); err != nil {
 		log.Error("unable to start DNS server: ", err.Error())
+		return err
+	}
+	if d.tcpListener, err = net.Listen("tcp4", listenAddr); err != nil {
+		log.Error("unable to start DNS server over TCP: ", err.Error())
+		d.packetConn.Close()
 		return err
 	}
 	d.exitChan = make(chan struct{})
 	go d.listen()
+	go d.listenTCP()
 	go d.receiverWorker()
 	go d.responseWorker()
 	if len(d.opts.BlocklistUrls) > 0 {
@@ -122,6 +136,9 @@ func (d *DNSServer) Start() error {
 func (d *DNSServer) Stop() error {
 	close(d.exitChan)
 	log.Info("stopping DNS server")
+	if d.tcpListener != nil {
+		d.tcpListener.Close()
+	}
 	d.lock.Lock() //wait for the goroutines to finish
 	defer d.lock.Unlock()
 	return nil
@@ -262,25 +279,7 @@ func (d *DNSServer) receiverWorker() {
 		}
 
 		log.Tracef("received DNS packet from %s", packet.ResponseAddr.String())
-		responses, authorities, err := d.resolver.Resolve(packet.DNSMessage.Questions[0].ParsedName, packet.DNSMessage.Questions[0].Type)
-
-		if err != nil {
-			if err == ErrNxDomain {
-				packet.DNSMessage.Header.SetRCODE(RCODENameFailure)
-			} else {
-				packet.DNSMessage.Header.SetRCODE(RCODEServerFailure)
-			}
-		} else {
-			packet.DNSMessage.Header.SetRCODE(RCODESuccess)
-			if responses != nil {
-				packet.DNSMessage.Answers = responses
-				log.Tracef("adding answer %v", responses)
-			}
-			if authorities != nil {
-				packet.DNSMessage.Authorities = authorities
-				log.Tracef("adding authority %s", authorities)
-			}
-		}
+		d.answer(packet.DNSMessage)
 
 		log.Tracef("push packet to response worker")
 		d.responseChan <- packet
@@ -298,10 +297,7 @@ func (d *DNSServer) receiverWorker() {
 func (d *DNSServer) responseWorker() {
 	for packet := range d.responseChan {
 		log.Tracef("sending DNS response packet to %s", packet.ResponseAddr.String())
-		packet.Header.SetQR(true)
-		packet.Header.SetRA(true)
-		packet.DNSMessage.Additionals = nil
-		data, err := MarshalDNSMessage(packet.DNSMessage)
+		data, err := prepareReply(packet.DNSMessage)
 		if err != nil {
 			log.Error("unable to marshal DNS packet: ", err.Error())
 			continue
@@ -312,6 +308,108 @@ func (d *DNSServer) responseWorker() {
 		reqDuration.Observe(float64(timeElapsed.Milliseconds()))
 		if err != nil {
 			log.Error("unable to send DNS packet: ", err.Error())
+		}
+	}
+}
+
+// answer resolves the first question of msg and fills msg in as the reply:
+// RCODE, answers and authorities.
+func (d *DNSServer) answer(msg *DNSMessage) {
+	responses, authorities, err := d.resolver.Resolve(msg.Questions[0].ParsedName, msg.Questions[0].Type)
+	if err != nil {
+		if err == ErrNxDomain {
+			msg.Header.SetRCODE(RCODENameFailure)
+		} else {
+			msg.Header.SetRCODE(RCODEServerFailure)
+		}
+		return
+	}
+	msg.Header.SetRCODE(RCODESuccess)
+	if responses != nil {
+		msg.Answers = responses
+		log.Tracef("adding answer %v", responses)
+	}
+	if authorities != nil {
+		msg.Authorities = authorities
+		log.Tracef("adding authority %s", authorities)
+	}
+}
+
+// prepareReply sets the reply flags on an answered query and marshals it.
+func prepareReply(msg *DNSMessage) ([]byte, error) {
+	msg.Header.SetQR(true)
+	msg.Header.SetRA(true)
+	msg.Additionals = nil
+	return MarshalDNSMessage(msg)
+}
+
+func (d *DNSServer) listenTCP() {
+	for {
+		conn, err := d.tcpListener.Accept()
+		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				log.Tracef("closing DNS TCP listener")
+				return
+			}
+			log.Error("unable to accept TCP connection: ", err.Error())
+			continue
+		}
+		go d.serveTCP(conn)
+	}
+}
+
+// serveTCP answers length-prefixed queries on one connection, in order,
+// until the client goes quiet, sends something unreadable or the server stops.
+func (d *DNSServer) serveTCP(conn net.Conn) {
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		select {
+		case <-d.exitChan:
+		case <-done:
+		}
+		conn.Close()
+	}()
+
+	clientIP := strings.Split(conn.RemoteAddr().String(), ":")[0]
+	lengthPrefix := make([]byte, 2)
+	for {
+		conn.SetReadDeadline(time.Now().Add(tcpIdleTimeout))
+		if _, err := io.ReadFull(conn, lengthPrefix); err != nil {
+			return
+		}
+		buff := make([]byte, binary.BigEndian.Uint16(lengthPrefix))
+		if _, err := io.ReadFull(conn, buff); err != nil {
+			return
+		}
+		startTime := time.Now()
+		msg, err := ParseDNSMessage(buff)
+		if err != nil {
+			log.Error("unable to parse DNS message over TCP: ", err.Error())
+			return
+		}
+		if len(msg.Questions) == 0 {
+			log.Error("DNS message over TCP has no question")
+			return
+		}
+
+		log.Tracef("received DNS packet over TCP from %s", clientIP)
+		d.answer(msg)
+		data, err := prepareReply(msg)
+		if err != nil {
+			log.Error("unable to marshal DNS packet: ", err.Error())
+			return
+		}
+		reply := make([]byte, 2, 2+len(data))
+		binary.BigEndian.PutUint16(reply, uint16(len(data)))
+		reply = append(reply, data...)
+		conn.SetWriteDeadline(time.Now().Add(tcpIdleTimeout))
+		_, err = conn.Write(reply)
+		reqDuration.Observe(float64(time.Since(startTime).Round(time.Millisecond).Milliseconds()))
+		queryByIPCounter.With(prometheus.Labels{"ip": clientIP, "result": "success"}).Inc()
+		if err != nil {
+			log.Error("unable to send DNS packet over TCP: ", err.Error())
+			return
 		}
 	}
 }

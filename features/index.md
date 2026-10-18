@@ -14,7 +14,7 @@ okf_version: "0.2"
 
 # DNS
 
-* [DNS server](/dns/server.md) - A UDP DNS server on the configured port that hands each query to the resolver and answers with its records, and can be reconfigured from the API.
+* [DNS server](/dns/server.md) - A UDP and TCP DNS server on the configured port that hands each query to the resolver and answers with its records, and can be reconfigured from the API.
 * [DNS resolver](/dns/resolver.md) - Resolves a name and type from the blocklist, a TTL cache, local domains, private PTR records or all upstreams in parallel, first answer wins.
 * [DNS blocklists](/dns/blocklist.md) - Blocklists in hosts-file format are fetched from HTTP(S) URLs or read from files, in parallel, and every hostname in them is blocked by the resolver.
 * [DNS wire format](/dns/wire-format.md) - Parses and marshals DNS messages (header, one question, answers, authorities, additionals, name compression, OPT) for the server and resolver.
