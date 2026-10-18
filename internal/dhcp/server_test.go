@@ -1,7 +1,10 @@
 package dhcp
 
 import (
+	"bytes"
 	"net"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
@@ -144,5 +147,97 @@ func TestDHCPServer_UpdateOptions(t *testing.T) {
 
 	if server.opts.LeaseTTL != 7200 {
 		t.Errorf("expected LeaseTTL 7200, got %d", server.opts.LeaseTTL)
+	}
+}
+
+// testServer is a DHCP server on a synthetic range that is not started; requests go straight to handleRequest.
+func testServer(start, end string) *DHCPServer {
+	z := NewDHCPServerWithOpts(&DHCPServerOpts{
+		StartFrom: net.ParseIP(start).To4(),
+		EndAt:     net.ParseIP(end).To4(),
+		LeaseTTL:  300,
+	})
+	z.interfaceAddr = net.ParseIP("10.0.0.254").To4()
+	return z
+}
+
+func testRequest(t *testing.T, msgType DHCPMessageType, mac string, extra Options) *DHCPPacket {
+	t.Helper()
+	hw, err := net.ParseMAC(mac)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := NewMessage(OpRequest)[:240]
+	m.SetHLen(len(hw))
+	m.SetCHAddr(hw)
+	opts := Options{OptionDHCPMessageType: []byte{byte(msgType)}}
+	for tag, val := range extra {
+		opts[tag] = val
+	}
+	return &DHCPPacket{Message: append(m, MarshalOptions(opts)...)}
+}
+
+func TestDHCPServer_ReservedClientReleaseKeepsReservation(t *testing.T) {
+	const mac = "02:00:00:00:00:01"
+	const reservedIP = "10.0.0.5"
+	cfgFile := filepath.Join(t.TempDir(), "config.yml")
+	if err := os.WriteFile(cfgFile, []byte("DHCP:\n  ReservedAddresses:\n    \""+mac+"\": "+reservedIP+"\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	saved := config.Config
+	t.Cleanup(func() { config.Config = saved })
+	if err := config.LoadConfig(cfgFile); err != nil {
+		t.Fatal(err)
+	}
+	before, _ := os.ReadFile(cfgFile)
+
+	z := testServer("10.0.0.1", "10.0.0.10")
+	for clientID, ip := range config.Config.DHCP.ReservedAddresses {
+		if err := z.issuedLeases.ReserveLease(clientID, net.ParseIP(ip).To4()); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if resp := z.handleRequest(testRequest(t, DHCPRelease, mac, nil)); resp != nil {
+		t.Fatalf("expected no reply to RELEASE, got %v", resp)
+	}
+	resp := z.handleRequest(testRequest(t, DHCPDiscover, mac, nil))
+	if resp == nil {
+		t.Fatalf("expected OFFER of %s after RELEASE, got none", reservedIP)
+	} else if !resp.YIAddr().Equal(net.ParseIP(reservedIP)) {
+		t.Fatalf("expected OFFER of %s after RELEASE, got %s", reservedIP, resp.YIAddr())
+	}
+	resp = z.handleRequest(testRequest(t, DHCPRequest, mac, Options{OptionRequestedIPAddress: net.ParseIP(reservedIP).To4()}))
+	if resp == nil || DHCPMessageType(ParseOptions(resp)[OptionDHCPMessageType][0]) != DHCPAck {
+		t.Fatalf("expected ACK of %s after RELEASE", reservedIP)
+	}
+	if got := config.Config.DHCP.ReservedAddresses[mac]; got != reservedIP {
+		t.Errorf("config reservation changed to %q", got)
+	}
+	if after, _ := os.ReadFile(cfgFile); !bytes.Equal(before, after) {
+		t.Errorf("config file was rewritten on RELEASE")
+	}
+}
+
+func TestDHCPServer_FullPoolNeverOffersReservedIP(t *testing.T) {
+	z := testServer("10.0.0.1", "10.0.0.3")
+	reservedIP := net.ParseIP("10.0.0.2").To4()
+	if err := z.issuedLeases.ReserveLease("02:00:00:00:00:10", reservedIP); err != nil {
+		t.Fatal(err)
+	}
+	offered := 0
+	for _, mac := range []string{"02:00:00:00:00:11", "02:00:00:00:00:12", "02:00:00:00:00:13"} {
+		resp := z.handleRequest(testRequest(t, DHCPDiscover, mac, nil))
+		if resp == nil {
+			continue
+		}
+		offered++
+		if resp.YIAddr().Equal(reservedIP) {
+			t.Errorf("client %s was offered reserved IP %s", mac, reservedIP)
+		}
+		z.handleRequest(testRequest(t, DHCPRequest, mac, Options{OptionRequestedIPAddress: resp.YIAddr().To4()}))
+	}
+	if offered != 2 {
+		t.Errorf("expected 2 offers from a 3-address pool with one reserved, got %d", offered)
 	}
 }

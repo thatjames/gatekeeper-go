@@ -27,7 +27,7 @@ func deleteLease(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "lease not found"})
 		return
 	}
-	dhcpService.LeaseDB().ReleaseLease(lease)
+	dhcpService.LeaseDB().DeleteLease(lease)
 	activeLeases := dhcpService.LeaseDB().ActiveLeases()
 	reservedLeases := dhcpService.LeaseDB().ReservedLeases()
 	c.JSON(http.StatusOK, DhcpLeaseResponse{

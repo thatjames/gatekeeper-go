@@ -9,7 +9,7 @@ code:
   - internal/dhcp/dhcp_feature_test.go
   - internal/dhcp/features/lease_offering.feature
 tags: [dhcp]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T21:52:15Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T22:10:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -33,8 +33,9 @@ optional module (confirmed 2026-10-17), not used at home: hecate serves DHCP.
   (option 50, else ciaddr) must equal the client's lease: then ACK (offered →
   active, active → renewed, reserved → stays reserved), else NAK. A client
   with no lease gets NAK. The hostname option is stored on the lease.
-- RELEASE: frees the client's lease. For a reserved client it deletes the
-  reservation from the pool and from the config file (bug).
+- RELEASE: frees the client's pool lease. A reserved client keeps its
+  reservation (pool and config file untouched), so it gets the same IP when
+  it rediscovers.
 - DECLINE and INFORM are not handled.
 - Replies go to the sender; when the sender is `0.0.0.0` they go to the
   subnet broadcast address on the same port.
@@ -52,6 +53,7 @@ optional module (confirmed 2026-10-17), not used at home: hecate serves DHCP.
   [DHCP API](/web/dhcp-api.md).
 
 # Decisions
-- Fixes agreed 2026-10-17 (plans): release must not delete a reservation;
-  live option changes, worker leaks, binding to the interface, DECLINE and
+- RELEASE keeps a reservation (2026-10-17, user): many devices release at
+  shutdown; removing a reservation is an admin action in the API.
+- Fixes agreed 2026-10-17 (plans): live option changes, worker leaks, binding to the interface, DECLINE and
   INFORM, the option 53 panic and the gauge.
