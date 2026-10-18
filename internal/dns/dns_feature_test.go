@@ -440,4 +440,6 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^the domain "([^"]*)" is blocked$`, ts.theDomainIsBlocked)
 	ctx.Step(`^the resolver has local domain for "([^"]*)" with IP "([^"]*)"$`, ts.theResolverHasALocalDomainWithIP)
 	ctx.Step(`^I should receive a ([a-z|A-Z]+) error$`, ts.iShouldReceiveAnError)
+
+	initializeParityScenario(ctx)
 }

@@ -18,7 +18,7 @@ okf_version: "0.2"
 * [DNS resolver](/dns/resolver.md) - Resolves a name and type from the blocklist, a TTL cache, local domains, private PTR records or all upstreams in parallel, first answer wins.
 * [DNS blocklists](/dns/blocklist.md) - Blocklists in hosts-file format are fetched from HTTP(S) URLs or read from files, in parallel, and every hostname in them is blocked by the resolver.
 * [DNS wire format](/dns/wire-format.md) - Parses and marshals DNS messages (header, one question, answers, authorities, additionals, name compression, OPT) for the server and resolver.
-* [Pi-hole parity on atlas](/dns/pihole-parity.md) - draft - what gatekeeper's DNS must do before it replaces Pi-hole on atlas - TCP and UDP on port 53, truncation and EDNS, conditional forwarding of reverse and local lookups to hecate, interface binding.
+* [Pi-hole parity on atlas](/dns/pihole-parity.md) - What gatekeeper's DNS does so it can replace Pi-hole on atlas - TCP and UDP on port 53, truncation and EDNS, conditional forwarding of reverse and local lookups to hecate, interface binding.
 
 # DHCP
 

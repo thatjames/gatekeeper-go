@@ -20,20 +20,29 @@ type fakeDNSServer struct {
 
 func newFakeDNSServer(t testing.TB, handler func(query *DNSMessage, tcp bool) *DNSMessage) *fakeDNSServer {
 	t.Helper()
-	udp, err := net.ListenPacket("udp4", "127.0.0.1:0")
+	f, err := startFakeDNSServer(handler)
 	if err != nil {
 		t.Fatal(err)
+	}
+	t.Cleanup(f.close)
+	return f
+}
+
+// startFakeDNSServer starts a fake server; the caller closes it.
+func startFakeDNSServer(handler func(query *DNSMessage, tcp bool) *DNSMessage) (*fakeDNSServer, error) {
+	udp, err := net.ListenPacket("udp4", "127.0.0.1:0")
+	if err != nil {
+		return nil, err
 	}
 	tcp, err := net.Listen("tcp4", udp.LocalAddr().String())
 	if err != nil {
 		udp.Close()
-		t.Fatal(err)
+		return nil, err
 	}
 	f := &fakeDNSServer{addr: udp.LocalAddr().String(), handler: handler, udp: udp, tcp: tcp}
-	t.Cleanup(f.close)
 	go f.serveUDP()
 	go f.serveTCP()
-	return f
+	return f, nil
 }
 
 func (f *fakeDNSServer) close() {

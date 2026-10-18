@@ -1,11 +1,13 @@
 ---
 type: Feature
 title: Pi-hole parity on atlas
-description: draft - what gatekeeper's DNS must do before it replaces Pi-hole on atlas - TCP and UDP on port 53, truncation and EDNS, conditional forwarding of reverse and local lookups to hecate, interface binding.
-status: draft
-code: []
+description: What gatekeeper's DNS does so it can replace Pi-hole on atlas - TCP and UDP on port 53, truncation and EDNS, conditional forwarding of reverse and local lookups to hecate, interface binding.
+status: stable
+code:
+  - internal/dns/features/dns_parity.feature
+  - internal/dns/parity_feature_test.go
 tags: [dns, atlas, pihole]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T12:24:43Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T14:00:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -61,7 +63,8 @@ DNS:
 `Interface` names an interface as gatekeeper sees it: with Docker's bridge
 network that is the container's `eth0`, so binding to atlas's LAN NIC needs
 host networking (or leave `Interface` empty).
-Built in [DNS server](/dns/server.md), [DNS resolver](/dns/resolver.md),
+The godog scenarios in `dns_parity.feature` run a real server on
+127.0.0.1 against fake forwarders. Built in [DNS server](/dns/server.md), [DNS resolver](/dns/resolver.md),
 [DNS wire format](/dns/wire-format.md) and [Config file](/config/config-file.md).
 
 # Decisions
