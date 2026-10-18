@@ -11,7 +11,28 @@ This is available from the `/metrics` endpoint on the web server, provided the `
 
 ## Authentication
 
-This endpoint is not protected by default. If you wish to expose this, it is recommended to set up authentication via a reverse proxy such as nginx or Caddy.
+The endpoint needs a login token, because the metrics include client IP addresses, hostnames and queried domains. Without one it answers `401`.
+
+A scraper sends a token as a bearer token. Get one by logging in:
+
+```bash
+curl -s -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"<password>"}' \
+  http://gatekeeper:8085/api/v1/login
+```
+
+and configure Prometheus with it:
+
+```yaml
+scrape_configs:
+  - job_name: gatekeeper
+    authorization:
+      credentials: <token>
+    static_configs:
+      - targets: ['gatekeeper:8085']
+```
+
+Tokens last 7 days, so a long-running scraper needs a fresh token each week.
 
 ## Available Metrics
 

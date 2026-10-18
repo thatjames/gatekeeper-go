@@ -6,30 +6,49 @@ weight: 5
 
 GateKeeper support JWT authentication using the [JSON Web Token](https://jwt.io/) (JWT) standard.
 
-## Configuration
+## JWT Secret
 
-GateKeeper requires some form of authentication to be configured. In the event that you do not, a default authentication provider is used with a random password that will be printed to the logs.
+GateKeeper signs its tokens with the secret in the `GATEKEEPER_JWT_SECRET` environment variable. When the `Web` module is configured and this variable is unset or empty, GateKeeper refuses to start and logs:
 
-There are two types of authentication providers that can be configured:
-
-### HTPasswd
-
-HTPasswd is a simple authentication provider that uses a [htpasswd](https://httpd.apache.org/docs/2.4/programs/htpasswd.html) file to authenticate users. 
-
-#### Example Configuration
-
-```yaml
-Auth:
-  AuthType: htpasswd
-  HTPasswdFile: /path/to/htpasswd
+```
+GATEKEEPER_JWT_SECRET must be set when Web is configured
 ```
 
-#### HTPasswd Parameters
+Use a long random value, for example:
 
-| Key          | Description                                              | Default |
-| ------------ | -------------------------------------------------------- | ------- |
-| AuthType     | Must be set to `htpasswd`                               |         |
-| HTPasswdFile | Path to the htpasswd file                               |         |
+```bash
+export GATEKEEPER_JWT_SECRET="$(openssl rand -base64 32)"
+```
+
+Tokens are valid for 7 days. Changing the secret logs everybody out.
+
+## Configuration
+
+There are two ways to log in, and password login is always available.
+
+### Password Login (htpasswd)
+
+Password login checks users against an [htpasswd](https://httpd.apache.org/docs/2.4/programs/htpasswd.html) file, named by `HTPasswdFile` in the `Web` section:
+
+```yaml
+Web:
+  Address: :8085
+  HTPasswdFile: /path/to/.htpasswd
+```
+
+The file is read again on every login, so you can add or change users without a restart.
+
+#### Fallback Password
+
+If GateKeeper cannot read the htpasswd file when it starts (the key is not set, or the file is missing or unreadable), it makes a random password and logs it once, at startup:
+
+```
+WARNING - No htpasswd file; log in as admin with password: <password>
+```
+
+Log in as `admin` with that password. It stays the same until GateKeeper restarts. Create an htpasswd file for anything beyond a first look.
+
+Passwords are never written to the log; failed and successful logins are logged with the username only.
 
 
 ### OIDC: OpenID Connect
@@ -60,6 +79,8 @@ Web:
   Address: :8085
   WebURL: https://your-domain.com
 ```
+
+After an OIDC login GateKeeper sets the `oauth_token` cookie. It is `HttpOnly` (scripts cannot read it), `SameSite=Lax`, lasts as long as the token (7 days), and is `Secure` when `WebURL` starts with `https://`, so serve GateKeeper over HTTPS when you use OIDC.
 
 #### OIDC Parameters
 

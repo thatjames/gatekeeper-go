@@ -62,5 +62,5 @@ The Web module is loaded if the config file contains the `Web` key.
 | Address      | Address and port for web server to listen on                                                                                            | :8085   |
 | WebURL       | Base URL for the web interface (used for OIDC redirects and CORS)                                                                      |         |
 | TLS          | TLS configuration for HTTPS                                                                                                             |         |
-| HTPasswdFile | Path to htpasswd file for authentication. If this is not included, the module defaults to username:password admin:admin                 |         |
-| Prometheus   | Enable Prometheus metrics endpoint. This is the same endpoint the DNS Statistics page uses, so disabling it here will disable that page | false   |
+| HTPasswdFile | Path to htpasswd file for authentication. If it cannot be read at startup, a random password for `admin` is printed to the log once     |         |
+| Prometheus   | Enable the Prometheus metrics endpoint (it needs a login token). The DNS Statistics page reads it, so leaving it off disables that page | false   |

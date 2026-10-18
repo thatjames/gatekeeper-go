@@ -8,7 +8,7 @@ code:
   - config/config.yml
   - config/docker-config.yml
 tags: [config, yaml]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T12:50:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T13:10:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -22,7 +22,9 @@ without hand edits.
   module off.
 - `Auth.AuthType` picks the auth block: `oidc` (IssuerURL, ClientID,
   ClientSecretVar, RedirectURL, Scopes) or `htpasswd` (HTPasswdFile). Any
-  other type fails the load. No `Auth:` leaves it nil.
+  other type fails the load. No `Auth:` leaves it nil. `Auth.HTPasswdFile`
+  is parsed but never read: password login uses `Web.HTPasswdFile`
+  ([auth](/web/auth.md)); the duplicate key is on the backlog.
 - `DHCP`: Interface, StartAddr, EndAddr, DomainName, NameServers, LeaseTTL
   (seconds), SubnetMask, Gateway, ReservedAddresses (MAC → IP), LeaseFile.
 - `DNS`: UpstreamServers, Interface, LocalDomains (name → IPv4), Port,
