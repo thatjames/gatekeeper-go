@@ -20,7 +20,8 @@ to it ([Pi-hole parity](/dns/pihole-parity.md)).
 
 # Behavior
 - Defaults: port 53, upstreams 8.8.8.8 and 1.1.1.1, read deadline 2 s. The
-  resolver gets the server's upstreams when its own list is empty.
+  resolver gets the server's upstreams when its own list is empty. Startup
+  passes `DNS.ConditionalForwarders` to the resolver.
 - `Start()` adds `BlockedDomains` to the resolver, listens on UDP4 and
   TCP4 `:<port>` on all interfaces (the `Interface` option is not used),
   starts the UDP listener with one receive worker and one response worker

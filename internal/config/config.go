@@ -200,6 +200,13 @@ type DNS struct {
 	Port            int               `yaml:"Port"`
 	BlockLists      []string          `yaml:"BlockLists"`
 	BlockedDomains  []string          `yaml:"BlockedDomains"`
+	// ConditionalForwarders send a zone's queries to its own server.
+	ConditionalForwarders []ConditionalForwarder `yaml:"ConditionalForwarders"`
+}
+
+type ConditionalForwarder struct {
+	Zone   string `yaml:"Zone"`
+	Server string `yaml:"Server"`
 }
 
 func LoadConfig(filePath string) error {

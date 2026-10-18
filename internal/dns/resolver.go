@@ -39,6 +39,7 @@ type DNSResolver struct {
 	upstream        []net.IP
 	blacklist       map[string]struct{}
 	localDomains    map[string]net.IP
+	forwarders      []conditionalForwarder
 	domainLock      *sync.RWMutex
 	cacheTTL        time.Duration
 	upstreamTimeout time.Duration
@@ -47,12 +48,13 @@ type DNSResolver struct {
 }
 
 type ResolverOpts struct {
-	Upstreams       []string
-	LocalDomains    map[string]net.IP
-	CacheTTL        time.Duration
-	UpstreamTimeout time.Duration
-	DialTimeout     time.Duration
-	ReadTimeout     time.Duration
+	Upstreams             []string
+	LocalDomains          map[string]net.IP
+	ConditionalForwarders []ConditionalForwarder
+	CacheTTL              time.Duration
+	UpstreamTimeout       time.Duration
+	DialTimeout           time.Duration
+	ReadTimeout           time.Duration
 }
 
 var defaultResolverOpts = ResolverOpts{
@@ -105,6 +107,7 @@ func NewDNSResolverWithOpts(options ResolverOpts) *DNSResolver {
 		cache:           make(map[string]*DNSCacheItem),
 		upstream:        upstreamAddrs,
 		localDomains:    options.LocalDomains,
+		forwarders:      parseForwarders(options.ConditionalForwarders),
 		domainLock:      new(sync.RWMutex),
 		blacklist:       make(map[string]struct{}),
 		cacheTTL:        cacheTTL,
@@ -173,6 +176,10 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 		return answers, nil, nil
 	}
 
+	if forwarder := r.forwarderFor(domain); forwarder != nil {
+		return r.forward(domain, dnsType, forwarder, cacheKey)
+	}
+
 	type result struct {
 		answers     []*DNSRecord
 		authorities []*DNSRecord
@@ -230,17 +237,7 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 				"result":   "success",
 			}).Inc()
 
-			var ttl time.Time
-			if res.answers != nil {
-				ttl = time.Now().Add(time.Duration(res.answers[0].TTL) * time.Second)
-			} else {
-				ttl = time.Now().Add(time.Duration(res.authorities[0].TTL) * time.Second)
-				log.Debugf("TTL: %v", ttl)
-			}
-			r.cache[cacheKey] = &DNSCacheItem{
-				records: res.answers,
-				ttl:     ttl,
-			}
+			r.cacheRecords(cacheKey, res.answers, res.authorities)
 			log.Debugf("Processing response from upstream %v", res.upstream)
 
 			return res.answers, res.authorities, nil
@@ -252,6 +249,24 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 		return nil, nil, lastErr
 	}
 	return nil, nil, ErrNxDomain
+}
+
+// cacheRecords caches answers under cacheKey for the TTL of the first answer,
+// or of the first authority when there are no answers.
+func (r *DNSResolver) cacheRecords(cacheKey string, answers, authorities []*DNSRecord) {
+	var ttl time.Time
+	if answers != nil {
+		ttl = time.Now().Add(time.Duration(answers[0].TTL) * time.Second)
+	} else if authorities != nil {
+		ttl = time.Now().Add(time.Duration(authorities[0].TTL) * time.Second)
+		log.Debugf("TTL: %v", ttl)
+	} else {
+		return
+	}
+	r.cache[cacheKey] = &DNSCacheItem{
+		records: answers,
+		ttl:     ttl,
+	}
 }
 
 func (r *DNSResolver) AddLocalDomain(domain string, ip net.IP) error {
@@ -321,6 +336,11 @@ func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (a
 			}
 		}
 	}
+	return r.exchange(domain, dnsType, fmt.Sprintf("%s:%d", upstream, 53))
+}
+
+// exchange asks the DNS server at addr (ip:port) for domain and dnsType.
+func (r *DNSResolver) exchange(domain string, dnsType DNSType, addr string) (answers, authorities []*DNSRecord, err error) {
 	message := NewDnsMessage()
 	message.Header.ID = uint16(rand.Intn(65535))
 	message.Header.SetRD(true)
@@ -340,7 +360,7 @@ func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (a
 		Timeout: r.dialTimeout,
 	}
 
-	raddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", upstream, 53))
+	raddr, err := net.ResolveUDPAddr("udp", addr)
 	if err != nil {
 		return nil, nil, err
 	}

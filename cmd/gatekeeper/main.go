@@ -66,14 +66,20 @@ func main() {
 			localDomains[domain] = parsed
 		}
 
+		forwarders := make([]dns.ConditionalForwarder, 0, len(config.Config.DNS.ConditionalForwarders))
+		for _, forwarder := range config.Config.DNS.ConditionalForwarders {
+			forwarders = append(forwarders, dns.ConditionalForwarder{Zone: forwarder.Zone, Server: forwarder.Server})
+		}
+
 		dnsServer := dns.NewDNSServerWithOpts(dns.DNSServerOpts{
 			Interface:      config.Config.DNS.Interface,
 			Upstream:       config.Config.DNS.UpstreamServers,
 			BlocklistUrls:  config.Config.DNS.BlockLists,
 			BlockedDomains: config.Config.DNS.BlockedDomains,
 			ResolverOpts: &dns.ResolverOpts{
-				LocalDomains: localDomains,
-				Upstreams:    config.Config.DNS.UpstreamServers,
+				LocalDomains:          localDomains,
+				Upstreams:             config.Config.DNS.UpstreamServers,
+				ConditionalForwarders: forwarders,
 			},
 			Port: config.Config.DNS.Port,
 		}, nil, nil)

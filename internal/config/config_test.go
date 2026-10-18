@@ -19,6 +19,11 @@ DNS:
     - 1.1.1.1
   Interface: eth0
   Port: 53
+  ConditionalForwarders:
+    - Zone: styx
+      Server: 10.20.1.1
+    - Zone: 1.20.10.in-addr.arpa
+      Server: 10.20.1.1:5353
 `
 
 	tmpFile, err := os.CreateTemp("", "config-*.yml")
@@ -52,6 +57,10 @@ DNS:
 	}
 	if len(Config.DNS.UpstreamServers) != 1 || Config.DNS.UpstreamServers[0] != "1.1.1.1" {
 		t.Errorf("unexpected DNS.UpstreamServers: %v", Config.DNS.UpstreamServers)
+	}
+	wantForwarders := []ConditionalForwarder{{Zone: "styx", Server: "10.20.1.1"}, {Zone: "1.20.10.in-addr.arpa", Server: "10.20.1.1:5353"}}
+	if len(Config.DNS.ConditionalForwarders) != 2 || Config.DNS.ConditionalForwarders[0] != wantForwarders[0] || Config.DNS.ConditionalForwarders[1] != wantForwarders[1] {
+		t.Errorf("unexpected DNS.ConditionalForwarders: %v", Config.DNS.ConditionalForwarders)
 	}
 }
 

@@ -8,7 +8,7 @@ code:
   - config/config.yml
   - config/docker-config.yml
 tags: [config, yaml]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T21:52:15Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T13:10:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -26,7 +26,9 @@ without hand edits.
 - `DHCP`: Interface, StartAddr, EndAddr, DomainName, NameServers, LeaseTTL
   (seconds), SubnetMask, Gateway, ReservedAddresses (MAC → IP), LeaseFile.
 - `DNS`: UpstreamServers, Interface, LocalDomains (name → IPv4), Port,
-  BlockLists (URLs or file paths), BlockedDomains.
+  BlockLists (URLs or file paths), BlockedDomains, ConditionalForwarders
+  (list of `Zone`, `Server`: IPv4 with optional `:port`;
+  [resolver](/dns/resolver.md)).
 - `Web`: Address, WebURL, TLS (PublicKey, PrivateKey paths), HTPasswdFile,
   Prometheus. `Prometheus` is parsed but not read: `/metrics` is always on.
 - `UpdateConfig()` truncates the loaded file and writes the whole global back
