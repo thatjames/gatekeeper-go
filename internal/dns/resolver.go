@@ -35,7 +35,7 @@ type Resolver interface {
 }
 
 type DNSResolver struct {
-	cache           map[string]*DNSCacheItem
+	cache           *dnsCache
 	upstream        []net.IP
 	blacklist       map[string]struct{}
 	localDomains    map[string]net.IP
@@ -44,6 +44,9 @@ type DNSResolver struct {
 	upstreamTimeout time.Duration
 	dialTimeout     time.Duration
 	readTimeout     time.Duration
+	upstreamPort    int
+	stopSweep       chan struct{}
+	closeOnce       sync.Once
 }
 
 type ResolverOpts struct {
@@ -62,11 +65,6 @@ var defaultResolverOpts = ResolverOpts{
 	UpstreamTimeout: time.Second * 5,
 	DialTimeout:     time.Second * 2,
 	ReadTimeout:     time.Second * 2,
-}
-
-type DNSCacheItem struct {
-	records []*DNSRecord //Handle multiple answers, e.g. CNAME
-	ttl     time.Time
 }
 
 func NewDNSResolverWithDefaultOpts() *DNSResolver {
@@ -101,8 +99,8 @@ func NewDNSResolverWithOpts(options ResolverOpts) *DNSResolver {
 		readTimeout = time.Second * 2
 	}
 
-	return &DNSResolver{
-		cache:           make(map[string]*DNSCacheItem),
+	r := &DNSResolver{
+		cache:           newDNSCache(defaultCacheLimit),
 		upstream:        upstreamAddrs,
 		localDomains:    options.LocalDomains,
 		domainLock:      new(sync.RWMutex),
@@ -111,17 +109,50 @@ func NewDNSResolverWithOpts(options ResolverOpts) *DNSResolver {
 		upstreamTimeout: upstreamTimeout,
 		dialTimeout:     dialTimeout,
 		readTimeout:     readTimeout,
+		upstreamPort:    53,
+		stopSweep:       make(chan struct{}),
+	}
+	go r.sweepCache(cacheSweepInterval, r.stopSweep)
+	return r
+}
+
+// Close stops the cache sweep.
+func (r *DNSResolver) Close() {
+	r.closeOnce.Do(func() { close(r.stopSweep) })
+}
+
+func (r *DNSResolver) sweepCache(interval time.Duration, stop <-chan struct{}) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-stop:
+			return
+		case now := <-ticker.C:
+			r.cache.sweep(now)
+		}
 	}
 }
 
-func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorities []*DNSRecord, err error) {
-	r.domainLock.Lock()
-	defer r.domainLock.Unlock()
+// cacheResult caches item for ttl from now; a zero TTL is not cached.
+func (r *DNSResolver) cacheResult(key string, item *DNSCacheItem, ttl time.Duration) {
+	if ttl <= 0 {
+		return
+	}
+	item.expires = time.Now().Add(ttl)
+	r.cache.set(key, item)
+}
 
+func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorities []*DNSRecord, err error) {
 	answers, authorities = make([]*DNSRecord, 0), make([]*DNSRecord, 0)
 	log.Debugf("resolving %s", domain)
 
-	if _, blocked := r.blacklist[domain]; blocked {
+	r.domainLock.RLock()
+	_, blocked := r.blacklist[domain]
+	responseIP, isLocal := r.localDomains[domain]
+	r.domainLock.RUnlock()
+
+	if blocked {
 		log.Infof("rejected %s in blacklist", domain)
 		var result []byte
 		if dnsType == DNSTypeA {
@@ -145,18 +176,15 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 	cacheKey := domain + "|" + dnsType.String()
 
 	// Check cache
-	if cacheItem, ok := r.cache[cacheKey]; ok {
-		if cacheItem.ttl.After(time.Now()) {
-			queryCounter.With(prometheus.Labels{"domain": domain, "upstream": "cache", "result": "success"}).Inc()
-			answers = cacheItem.records
-			return answers, nil, nil
-		} else {
-			log.Debugf("removing expired cache item for %s", domain)
-			delete(r.cache, cacheKey)
+	if cacheItem, ok := r.cache.get(cacheKey, time.Now()); ok {
+		if cacheItem.nxDomain {
+			return nil, cacheItem.authorities, ErrNxDomain
 		}
+		queryCounter.With(prometheus.Labels{"domain": domain, "upstream": "cache", "result": "success"}).Inc()
+		return cacheItem.answers, cacheItem.authorities, nil
 	}
 
-	if responseIP, ok := r.localDomains[domain]; ok {
+	if isLocal {
 		log.Debugf("found %s in local domains", domain)
 		if dnsType != DNSTypeA {
 			return nil, nil, nil
@@ -180,7 +208,8 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 		err         error
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	// One deadline for the whole fan-out, not a fresh one per reply.
+	ctx, cancel := context.WithTimeout(context.Background(), r.upstreamTimeout)
 	defer cancel()
 
 	results := make(chan result, len(r.upstream))
@@ -197,20 +226,26 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 	}
 
 	var lastErr error
+	var nxSOA *DNSRecord
+	var nxTTL time.Duration
 
+wait:
 	for i := 0; i < len(r.upstream); i++ {
 		var res result
 		select {
 		case res = <-results:
-		case <-time.After(r.upstreamTimeout):
+		case <-ctx.Done():
 			log.Warn("timeout waiting for an upstream response")
-			continue
+			break wait
 		}
 
 		if res.err != nil {
 			log.Error("unable to lookup: ", res.err.Error())
 			lastErr = res.err
 
+			if res.err == ErrNxDomain && nxSOA == nil {
+				nxSOA, nxTTL = soaMinimum(res.authorities)
+			}
 			if res.err != ErrNxDomain {
 				queryCounter.With(prometheus.Labels{
 					"domain":   domain,
@@ -230,17 +265,17 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 				"result":   "success",
 			}).Inc()
 
-			var ttl time.Time
+			var ttl uint32
 			if res.answers != nil {
-				ttl = time.Now().Add(time.Duration(res.answers[0].TTL) * time.Second)
+				ttl = res.answers[0].TTL
 			} else {
-				ttl = time.Now().Add(time.Duration(res.authorities[0].TTL) * time.Second)
+				ttl = res.authorities[0].TTL
 				log.Debugf("TTL: %v", ttl)
 			}
-			r.cache[cacheKey] = &DNSCacheItem{
-				records: res.answers,
-				ttl:     ttl,
-			}
+			r.cacheResult(cacheKey, &DNSCacheItem{
+				answers:     res.answers,
+				authorities: res.authorities,
+			}, time.Duration(ttl)*time.Second)
 			log.Debugf("Processing response from upstream %v", res.upstream)
 
 			return res.answers, res.authorities, nil
@@ -248,10 +283,18 @@ func (r *DNSResolver) Resolve(domain string, dnsType DNSType) (answers, authorit
 	}
 
 	// All upstreams failed
-	if lastErr != nil {
+	if lastErr != nil && lastErr != ErrNxDomain {
 		return nil, nil, lastErr
 	}
-	return nil, nil, ErrNxDomain
+	if nxSOA == nil {
+		return nil, nil, ErrNxDomain
+	}
+	authorities = []*DNSRecord{nxSOA}
+	r.cacheResult(cacheKey, &DNSCacheItem{
+		authorities: authorities,
+		nxDomain:    true,
+	}, nxTTL)
+	return nil, authorities, ErrNxDomain
 }
 
 func (r *DNSResolver) AddLocalDomain(domain string, ip net.IP) error {
@@ -303,6 +346,7 @@ func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (a
 		ip := octets[3] + "." + octets[2] + "." + octets[1] + "." + octets[0]
 		log.Debugf("reverse lookup %s", ip)
 		if net.ParseIP(ip).IsPrivate() {
+			r.domainLock.RLock()
 			for host, localIp := range r.localDomains {
 				log.Tracef("checking %s against %v", host, localIp)
 				if localIp.String() == ip {
@@ -315,10 +359,13 @@ func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (a
 						ParsedName: host,
 						RData:      stringToDNSWireFormat(host),
 					})
+					r.domainLock.RUnlock()
 					return answers, nil, nil
 				}
+				r.domainLock.RUnlock()
 				return nil, nil, ErrNxDomain // we don't have this local domain defined, so we treat it as a bad name
 			}
+			r.domainLock.RUnlock()
 		}
 	}
 	message := NewDnsMessage()
@@ -340,7 +387,7 @@ func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (a
 		Timeout: r.dialTimeout,
 	}
 
-	raddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", upstream, 53))
+	raddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", upstream, r.upstreamPort))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -377,7 +424,7 @@ func (r *DNSResolver) lookup(domain string, dnsType DNSType, upstream net.IP) (a
 		return nil, nil, ErrDNSFormatError
 	case RCODENameFailure:
 		log.Errorf("DNS packet from %s name failure", conn.RemoteAddr().String())
-		return nil, nil, ErrNxDomain
+		return nil, msg.Authorities, ErrNxDomain
 	case RCODEServerFailure:
 		log.Errorf("DNS packet from %s server failure", conn.RemoteAddr().String())
 		return nil, nil, ErrDNSServerFailure

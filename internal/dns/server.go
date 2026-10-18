@@ -249,7 +249,11 @@ func (d *DNSServer) listen() {
 	}
 }
 
+// maxQueriesInFlight caps the queries the receive worker resolves at once.
+const maxQueriesInFlight = 256
+
 func (d *DNSServer) receiverWorker() {
+	inFlight := make(chan struct{}, maxQueriesInFlight)
 	for packet := range d.receiverChan {
 		if packet.err != nil {
 			log.Errorf("skipping malformed packet: %v", packet.err)
@@ -262,36 +266,47 @@ func (d *DNSServer) receiverWorker() {
 		}
 
 		log.Tracef("received DNS packet from %s", packet.ResponseAddr.String())
-		responses, authorities, err := d.resolver.Resolve(packet.DNSMessage.Questions[0].ParsedName, packet.DNSMessage.Questions[0].Type)
+		inFlight <- struct{}{}
+		go func(packet *dnsWorkItem) {
+			defer func() { <-inFlight }()
+			d.answer(packet)
+		}(packet)
+	}
+}
 
-		if err != nil {
-			if err == ErrNxDomain {
-				packet.DNSMessage.Header.SetRCODE(RCODENameFailure)
-			} else {
-				packet.DNSMessage.Header.SetRCODE(RCODEServerFailure)
-			}
+// answer resolves the packet's first question and hands the reply to the
+// response worker.
+func (d *DNSServer) answer(packet *dnsWorkItem) {
+	responses, authorities, err := d.resolver.Resolve(packet.DNSMessage.Questions[0].ParsedName, packet.DNSMessage.Questions[0].Type)
+
+	if err != nil {
+		if err == ErrNxDomain {
+			packet.DNSMessage.Header.SetRCODE(RCODENameFailure)
+			packet.DNSMessage.Authorities = authorities
 		} else {
-			packet.DNSMessage.Header.SetRCODE(RCODESuccess)
-			if responses != nil {
-				packet.DNSMessage.Answers = responses
-				log.Tracef("adding answer %v", responses)
-			}
-			if authorities != nil {
-				packet.DNSMessage.Authorities = authorities
-				log.Tracef("adding authority %s", authorities)
-			}
+			packet.DNSMessage.Header.SetRCODE(RCODEServerFailure)
 		}
-
-		log.Tracef("push packet to response worker")
-		d.responseChan <- packet
-		log.Tracef("packet pushed to response worker")
-
-		// we do this afterwards to not interfere with the response timing
-		if packet.err != nil {
-			queryByIPCounter.With(prometheus.Labels{"ip": strings.Split(packet.ResponseAddr.String(), ":")[0], "result": "failed"}).Inc()
-		} else {
-			queryByIPCounter.With(prometheus.Labels{"ip": strings.Split(packet.ResponseAddr.String(), ":")[0], "result": "success"}).Inc()
+	} else {
+		packet.DNSMessage.Header.SetRCODE(RCODESuccess)
+		if responses != nil {
+			packet.DNSMessage.Answers = responses
+			log.Tracef("adding answer %v", responses)
 		}
+		if authorities != nil {
+			packet.DNSMessage.Authorities = authorities
+			log.Tracef("adding authority %s", authorities)
+		}
+	}
+
+	log.Tracef("push packet to response worker")
+	d.responseChan <- packet
+	log.Tracef("packet pushed to response worker")
+
+	// we do this afterwards to not interfere with the response timing
+	if packet.err != nil {
+		queryByIPCounter.With(prometheus.Labels{"ip": strings.Split(packet.ResponseAddr.String(), ":")[0], "result": "failed"}).Inc()
+	} else {
+		queryByIPCounter.With(prometheus.Labels{"ip": strings.Split(packet.ResponseAddr.String(), ":")[0], "result": "success"}).Inc()
 	}
 }
 

@@ -10,7 +10,7 @@ code:
   - internal/dns/dns_feature_test.go
   - internal/dns/features/dns_request.feature
 tags: [dns]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T21:52:15Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T10:00:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -27,10 +27,15 @@ to it ([Pi-hole parity](/dns/pihole-parity.md)).
   blocklist URLs ([blocklists](/dns/blocklist.md)) before it returns.
 - Each datagram (up to 1500 bytes) is parsed; a packet that does not parse
   is logged and dropped with no answer.
+- The receive worker resolves each query in its own goroutine, at most 256
+  at a time; with 256 in flight it waits for one to finish before it takes
+  the next packet. Answers may leave in a different order than the queries
+  came in.
 - Only the first question is resolved. A query with no question panics the
   receive worker (bug).
 - Resolver result → RCODE: success 0 with answers and authorities set;
-  `ErrNxDomain` 3; any other error 2 (server failure).
+  `ErrNxDomain` 3 with the resolver's authorities (the SOA); any other
+  error 2 (server failure).
 - The reply sets QR and RA, drops all additional records (EDNS OPT too) and
   goes back to the sender. There is no TCP and no truncation.
 - Metrics (defined in `types.go`): `dns_req_time`, `dns_query_count`,
@@ -55,3 +60,6 @@ to it ([Pi-hole parity](/dns/pihole-parity.md)).
 - Fixes agreed 2026-10-17: empty-question panic, the failed metric and the
   worker leak (plans), TCP/truncation/EDNS/interface binding under
   [Pi-hole parity](/dns/pihole-parity.md).
+- Parallel receive capped at 256 queries in flight: one slow lookup no
+  longer holds up the LAN, and a flood of queries cannot start unbounded
+  goroutines (user, 2026-10-18).

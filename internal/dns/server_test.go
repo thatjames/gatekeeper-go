@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -252,5 +253,83 @@ func TestNewDNSServerWithOptsPassesResolverOptsThrough(t *testing.T) {
 	}
 	if len(answers) != 1 || !net.IP(answers[0].RData).Equal(net.ParseIP("192.168.1.1")) {
 		t.Fatalf("expected a local answer of 192.168.1.1, got %v", answers)
+	}
+}
+
+// slowResolver answers every A query with 192.0.2.1, after delay for slow.
+type slowResolver struct {
+	*mockResolver
+	slow  string
+	delay time.Duration
+}
+
+func (s *slowResolver) Resolve(domain string, dnsType DNSType) (answers, authorities []*DNSRecord, err error) {
+	if domain == s.slow {
+		time.Sleep(s.delay)
+	}
+	return []*DNSRecord{{
+		Name:  compressedDomainVal,
+		Type:  DNSTypeA,
+		Class: DNSClassIN,
+		TTL:   300,
+		RData: net.IPv4(192, 0, 2, 1).To4(),
+	}}, nil, nil
+}
+
+func freeUDPPort(t *testing.T) int {
+	t.Helper()
+	conn, err := net.ListenPacket("udp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer conn.Close()
+	return conn.LocalAddr().(*net.UDPAddr).Port
+}
+
+func TestDNSServer_AnswersQueriesInParallel(t *testing.T) {
+	port := freeUDPPort(t)
+	resolver := &slowResolver{mockResolver: newMockResolver(), slow: "slow.example.test", delay: 2 * time.Second}
+	server := NewDNSServerWithOpts(DNSServerOpts{Port: port, ReadDeadline: 50 * time.Millisecond}, resolver, nil)
+	if err := server.Start(); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	defer server.Stop()
+
+	client, err := net.Dial("udp4", fmt.Sprintf("127.0.0.1:%d", port))
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	defer client.Close()
+
+	for i, name := range []string{"slow.example.test", "fast.example.test"} {
+		query := NewDnsMessage()
+		query.Header.ID = uint16(i + 1)
+		query.Header.SetRD(true)
+		query.Questions = []*DNSQuestion{{Name: stringToDNSWireFormat(name), Type: DNSTypeA, Class: DNSClassIN}}
+		dat, err := MarshalDNSMessage(query)
+		if err != nil {
+			t.Fatalf("marshal: %v", err)
+		}
+		if _, err := client.Write(dat); err != nil {
+			t.Fatalf("write: %v", err)
+		}
+	}
+
+	start := time.Now()
+	client.SetReadDeadline(time.Now().Add(time.Second))
+	buff := make([]byte, 1500)
+	n, err := client.Read(buff)
+	if err != nil {
+		t.Fatalf("no answer while the slow query was in flight: %v", err)
+	}
+	reply, err := ParseDNSMessage(buff[:n])
+	if err != nil {
+		t.Fatalf("parse reply: %v", err)
+	}
+	if reply.Header.ID != 2 {
+		t.Errorf("expected the fast query (ID 2) to be answered first, got ID %d", reply.Header.ID)
+	}
+	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
+		t.Errorf("fast query took %v behind a slow one", elapsed)
 	}
 }
