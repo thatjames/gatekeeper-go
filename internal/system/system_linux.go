@@ -25,9 +25,12 @@ func GetSystemInfo() (SystemInfo, error) {
 		"Uptime":   formatDuration((time.Second * time.Duration(t.Uptime)).Round(time.Second)),
 		"Memory":   fmt.Sprintf("%s / %s", byteSize(uint64(t.Freeram)), byteSize(uint64(t.Totalram))),
 	}
-	if config.Config.DHCP != nil {
-		if lanStats, err := getInterfaceStatsByName(config.Config.DHCP.Interface); err == nil {
-			si["LAN Interface"] = config.Config.DHCP.Interface
+	config.RLock()
+	dhcpConfig := config.Config.DHCP
+	config.RUnlock()
+	if dhcpConfig != nil {
+		if lanStats, err := getInterfaceStatsByName(dhcpConfig.Interface); err == nil {
+			si["LAN Interface"] = dhcpConfig.Interface
 			si["LAN Tx"] = byteSize(uint64(lanStats.TxBytes))
 			si["LAN Rx"] = byteSize(uint64(lanStats.RxBytes))
 		}

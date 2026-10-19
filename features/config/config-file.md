@@ -8,7 +8,7 @@ code:
   - config/config.yml
   - config/docker-config.yml
 tags: [config, yaml]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T13:10:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T21:59:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -31,12 +31,16 @@ without hand edits.
   BlockLists (URLs or file paths), BlockedDomains, ConditionalForwarders
   (list of `Zone`, `Server`: IPv4 with optional `:port`;
   [resolver](/dns/resolver.md)).
-- `Web`: Address, WebURL, TLS (PublicKey, PrivateKey paths), HTPasswdFile,
-  Prometheus. `Prometheus` (default false) turns on `/metrics`
+- `Web`: Address, WebURL, AllowedOrigins (extra CORS origins), TLS
+  (PublicKey, PrivateKey paths), HTPasswdFile, Prometheus. `Prometheus` (default false) turns on `/metrics`
   ([HTTP server](/web/http-server.md)).
 - `UpdateConfig()` truncates the loaded file and writes the whole global back
   (2-space indent); comments and key order in the file are lost. With no
   file loaded it returns an error.
+- One `sync.RWMutex` guards the global after load: `config.Lock()` /
+  `Unlock()` around a change and its `UpdateConfig()` (the caller must hold
+  `Lock`), `config.RLock()` / `RUnlock()` to read a section the API can
+  change (DHCP, DNS). Web and Auth are only set at load and read without it.
 - `String()` prints the config as an indented tree for debug logs; nil
   sections are skipped.
 - `config/config.yml` is the developer sample (OIDC, DNS only);
@@ -48,5 +52,6 @@ without hand edits.
 - The sample's `IssuerURL` points at `keycloak.thatjames.nl`, which is stale:
   the identity provider is Authentik on atlas ([OIDC login](/web/auth.md)).
 - The config format is not a hard constraint; it may change.
-- The handlers mutate `config.Config` with no lock (race): fixed by the
-  web handler plan.
+- One global lock rather than one per section (2026-10-18, web handler
+  plan): `UpdateConfig` writes every section, so any save must exclude every
+  change.

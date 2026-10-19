@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"os"
 	"path"
@@ -165,7 +166,11 @@ func (z *DHCPServer) Start() error {
 		}
 	}
 
-	for clientID, lease := range z.opts.ReservedLeases {
+	// The map is the config's ReservedAddresses, which the web API changes: copy it under the config lock.
+	config.RLock()
+	reserved := maps.Clone(z.opts.ReservedLeases)
+	config.RUnlock()
+	for clientID, lease := range reserved {
 		z.issuedLeases.ReserveLease(clientID, net.ParseIP(lease).To4())
 		activeLeaseGauge.Inc()
 		log.Infof("reserving %s for %s", lease, clientID)

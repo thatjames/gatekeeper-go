@@ -88,3 +88,31 @@ func TestMetrics(t *testing.T) {
 		t.Errorf("Prometheus off: expected 404, got %d", w.Code)
 	}
 }
+
+func TestCORSOrigins(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cfg := &config.Web{WebURL: "https://gatekeeper.example.com", AllowedOrigins: []string{"http://localhost:5173"}}
+	oldConfig := config.Config
+	t.Cleanup(func() { config.Config = oldConfig })
+	config.Config = &config.ConfigInstance{Web: cfg}
+	r := newRouter(cfg)
+
+	for origin, allowed := range map[string]bool{
+		"https://gatekeeper.example.com":  true,
+		"http://localhost:5173":           true,
+		"https://gatekeeper.thatjames.nl": false,
+		"https://evil.example.com":        false,
+	} {
+		req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
+		req.Header.Set("Origin", origin)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		got := w.Header().Get("Access-Control-Allow-Origin")
+		if allowed && got != origin {
+			t.Errorf("%s: expected Access-Control-Allow-Origin %q, got %q", origin, origin, got)
+		}
+		if !allowed && got != "" {
+			t.Errorf("%s: expected no CORS headers, got Access-Control-Allow-Origin %q", origin, got)
+		}
+	}
+}

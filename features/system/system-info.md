@@ -7,7 +7,7 @@ code:
   - internal/system/types.go
   - internal/system/system_linux.go
 tags: [system, linux]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T21:52:15Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T21:59:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -19,7 +19,8 @@ Show the state of the box gatekeeper runs on.
   `free / total` (label says Memory, value starts with free), sizes as
   `1.5G`.
 - `LAN Interface/Tx/Rx` from `/sys/class/net/<DHCP.Interface>/statistics`
-  when DHCP is configured; `WAN Interface/Tx/Rx` from `ppp0` when it
+  when DHCP is configured (read under the config read lock, since the DHCP
+  API replaces that section); `WAN Interface/Tx/Rx` from `ppp0` when it
   exists. On atlas (DNS only, no ppp0) neither shows.
 - `Version` holds the build version.
 

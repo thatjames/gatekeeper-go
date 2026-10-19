@@ -38,7 +38,7 @@ func newRouter(cfg *config.Web) *gin.Engine {
 	r.Use(gin.Recovery())
 
 	corsConfig := cors.DefaultConfig()
-	corsConfig.AllowOrigins = []string{cfg.WebURL, "http://gatekeeper.thatjames.nl", "https://gatekeeper.thatjames.nl"}
+	corsConfig.AllowOrigins = append([]string{cfg.WebURL}, cfg.AllowedOrigins...)
 	corsConfig.AllowHeaders = append(corsConfig.AllowHeaders, "Authorization")
 	corsConfig.AllowCredentials = true
 	r.Use(cors.New(corsConfig))

@@ -9,7 +9,7 @@ code:
   - internal/dhcp/dhcp_feature_test.go
   - internal/dhcp/features/lease_offering.feature
 tags: [dhcp]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T22:10:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T22:05:44Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -22,7 +22,9 @@ optional module (confirmed 2026-10-17), not used at home: hecate serves DHCP.
   it takes the interface's first IP network as server address and computes
   its broadcast address. It loads the lease file (default
   `/var/lib/gatekeeper/leases`; a load error is only a warning), adds the
-  configured reservations, listens on UDP4 `:67` on all interfaces, and
+  configured reservations (copied under the
+  [config lock](/config/config-file.md), since the API changes that map),
+  listens on UDP4 `:67` on all interfaces, and
   starts one listener with 10 receive and 10 response workers.
 - Only BOOTREQUEST packets of at least 240 bytes are handled. A packet with
   no option 53 panics the worker (bug).

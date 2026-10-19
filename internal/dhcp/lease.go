@@ -123,8 +123,15 @@ func (l *LeasePool) UpdateLease(clientId string, ip net.IP) error {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	if reservedLease, ok := l.reservedAddresses[clientId]; ok {
+		for _, other := range l.reservedAddresses {
+			if other.ClientId != clientId && other.IP.Equal(ip) {
+				return errors.New("ip already reserved")
+			}
+		}
 		reservedLease.IP = ip
 		l.evictOthers(clientId, ip)
+		config.Lock()
+		defer config.Unlock()
 		return config.UpdateConfig()
 	}
 	for _, lease := range l.leases {
@@ -355,8 +362,10 @@ func (l *LeasePool) DeleteLease(delLease *Lease) {
 	defer l.lock.Unlock()
 	if _, ok := l.reservedAddresses[delLease.ClientId]; ok {
 		delete(l.reservedAddresses, delLease.ClientId)
+		config.Lock()
 		delete(config.Config.DHCP.ReservedAddresses, delLease.ClientId)
 		config.UpdateConfig()
+		config.Unlock()
 		return
 	}
 	l.clearClient(delLease.ClientId)

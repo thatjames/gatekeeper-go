@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"sync"
 
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -13,6 +14,21 @@ import (
 var loadedFilePath *string
 
 var Config *ConfigInstance
+
+// mu guards the DHCP and DNS sections of Config, which the web API changes at runtime.
+var mu sync.RWMutex
+
+// Lock takes the config lock for a change; hold it through UpdateConfig.
+func Lock() { mu.Lock() }
+
+// Unlock releases the lock taken by Lock.
+func Unlock() { mu.Unlock() }
+
+// RLock takes the config lock for reading.
+func RLock() { mu.RLock() }
+
+// RUnlock releases the lock taken by RLock.
+func RUnlock() { mu.RUnlock() }
 
 type Auth interface {
 	Type() string
@@ -181,11 +197,12 @@ type DHCP struct {
 }
 
 type Web struct {
-	Address      string     `yaml:"Address"`
-	WebURL       string     `yaml:"WebURL"`
-	TLS          *TLSConfig `yaml:"TLS"`
-	HTPasswdFile string     `yaml:"HTPasswdFile"`
-	Prometheus   bool       `yaml:"Prometheus"`
+	Address        string     `yaml:"Address"`
+	WebURL         string     `yaml:"WebURL"`
+	AllowedOrigins []string   `yaml:"AllowedOrigins"`
+	TLS            *TLSConfig `yaml:"TLS"`
+	HTPasswdFile   string     `yaml:"HTPasswdFile"`
+	Prometheus     bool       `yaml:"Prometheus"`
 }
 
 type TLSConfig struct {
@@ -224,6 +241,7 @@ func LoadConfig(filePath string) error {
 	return nil
 }
 
+// UpdateConfig writes Config back to the loaded file. The caller holds Lock.
 func UpdateConfig() error {
 	if loadedFilePath == nil {
 		return fmt.Errorf("no config file path loaded")
