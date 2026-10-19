@@ -8,7 +8,7 @@ code:
   - config/config.yml
   - config/docker-config.yml
 tags: [config, yaml]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T21:59:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-19T08:21:41Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -52,6 +52,6 @@ without hand edits.
 - The sample's `IssuerURL` points at `keycloak.thatjames.nl`, which is stale:
   the identity provider is Authentik on atlas ([OIDC login](/web/auth.md)).
 - The config format is not a hard constraint; it may change.
-- One global lock rather than one per section (2026-10-18, web handler
-  plan): `UpdateConfig` writes every section, so any save must exclude every
+- One global lock rather than one per section (2026-10-18): `UpdateConfig`
+  writes every section, so any save must exclude every
   change.

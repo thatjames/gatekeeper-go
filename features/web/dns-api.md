@@ -7,7 +7,7 @@ code:
   - internal/web/v1/dns.go
   - internal/web/v1/dns_test.go
 tags: [web, api, dns]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T22:05:44Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-19T08:21:41Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -52,8 +52,9 @@ Manage DNS from the UI, as Pi-hole's admin pages did.
   a temp config file, and runs them concurrently for `go test -race`.
 
 # Decisions
-- Fixes agreed 2026-10-17 (plans): apply config changes to the running
-  resolver; the handler bugs, bodies, rollback and races.
-- A blocklist URL is fetched before it is saved (2026-10-18, web handler
-  plan): a URL that cannot be fetched is not kept, and the fetch is the only
+- Fix agreed 2026-10-17 (plans): apply config changes to the running
+  resolver. The handler errors, bodies, rollback and races were fixed
+  2026-10-18.
+- A blocklist URL is fetched before it is saved (2026-10-18): a URL that
+  cannot be fetched is not kept, and the fetch is the only
   one.
