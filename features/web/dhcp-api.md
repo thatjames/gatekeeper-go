@@ -5,8 +5,9 @@ description: Authenticated /api/v1/dhcp routes to list, release, reserve and cha
 status: stable
 code:
   - internal/web/v1/dhcp.go
+  - internal/web/v1/dhcp_test.go
 tags: [web, api, dhcp]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T21:59:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-19T08:16:21Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -22,7 +23,8 @@ Manage leases and DHCP settings from the UI.
 - `POST /dhcp/leases/reserve {clientId, ip}` reserves, saves the config and
   answers the lists; an IP reserved for another client → 400.
 - `PUT /dhcp/leases {clientId, ip}` changes a reservation or lease IP and
-  saves the config.
+  saves the config. Moving a reservation onto an IP reserved for another
+  client → 400, nothing changed, as for reserve.
 - `GET /dhcp/options` → interface, range, TTL, gateway, mask, domain, lease
   file, DNS servers.
 - `PUT /dhcp/options` validates, swaps the server options, restarts the
@@ -37,3 +39,7 @@ Manage leases and DHCP settings from the UI.
 
 # Interfaces
 - [Lease pool](/dhcp/lease-pool.md), [config file](/config/config-file.md).
+
+# Decisions
+- A reservation cannot move onto another client's reserved IP (user,
+  2026-10-18): `PUT /dhcp/leases` answers 400, as `ReserveLease` refuses it.

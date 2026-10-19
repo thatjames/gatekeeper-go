@@ -141,6 +141,7 @@ func newHandlerTest(t *testing.T) *handlerTest {
 	r.DELETE("/dns/blockeddomains/:id", deleteBlockedDomain)
 	r.DELETE("/dhcp/leases/:clientId", deleteLease)
 	r.POST("/dhcp/leases/reserve", reserveLease)
+	r.PUT("/dhcp/leases", updateLease)
 	return ht
 }
 

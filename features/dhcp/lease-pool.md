@@ -10,7 +10,7 @@ code:
   - internal/dhcp/features/lease_initialization.feature
   - internal/dhcp/features/reserved_leases.feature
 tags: [dhcp, leases]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T21:59:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-19T08:16:21Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -37,7 +37,8 @@ known devices, and remember leases across restarts.
   its next REQUEST and rediscovers), then stores the reservation.
 - `UpdateLease(client, ip)` changes a reservation (clearing any other
   client's pool lease on the new IP, then writing the config file) or a pool
-  lease's IP.
+  lease's IP. Like `ReserveLease`, it refuses to move a reservation onto an
+  IP reserved for another client and then changes nothing.
 - `ReleaseLease` (the client's DHCPRELEASE): a reserved client keeps its
   reservation, in the pool and in the config file, and nothing is written;
   otherwise the client's pool lease is cleared.
