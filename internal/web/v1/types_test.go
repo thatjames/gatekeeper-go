@@ -242,6 +242,19 @@ func TestDNSConfigRequestValidate_Valid(t *testing.T) {
 	}
 }
 
+func TestDNSConfigRequestValidate_Port(t *testing.T) {
+	for port, valid := range map[int]bool{0: true, 1: true, 5354: true, 65535: true, -1: false, 65536: false} {
+		req := &DNSConfigRequest{Interface: "eth0", Port: port, Upstreams: []string{"9.9.9.9"}}
+		errs := req.Validate()
+		if valid && errs != nil {
+			t.Errorf("port %d: expected no errors, got %v", port, errs)
+		}
+		if !valid && (len(errs) != 1 || errs[0].Field != "port") {
+			t.Errorf("port %d: expected one port error, got %v", port, errs)
+		}
+	}
+}
+
 func TestDNSConfigRequestValidate_MissingInterface(t *testing.T) {
 	req := &DNSConfigRequest{
 		Upstreams: []string{"8.8.8.8"},

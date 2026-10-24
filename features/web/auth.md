@@ -21,12 +21,16 @@ provider is Authentik on atlas (confirmed 2026-10-17).
 - `POST /login {username, password}` logs the attempt and its outcome with
   the username only; the password and the request body are never logged.
   The route stays open when OIDC is configured.
-- At startup the `Web.HTPasswdFile` file is read once to see whether it can
-  be used. When it can, each login is checked against it (any htpasswd hash,
-  re-read per login so edits apply). When it cannot (unset, missing,
-  unreadable), gatekeeper makes one random 16-character password with
-  `crypto/rand`, logs it once at warn level, and accepts `admin` with that
-  password, compared in constant time, for the life of the process.
+- At startup, when `Web.HTPasswdFile` is set and the file does not exist,
+  gatekeeper writes one: `admin` with a random 16-character password
+  (`crypto/rand`), bcrypt-hashed, mode 0600, the password logged once at
+  warn level ([settings from the branch](/ui/settings-page.md)).
+- Then the file is read once to see whether it can be used. When it can,
+  each login is checked against it (any htpasswd hash, re-read per login so
+  edits apply). When it cannot (unset, unreadable, or the write above
+  failed), gatekeeper makes one random 16-character password, logs it once
+  at warn level, and accepts `admin` with that password, compared in
+  constant time, for the life of the process.
 - Success → `{token}`: HS256 JWT, subject and username = login name, role
   `admin`, issuer `gatekeeper`, valid 7 days. Wrong credentials → 401.
 - The JWT secret is `GATEKEEPER_JWT_SECRET`, loaded at startup; with `Web:`
@@ -59,7 +63,9 @@ provider is Authentik on atlas (confirmed 2026-10-17).
   took DNS down with it.
 - The fallback password is per process and logged once (2026-10-17), so a
   fresh install can log in without an htpasswd file, and the log shows the
-  password only at startup, never per request.
+  password only at startup, never per request. With a configured path the
+  generated file replaces it (2026-10-24), so the password survives
+  restarts.
 - The cookie is HttpOnly and the UI asks `GET /me` who is logged in (user,
   2026-10-18); `/me` also stands in for the `/verify` the UI calls
   ([UI shell](/ui/app-shell.md)).

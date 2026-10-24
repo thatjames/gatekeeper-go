@@ -218,6 +218,9 @@ func initLogin() {
 	if config.Config.Web != nil {
 		file = config.Config.Web.HTPasswdFile
 	}
+	if _, err := ensureHTPasswdFile(file); err != nil {
+		log.WithError(err).Warn("Unable to create htpasswd file")
+	}
 	_, err := htpasswd.New(file, htpasswd.DefaultSystems, nil)
 	if err == nil {
 		return

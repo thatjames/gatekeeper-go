@@ -15,9 +15,14 @@ import (
 
 // dnsConfigResponse is the DNS section as the API answers it. The caller holds the config lock.
 func dnsConfigResponse() DNSConfigResponse {
+	port := config.Config.DNS.Port
+	if port == 0 {
+		port = 53
+	}
 	return DNSConfigResponse{
 		Upstreams:      config.Config.DNS.UpstreamServers,
 		Interface:      config.Config.DNS.Interface,
+		Port:           port,
 		Blocklist:      config.Config.DNS.BlockLists,
 		BlockedDomains: config.Config.DNS.BlockedDomains,
 	}
@@ -57,26 +62,36 @@ func updateDNSConfig(c *gin.Context) {
 	dnsService := service.GetService[*dns.DNSServer](service.DNS)
 	oldOpts := new(dns.DNSServerOpts)
 	*oldOpts = *dnsService.Options()
+	port := req.Port
+	if port == 0 {
+		port = oldOpts.Port
+	}
+	restore := func() {
+		dnsService.Options().Interface = oldOpts.Interface
+		dnsService.Options().Port = oldOpts.Port
+		dnsService.Options().ResolverOpts.Upstreams = oldOpts.ResolverOpts.Upstreams
+	}
 	dnsService.Options().Interface = req.Interface
+	dnsService.Options().Port = port
 	dnsService.Options().ResolverOpts.Upstreams = req.Upstreams
 	dnsService.Options().BlockedDomains = req.BlockedDomains
 	if err := dnsService.Stop(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		dnsService.Options().Interface = oldOpts.Interface
-		dnsService.Options().ResolverOpts.Upstreams = oldOpts.ResolverOpts.Upstreams
+		restore()
 		return
 	} else if err = dnsService.Start(); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		dnsService.Options().Interface = oldOpts.Interface
-		dnsService.Options().ResolverOpts.Upstreams = oldOpts.ResolverOpts.Upstreams
+		restore()
 		dnsService.Start()
 		return
 	}
-	oldInterface, oldUpstreams := config.Config.DNS.Interface, config.Config.DNS.UpstreamServers
-	config.Config.DNS.Interface = req.Interface
-	config.Config.DNS.UpstreamServers = req.Upstreams
+	dnsCfg := config.Config.DNS
+	oldInterface, oldPort, oldUpstreams := dnsCfg.Interface, dnsCfg.Port, dnsCfg.UpstreamServers
+	dnsCfg.Interface = req.Interface
+	dnsCfg.Port = port
+	dnsCfg.UpstreamServers = req.Upstreams
 	if err := config.UpdateConfig(); err != nil {
-		config.Config.DNS.Interface, config.Config.DNS.UpstreamServers = oldInterface, oldUpstreams
+		dnsCfg.Interface, dnsCfg.Port, dnsCfg.UpstreamServers = oldInterface, oldPort, oldUpstreams
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

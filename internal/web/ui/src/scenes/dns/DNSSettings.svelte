@@ -184,6 +184,17 @@
         <h5
           class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white"
         >
+          Port
+        </h5>
+        <p class="leading-tight font-normal text-gray-700 dark:text-gray-400">
+          {settings?.port || 53}
+        </p>
+      </Card>
+
+      <Card class="p-5 min-w-full">
+        <h5
+          class="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white"
+        >
           Upstreams
         </h5>
         <div class="flex flex-wrap gap-2">

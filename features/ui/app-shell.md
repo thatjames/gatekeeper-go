@@ -48,7 +48,8 @@ The admin UI, embedded in the binary, for the one admin.
   lands on login (bug).
 - Login: username/password → `POST /login`, token kept in
   `sessionStorage`. When `/features` lists `oidc` a provider button goes
-  to `/oidc-login`, and the login page asks `GET /me` (with cookies, no
+  to `/oidc-login` and the password form hides behind a link
+  ([settings from the branch](/ui/settings-page.md)), and the login page asks `GET /me` (with cookies, no
   reload on 401): a user there lands on home, otherwise the form stays.
   The `oauth_token` cookie is HttpOnly, so the UI never reads it.
 - Logout clears the session, calls `/logout` and reloads.

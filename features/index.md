@@ -43,7 +43,7 @@ okf_version: "0.2"
 * [UI DHCP pages](/ui/dhcp-pages.md) - Lease pages (active and reserved tables, details, reserve, edit, release) and the DHCP settings view and form.
 * [UI DNS pages](/ui/dns-pages.md) - DNS settings (upstreams, interface, blocklist URLs, blocked domains) and local domain pages.
 * [UI DNS statistics](/ui/dns-statistics.md) - Charts of DNS metrics read from /metrics every 30 s - request time, queries by upstream and result, top blocked domains, queries by client IP.
-* [UI settings page](/ui/settings-page.md) - draft - a settings page in the UI, with backing API and web server changes, in progress on the feature/settings-page branch.
+* [Settings from feature/settings-page](/ui/settings-page.md) - What came to main from the feature/settings-page branch - the DNS port in the DNS settings, a login screen shaped by the auth type, and a generated bcrypt htpasswd file on first start; no settings page of its own.
 
 # System
 

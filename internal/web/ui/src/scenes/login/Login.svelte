@@ -14,6 +14,8 @@
   import { push } from "svelte-spa-router";
   let loginData = {};
   let errorText = $state("");
+  // With OIDC the provider button leads; the password form stays one click away.
+  let showPassword = $state(false);
   const doLogin = (e) => {
     e.preventDefault();
     login(loginData)
@@ -31,8 +33,7 @@
   });
 
   const handleOIDCRedirect = () => {
-    console.log("do redirect");
-    window.location = env.url + "oidc-login";
+    window.location.href = env.url + "oidc-login";
   };
 
 </script>
@@ -57,25 +58,34 @@
 
   <form class="md:w-1/2 mx-auto" onsubmit={doLogin}>
     <div class="flex flex-col gap-2">
-      <FloatingLabelInput
-        variant="outlined"
-        id="username"
-        name="username"
-        type="text"
-        bind:value={loginData.username}
-        >Username
-      </FloatingLabelInput>
-      <FloatingLabelInput
-        variant="outlined"
-        id="password"
-        name="password"
-        type="password"
-        bind:value={loginData.password}>Password</FloatingLabelInput
-      >
-      <Button type="submit">Login</Button>
       {#if $features.includes("oidc")}
-        <Button outline color="dark" onclick={handleOIDCRedirect}
-          >OIDC Login</Button
+        <Button onclick={handleOIDCRedirect}>Log in with OIDC</Button>
+        {#if !showPassword}
+          <Button
+            outline
+            color="alternative"
+            onclick={() => (showPassword = true)}>Log in with a password</Button
+          >
+        {/if}
+      {/if}
+      {#if !$features.includes("oidc") || showPassword}
+        <FloatingLabelInput
+          variant="outlined"
+          id="username"
+          name="username"
+          type="text"
+          bind:value={loginData.username}
+          >Username
+        </FloatingLabelInput>
+        <FloatingLabelInput
+          variant="outlined"
+          id="password"
+          name="password"
+          type="password"
+          bind:value={loginData.password}>Password</FloatingLabelInput
+        >
+        <Button type="submit" outline={$features.includes("oidc")}
+          >Login</Button
         >
       {/if}
     </div>

@@ -38,9 +38,19 @@ Web:
 
 The file is read again on every login, so you can add or change users without a restart.
 
+#### First Start
+
+When `HTPasswdFile` is set and no file exists at that path, GateKeeper creates it on startup with one user, `admin`, a random password (stored as a bcrypt hash, file mode `0600`), and logs the password once:
+
+```
+WARNING - Created htpasswd file /path/to/.htpasswd; log in as admin with password: <password>
+```
+
+The password stays valid across restarts. Change it with `htpasswd -B /path/to/.htpasswd admin`.
+
 #### Fallback Password
 
-If GateKeeper cannot read the htpasswd file when it starts (the key is not set, or the file is missing or unreadable), it makes a random password and logs it once, at startup:
+If GateKeeper still cannot read an htpasswd file when it starts (the key is not set, or the file is unreadable), it makes a random password and logs it once, at startup:
 
 ```
 WARNING - No htpasswd file; log in as admin with password: <password>

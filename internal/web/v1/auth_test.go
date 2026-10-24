@@ -89,7 +89,7 @@ func TestLoginNeverLogsPassword(t *testing.T) {
 
 func TestFallbackLoginWorksTwice(t *testing.T) {
 	buf := captureLog(t)
-	r := setupRouter(t, &config.Web{HTPasswdFile: filepath.Join(t.TempDir(), "missing")})
+	r := setupRouter(t, &config.Web{})
 
 	password := fallbackPassword
 	if len(password) != 16 {

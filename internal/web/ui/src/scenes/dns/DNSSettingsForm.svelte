@@ -116,6 +116,23 @@
       {/if}
     </div>
 
+    <Label for="port" class="mb-2">Port</Label>
+    <div class="flex flex-col">
+      <Input
+        type="number"
+        id="port"
+        placeholder="53"
+        min="1"
+        max="65535"
+        bind:value={settings.port}
+      />
+      {#if fieldErrors.port}
+        <Helper class="mt-2 text-primary-500 dark:text-primary-500">
+          {fieldErrors.port}
+        </Helper>
+      {/if}
+    </div>
+
     <Label for="upstreams" class="mb-2">Upstreams</Label>
     <div class="flex flex-col">
       <ButtonGroup>

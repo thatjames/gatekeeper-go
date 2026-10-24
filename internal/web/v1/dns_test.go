@@ -192,6 +192,17 @@ func (ht *handlerTest) breakSave(t *testing.T) {
 	}
 }
 
+func TestDNSConfigAnswersPort(t *testing.T) {
+	ht := newHandlerTest(t)
+	if code, answer := ht.do(t, http.MethodGet, "/dns/config", nil); code != http.StatusOK || answer["port"] != float64(53) {
+		t.Errorf("unset port: expected 200 with port 53, got %d %v", code, answer)
+	}
+	config.Config.DNS.Port = 5354
+	if _, answer := ht.do(t, http.MethodGet, "/dns/config", nil); answer["port"] != float64(5354) {
+		t.Errorf("expected port 5354, got %v", answer["port"])
+	}
+}
+
 func TestAddLocalDomainLiveErrorChangesNothing(t *testing.T) {
 	ht := newHandlerTest(t)
 	before := ht.file(t)

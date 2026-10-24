@@ -7,7 +7,7 @@ code:
   - internal/web/v1/dns.go
   - internal/web/v1/dns_test.go
 tags: [web, api, dns]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-19T08:21:41Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-24T16:55:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -15,9 +15,13 @@ verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 Manage DNS from the UI, as Pi-hole's admin pages did.
 
 # Behavior
-- `GET /dns/config` → `{upstreams, interface, blocklist, blockedDomains}`.
-- `PUT /dns/config {interface, upstreams, blockedDomains}` restarts the DNS
-  server with them and saves interface and upstreams to the config. The
+- `GET /dns/config` → `{upstreams, interface, port, blocklist,
+  blockedDomains}`; `port` is 53 when the config leaves it unset.
+- `PUT /dns/config {interface, port, upstreams, blockedDomains}` restarts
+  the DNS server with them and saves interface, port and upstreams to the
+  config. `port` 0 or absent keeps the current port; outside 1-65535 → 400
+  on the `port` field. A failed restart puts the old interface, port and
+  upstreams back. The
   running resolver keeps its old upstreams (bug), and blocked domains are
   neither saved nor removed from the resolver.
 - `GET /dns/local-domains` → the name → IP map.
