@@ -207,6 +207,8 @@ type Web struct {
 	TLS            *TLSConfig `yaml:"TLS"`
 	HTPasswdFile   string     `yaml:"HTPasswdFile"`
 	Prometheus     bool       `yaml:"Prometheus"`
+	// WANInterface overrides the default-route interface on the home screen.
+	WANInterface string `yaml:"WANInterface,omitempty"`
 }
 
 type TLSConfig struct {

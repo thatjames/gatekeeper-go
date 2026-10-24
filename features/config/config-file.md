@@ -33,7 +33,8 @@ without hand edits.
   (list of `Zone`, `Server`: IPv4 with optional `:port`;
   [resolver](/dns/resolver.md)).
 - `Web`: Address, WebURL, AllowedOrigins (extra CORS origins), TLS
-  (PublicKey, PrivateKey paths), HTPasswdFile, Prometheus. `Prometheus` (default false) turns on `/metrics`
+  (PublicKey, PrivateKey paths), HTPasswdFile, Prometheus, WANInterface
+  (optional; [system info](/system/system-info.md)). `Prometheus` (default false) turns on `/metrics`
   ([HTTP server](/web/http-server.md)).
 - `UpdateConfig()` truncates the loaded file and writes the whole global back
   (2-space indent); comments and key order in the file are lost. With no

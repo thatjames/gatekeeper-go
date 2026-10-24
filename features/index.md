@@ -47,7 +47,7 @@ okf_version: "0.2"
 
 # System
 
-* [System info](/system/system-info.md) - Linux host facts for the home screen - hostname, uptime, memory, and Tx/Rx of the DHCP interface and ppp0 - plus the network interface list.
+* [System info](/system/system-info.md) - Linux host facts for the home screen - hostname, uptime, used/total memory, and Tx/Rx of the DHCP interface and the WAN (default-route or configured) interface - plus the network interface list.
 * [Byte size helper](/system/byte-size.md) - util.ByteSize formats a byte count as B, K, M or G; tested but not called by any code (system info has its own copy).
 * [Non-Linux stubs](/system/non-linux-stubs.md) - deprecated - darwin and windows stubs of the system package that return "not supported"; gatekeeper is Linux only, the darwin build fails, to be deleted.
 
