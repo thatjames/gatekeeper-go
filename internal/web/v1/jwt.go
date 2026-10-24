@@ -30,14 +30,14 @@ func LoadJWTSecret() error {
 	return nil
 }
 
-func CreateAuthToken(username string) (string, error) {
+func CreateAuthToken(username string, role Role) (string, error) {
 	if len(jwtSecret) == 0 {
 		return "", ErrNoJWTSecret
 	}
 	claims := UserClaims{
 		User: User{
 			Username: username,
-			Role:     UserRole,
+			Role:     role,
 		},
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(tokenLife)),

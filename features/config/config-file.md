@@ -8,7 +8,7 @@ code:
   - config/config.yml
   - config/docker-config.yml
 tags: [config, yaml]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-19T08:21:41Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-24T17:20:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -21,7 +21,8 @@ without hand edits.
   path. Each top-level section is optional; a missing section turns its
   module off.
 - `Auth.AuthType` picks the auth block: `oidc` (IssuerURL, ClientID,
-  ClientSecretVar, RedirectURL, Scopes) or `htpasswd` (HTPasswdFile). Any
+  ClientSecretVar, RedirectURL, Scopes, RoleClaim, Roles;
+  [OIDC roles](/web/auth-roles.md)) or `htpasswd` (HTPasswdFile). Any
   other type fails the load. No `Auth:` leaves it nil. `Auth.HTPasswdFile`
   is parsed but never read: password login uses `Web.HTPasswdFile`
   ([auth](/web/auth.md)); the duplicate key is on the backlog.

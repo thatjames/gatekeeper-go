@@ -92,3 +92,26 @@ After an OIDC login GateKeeper sets the `oauth_token` cookie. It is `HttpOnly` (
 | ClientSecretVar   | Environment variable name containing the client secret                                                       |         |
 | RedirectURL       | The callback URL (must include `/auth/callback`)                                                             |         |
 | Scopes            | OAuth scopes to request (typically `openid`, `profile`, `email`)                                            | [openid, profile, email] |
+| RoleClaim         | The ID token claim that lists the user's groups                                                              | groups |
+| Roles             | Map from a group in `RoleClaim` to a GateKeeper role (`admin` or `viewer`)                                  | the groups `admin` and `viewer` map to themselves |
+
+## Roles
+
+Every user has one of two roles:
+
+- `admin` can do everything.
+- `viewer` can open every page but cannot change anything: the API answers `403` to any change, and the UI hides the edit buttons.
+
+Password (htpasswd) users are always `admin`. An OIDC user gets the role their groups map to through `Roles`; when a user is in groups for both roles, `admin` wins. **An OIDC user whose groups map to no role cannot log in.**
+
+```yaml
+Auth:
+  AuthType: oidc
+  # ...
+  RoleClaim: groups
+  Roles:
+    gatekeeper-admins: admin
+    gatekeeper-viewers: viewer
+```
+
+With Authentik, the `groups` claim is sent by the default `profile` scope mapping: create the two groups and add users to them.

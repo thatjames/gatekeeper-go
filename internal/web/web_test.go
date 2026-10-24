@@ -67,7 +67,7 @@ func TestMetrics(t *testing.T) {
 		r.ServeHTTP(w, req)
 		return w
 	}
-	token, err := v1.CreateAuthToken("admin")
+	token, err := v1.CreateAuthToken("admin", v1.AdminRole)
 	if err != nil {
 		t.Fatal(err)
 	}

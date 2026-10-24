@@ -14,6 +14,9 @@ if (authHolder) {
   auth.token = authHolder.token;
 }
 
+// Viewers may only read; the server refuses their changes with 403.
+export const isAdmin = () => auth.user?.Role === "admin";
+
 export const login = async ({ username, password }) => {
   return api
     .post("/login", { username: username, password: password })

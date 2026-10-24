@@ -92,7 +92,7 @@ func SetupV1Endpoints(r *gin.RouterGroup) {
 	v1Group.GET("/health", healthHandler)
 	v1Group.GET("/version", getVersion)
 
-	protected := v1Group.Group("/", loggingMiddleware(), AuthMiddleware())
+	protected := v1Group.Group("/", loggingMiddleware(), AuthMiddleware(), RoleMiddleware())
 	protected.GET("/me", meHandler)
 	if service.IsRegistered(service.DHCP) {
 		log.Info("Registering DHCP endpoints")
@@ -178,19 +178,23 @@ func oidcCallbackHandler(c *gin.Context) {
 	}
 
 	// Extract claims
-	var claims struct {
-		Email   string   `json:"email"`
-		Name    string   `json:"name"`
-		Subject string   `json:"sub"`
-		Roles   []string `json:"roles"`
-	}
+	var claims map[string]any
 	if err := idToken.Claims(&claims); err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse claims"})
 		return
 	}
+	email, _ := claims["email"].(string)
+
+	cfg := config.Config.Auth.(*config.OIDCAuth)
+	role, ok := RoleFromClaims(claims, cfg.RoleClaim, cfg.Roles)
+	if !ok {
+		log.WithFields(log.Fields{"email": email, "claim": cfg.RoleClaim}).Warn("OIDC login refused: no gatekeeper role")
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "No gatekeeper role for this user"})
+		return
+	}
 
 	// Issue app token so AuthMiddleware is unchanged
-	token, err := CreateAuthToken(claims.Email)
+	token, err := CreateAuthToken(email, role)
 	if err != nil {
 		log.WithError(err).Error("Failed to create auth token after OIDC")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to create token"})
@@ -253,7 +257,7 @@ func defaultLoginHandler(c *gin.Context) {
 		return
 	}
 
-	token, err := CreateAuthToken(req.Username)
+	token, err := CreateAuthToken(req.Username, AdminRole)
 	if err != nil {
 		logger.Error("Failed to create auth token: ", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create token"})

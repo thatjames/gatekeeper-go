@@ -9,7 +9,7 @@ code:
   - internal/web/v1/middleware.go
   - internal/web/v1/auth_test.go
 tags: [web, auth, oidc, jwt]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T12:45:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-24T17:20:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -28,7 +28,7 @@ provider is Authentik on atlas (confirmed 2026-10-17).
   `crypto/rand`, logs it once at warn level, and accepts `admin` with that
   password, compared in constant time, for the life of the process.
 - Success → `{token}`: HS256 JWT, subject and username = login name, role
-  `user`, issuer `gatekeeper`, valid 7 days. Wrong credentials → 401.
+  `admin`, issuer `gatekeeper`, valid 7 days. Wrong credentials → 401.
 - The JWT secret is `GATEKEEPER_JWT_SECRET`, loaded at startup; with `Web:`
   configured and the variable unset or empty, gatekeeper refuses to start
   ([startup](/runtime/startup.md)). Creating or parsing a token without a
@@ -37,9 +37,10 @@ provider is Authentik on atlas (confirmed 2026-10-17).
   the OIDC routes are not added). `/oidc-login` sets a random state cookie
   (10 min, Secure, HttpOnly) and redirects to the provider. `/auth/callback`
   checks the state, exchanges the code, verifies the ID token for
-  `ClientID`, and issues the app JWT for the token's email in the
-  `oauth_token` cookie, then redirects to `WebURL`. Any user the provider
-  accepts gets in; the `roles` claim is read but unused.
+  `ClientID`, maps its role claim to a gatekeeper role (none → 403, no
+  cookie; [OIDC roles](/web/auth-roles.md)), and issues the app JWT for the
+  token's email with that role in the `oauth_token` cookie, then redirects
+  to `WebURL`.
 - The `oauth_token` cookie: path `/`, HttpOnly, SameSite Lax, Secure when
   `WebURL` starts with `https://`, max age 7 days (the JWT life). Scripts
   cannot read it; the UI learns the user from `GET /me`.
@@ -47,7 +48,8 @@ provider is Authentik on atlas (confirmed 2026-10-17).
 - Middleware: token from `Authorization: Bearer`, else the `oauth_token`
   cookie. None → 401. Invalid or expired → 403 and the cookie is cleared.
   It guards the protected API routes and `/metrics`
-  ([HTTP server](/web/http-server.md)).
+  ([HTTP server](/web/http-server.md)); on the API routes the role check
+  follows it ([OIDC roles](/web/auth-roles.md)).
 - `GET /me` (behind the middleware) answers `{Username, Role}` of the token.
 - `/logout` clears the `oauth_token` cookie (same attributes, max age -1).
 

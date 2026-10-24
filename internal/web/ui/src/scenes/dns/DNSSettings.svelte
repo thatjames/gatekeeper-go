@@ -1,5 +1,6 @@
 <script>
   import SimpleCard from "$components/SimpleCard.svelte";
+  import { isAdmin } from "$lib/auth/auth.svelte";
   import {
     addDNSBlocklist,
     deleteDNSBlocklist,
@@ -159,11 +160,13 @@
   {:else}
     <div class="flex gap-5 items-center">
       <Heading tag="h3">DNS Settings</Heading>
-      <EditOutline
-        class="shrink-0 h-6 w-6 text-primary-600 hover:text-primary-500 hover:cursor-pointer"
-        onclick={onEditClick}
-      />
-      <Tooltip>Edit Settings</Tooltip>
+      {#if isAdmin()}
+        <EditOutline
+          class="shrink-0 h-6 w-6 text-primary-600 hover:text-primary-500 hover:cursor-pointer"
+          onclick={onEditClick}
+        />
+        <Tooltip>Edit Settings</Tooltip>
+      {/if}
     </div>
     <div class="flex flex-col gap-5 md:grid md:grid-cols-2">
       <Card class="p-5 min-w-full">
@@ -326,29 +329,34 @@
     <div class="flex flex-col gap-5">
       <Heading tag="h4">Blocklists</Heading>
       {#if settings.blocklist?.length > 0}
-        <P class="text-xs">Click on an entry below to delete it</P>
+        {#if isAdmin()}
+          <P class="text-xs">Click on an entry below to delete it</P>
+        {/if}
         <div>
-          <Listgroup active>
+          <Listgroup active={isAdmin()}>
             {#each settings.blocklist as listItem, index}
               <ListgroupItem
-                class="hover:cursor-pointer"
+                class={isAdmin() ? "hover:cursor-pointer" : ""}
                 onclick={() => {
+                  if (!isAdmin()) return;
                   showDeleteBlocklistModal = true;
                   deleteModalIndex = index;
                 }}>{listItem}</ListgroupItem
               >
             {/each}
           </Listgroup>
-          <div>
-            <Button
-              outline
-              class="mt-3"
-              onclick={() => (showAddBlocklistModal = true)}>Add</Button
-            >
-            <Tooltip>Add a blocklist</Tooltip>
-          </div>
+          {#if isAdmin()}
+            <div>
+              <Button
+                outline
+                class="mt-3"
+                onclick={() => (showAddBlocklistModal = true)}>Add</Button
+              >
+              <Tooltip>Add a blocklist</Tooltip>
+            </div>
+          {/if}
         </div>
-      {:else}
+      {:else if isAdmin()}
         <P class="text-xs">Click the button below to add a blocklist</P>
         <div>
           <Button
@@ -358,33 +366,42 @@
           >
           <Tooltip>Add a blocklist</Tooltip>
         </div>
+      {:else}
+        <P class="text-xs">No blocklists</P>
       {/if}
       <Heading tag="h4">Blocked Domains</Heading>
       <div class="flex flex-col">
         {#if settings.blockedDomains?.length > 0}
-          <P class="text-xs mb-5">Click on an entry below to delete it.</P>
-          <Listgroup active>
+          {#if isAdmin()}
+            <P class="text-xs mb-5">Click on an entry below to delete it.</P>
+          {/if}
+          <Listgroup active={isAdmin()}>
             {#each settings.blockedDomains as listItem, index}
               <ListgroupItem
-                class="hover:cursor-pointer"
+                class={isAdmin() ? "hover:cursor-pointer" : ""}
                 onclick={() => {
+                  if (!isAdmin()) return;
                   deleteModalIndex = index;
                   showDeleteBlockedDomainModal = true;
                 }}>{listItem}</ListgroupItem
               >
             {/each}
           </Listgroup>
-        {:else}
+        {:else if isAdmin()}
           <P class="text-xs">Click the button below to add a blocked domain</P>
+        {:else}
+          <P class="text-xs">No blocked domains</P>
         {/if}
-        <div>
-          <Button
-            outline
-            class="mt-3"
-            onclick={() => (showAddBlockedDomainModal = true)}>Add</Button
-          >
-          <Tooltip>Add a blocked domain</Tooltip>
-        </div>
+        {#if isAdmin()}
+          <div>
+            <Button
+              outline
+              class="mt-3"
+              onclick={() => (showAddBlockedDomainModal = true)}>Add</Button
+            >
+            <Tooltip>Add a blocked domain</Tooltip>
+          </div>
+        {/if}
       </div>
     </div>
   {/if}

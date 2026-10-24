@@ -31,7 +31,7 @@ okf_version: "0.2"
 * [HTTP server](/web/http-server.md) - A gin server on Web.Address (default :8085, optional TLS) that serves the API under /api, authenticated Prometheus metrics at /metrics when Web.Prometheus is true, and the embedded UI for every other path, with CORS for WebURL and Web.AllowedOrigins.
 * [API v1 routes](/web/api-routes.md) - The /api/v1 route table - open health, version, features and login routes; DHCP, DNS and system routes behind auth, registered only for running modules - with request types and validation.
 * [Login and tokens](/web/auth.md) - Users log in with htpasswd credentials or OIDC (Authentik) and get a 7-day HS256 JWT signed with GATEKEEPER_JWT_SECRET, sent as a Bearer header or the oauth_token cookie.
-* [OIDC roles](/web/auth-roles.md) - draft - map the OIDC roles claim to gatekeeper roles (admin, user and more) and allow API actions by role, so not every Authentik user can change DNS.
+* [OIDC roles](/web/auth-roles.md) - An OIDC login gets the gatekeeper role (admin or viewer) its groups claim maps to, or is refused; viewers may use every GET route and get 403 on changes; htpasswd users are admin.
 * [DHCP API](/web/dhcp-api.md) - Authenticated /api/v1/dhcp routes to list, release, reserve and change leases and to read and change DHCP options, writing changes back to the config file.
 * [DNS API](/web/dns-api.md) - Authenticated /api/v1/dns routes to read and change upstreams and interface, manage local domains, blocklist URLs and single blocked domains, writing changes back to the config file.
 * [System API](/web/system-api.md) - /api/v1/version and authenticated /api/v1/system routes for host info, network interfaces and active modules; /features names extra features such as oidc.

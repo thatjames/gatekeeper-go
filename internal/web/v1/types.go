@@ -13,8 +13,8 @@ import (
 type Role string
 
 const (
-	AdminRole Role = "admin"
-	UserRole  Role = "user"
+	AdminRole  Role = "admin"
+	ViewerRole Role = "viewer"
 )
 
 type ValidationError struct {

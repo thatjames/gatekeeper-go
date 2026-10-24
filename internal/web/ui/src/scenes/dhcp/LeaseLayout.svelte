@@ -17,6 +17,7 @@
   } from "flowbite-svelte";
   import LeaseTable from "./LeaseTable.svelte";
   import { Tabs, TabItem } from "flowbite-svelte";
+  import { isAdmin } from "$lib/auth/auth.svelte";
 
   let leases = $state([]);
   getLeases().then((resp) => {
@@ -145,6 +146,7 @@
           <Input
             id="ipAddress"
             placeholder="IP Address"
+            disabled={!isAdmin()}
             bind:value={activeLease.ip}
             oninput={() => clearFieldError("ip")}
             color={fieldErrors.ip ? "red" : "default"}
@@ -157,6 +159,7 @@
         </div>
 
         <!-- Action Buttons -->
+        {#if isAdmin()}
         <div class="flex gap-3 mt-4 items-center justify-center">
           {#if activeLease.state === "Active"}
             <Button
@@ -185,6 +188,7 @@
           </Button>
           <Tooltip>Releases the IP</Tooltip>
         </div>
+        {/if}
 
         <!-- General Error -->
         {#if generalError}
@@ -253,7 +257,9 @@
     </TabItem>
     <TabItem title="Reserved Leases">
       <LeaseTable leases={leases.reserved} {onLeaseClick} />
-      <Button outline class="mt-5" onclick={onAddLeaseClick}>Add Lease</Button>
+      {#if isAdmin()}
+        <Button outline class="mt-5" onclick={onAddLeaseClick}>Add Lease</Button>
+      {/if}
     </TabItem>
   </Tabs>
 </div>

@@ -27,7 +27,7 @@ code:
   - internal/web/ui/src/scenes/login/**
   - internal/web/ui/src/scenes/error/**
 tags: [ui, svelte, auth]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-18T12:50:00Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-24T17:20:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -52,6 +52,10 @@ The admin UI, embedded in the binary, for the one admin.
   reload on 401): a user there lands on home, otherwise the form stays.
   The `oauth_token` cookie is HttpOnly, so the UI never reads it.
 - Logout clears the session, calls `/logout` and reloads.
+- `isAdmin()` is true when the logged-in user's `Role` is `admin`. For a
+  viewer the DHCP and DNS pages show no Edit, Add, Reserve, Save or Delete
+  buttons and opening a lease or local domain shows it read only
+  ([OIDC roles](/web/auth-roles.md)).
 - `verify()` calls `/verify`, which the server lacks.
 - The side menu shows DHCP (Leases, Settings) and DNS (Local Domains,
   Statistics, Settings) only for running modules; the footer shows the

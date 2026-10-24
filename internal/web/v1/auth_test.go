@@ -132,7 +132,7 @@ func TestTokenWithoutSecretErrors(t *testing.T) {
 	jwtSecret = nil
 	t.Cleanup(func() { jwtSecret = oldSecret })
 
-	if _, err := CreateAuthToken("admin"); !errors.Is(err, ErrNoJWTSecret) {
+	if _, err := CreateAuthToken("admin", AdminRole); !errors.Is(err, ErrNoJWTSecret) {
 		t.Errorf("create: expected ErrNoJWTSecret, got %v", err)
 	}
 	if _, err := ParseAuthToken("x.y.z"); !errors.Is(err, ErrNoJWTSecret) {
@@ -170,7 +170,7 @@ func TestTokenCookieFlags(t *testing.T) {
 
 func TestMeReturnsUser(t *testing.T) {
 	r := setupRouter(t, &config.Web{})
-	token, err := CreateAuthToken("alice")
+	token, err := CreateAuthToken("alice", ViewerRole)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +185,7 @@ func TestMeReturnsUser(t *testing.T) {
 		r.ServeHTTP(w, req)
 		var user User
 		if w.Code != http.StatusOK || json.Unmarshal(w.Body.Bytes(), &user) != nil ||
-			user.Username != "alice" || user.Role != UserRole {
+			user.Username != "alice" || user.Role != ViewerRole {
 			t.Errorf("%s: expected 200 with alice, got %d %s", name, w.Code, w.Body.String())
 		}
 	}

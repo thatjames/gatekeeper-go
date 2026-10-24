@@ -20,6 +20,7 @@
     Helper,
     Tooltip,
   } from "flowbite-svelte";
+  import { isAdmin } from "$lib/auth/auth.svelte";
 
   let localDomains = $state({});
   let activeDomain = $state({});
@@ -111,6 +112,7 @@
         <Input
           id="domain"
           placeholder="example.com"
+          disabled={!isAdmin()}
           color={fieldErrors.domain ? "red" : "default"}
           oninput={() => clearFieldError("domain")}
           bind:value={activeDomain.domain}
@@ -127,6 +129,7 @@
         <Input
           id="domain"
           placeholder="127.0.0.1"
+          disabled={!isAdmin()}
           oninput={() => clearFieldError("address")}
           color={fieldErrors.ip ? "red" : "default"}
           bind:value={activeDomain.ip}
@@ -138,7 +141,9 @@
         {/if}
       </div>
 
-      {#if originalDomain}
+      {#if !isAdmin()}
+        <!-- viewers see the domain read only -->
+      {:else if originalDomain}
         <div class="flex gap-3 mt-4 items-center justify-center">
           <Button
             disabled={fieldErrors.domain}
@@ -208,7 +213,9 @@
       {/if}
     </TableBody>
   </Table>
-  <div>
-    <Button outline onclick={onAddClick}>Add</Button>
-  </div>
+  {#if isAdmin()}
+    <div>
+      <Button outline onclick={onAddClick}>Add</Button>
+    </div>
+  {/if}
 </div>

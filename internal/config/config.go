@@ -176,6 +176,10 @@ type OIDCAuth struct {
 	ClientSecretVar string   `yaml:"ClientSecretVar"`
 	RedirectURL     string   `yaml:"RedirectURL"`
 	Scopes          []string `yaml:"Scopes"`
+	// RoleClaim names the ID token claim holding the user's groups
+	// (default "groups"); Roles maps its values to gatekeeper roles.
+	RoleClaim string            `yaml:"RoleClaim,omitempty"`
+	Roles     map[string]string `yaml:"Roles,omitempty"`
 }
 
 type HTTPAuth struct {

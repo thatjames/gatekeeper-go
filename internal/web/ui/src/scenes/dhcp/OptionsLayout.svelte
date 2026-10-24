@@ -13,6 +13,7 @@
     Spinner,
   } from "flowbite-svelte";
   import { EditOutline } from "flowbite-svelte-icons";
+  import { isAdmin } from "$lib/auth/auth.svelte";
 
   let settings = $state({});
   let settingsFormData = $state({});
@@ -76,11 +77,13 @@
   {:else}
     <div class="flex gap-5 items-center">
       <Heading tag="h3">Settings</Heading>
-      <EditOutline
-        class="shrink-0 h-6 w-6 text-primary-600 hover:text-primary-500 hover:cursor-pointer"
-        onclick={editSettings}
-      />
-      <Tooltip>Edit Settings</Tooltip>
+      {#if isAdmin()}
+        <EditOutline
+          class="shrink-0 h-6 w-6 text-primary-600 hover:text-primary-500 hover:cursor-pointer"
+          onclick={editSettings}
+        />
+        <Tooltip>Edit Settings</Tooltip>
+      {/if}
     </div>
     <SettingsDisplay {settings} />
   {/if}
