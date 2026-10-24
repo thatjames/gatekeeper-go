@@ -4,9 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -65,6 +63,7 @@ type LeasePool struct {
 	leases            []*Lease
 	lock              *sync.Mutex
 	reservedAddresses map[string]*Lease
+	changed           chan struct{}
 }
 
 func NewLeasePool(startAddr, endAddr net.IP) *LeasePool {
@@ -83,6 +82,25 @@ func NewLeasePool(startAddr, endAddr net.IP) *LeasePool {
 		lock:              new(sync.Mutex),
 		leases:            leases,
 		reservedAddresses: make(map[string]*Lease),
+		changed:           make(chan struct{}, 1),
+	}
+}
+
+// notify tells the lease writer that the lease file is out of date. It never blocks.
+func (l *LeasePool) notify() {
+	select {
+	case l.changed <- struct{}{}:
+	default:
+	}
+}
+
+// SetHostname stores the hostname a client sent with its lease.
+func (l *LeasePool) SetHostname(ls *Lease, hostname string) {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	if ls.Hostname != hostname {
+		ls.Hostname = hostname
+		l.notify()
 	}
 }
 
@@ -114,6 +132,7 @@ func (l *LeasePool) AcceptLease(ls *Lease, ttl time.Duration) {
 		if lease.ClientId == ls.ClientId {
 			lease.State = LeaseActive
 			lease.Expiry = time.Now().Add(ttl)
+			l.notify()
 			return
 		}
 	}
@@ -130,6 +149,7 @@ func (l *LeasePool) UpdateLease(clientId string, ip net.IP) error {
 		}
 		reservedLease.IP = ip
 		l.evictOthers(clientId, ip)
+		l.notify()
 		config.Lock()
 		defer config.Unlock()
 		return config.UpdateConfig()
@@ -137,6 +157,7 @@ func (l *LeasePool) UpdateLease(clientId string, ip net.IP) error {
 	for _, lease := range l.leases {
 		if lease.ClientId == clientId {
 			lease.IP = ip
+			l.notify()
 			return nil
 		}
 	}
@@ -198,6 +219,7 @@ func (l *LeasePool) ReserveLease(clientID string, reservedIP net.IP) error {
 	}
 	l.evictOthers(clientID, reservedIP)
 	l.reservedAddresses[clientID] = &Lease{ClientId: clientID, IP: reservedIP, State: LeaseReserved}
+	l.notify()
 	return nil
 }
 
@@ -219,95 +241,6 @@ func (l *LeasePool) evictOthers(clientID string, ip net.IP) {
 			lease.Clear()
 		}
 	}
-}
-
-func (l *LeasePool) PeristLeases(file string) error {
-	f, err := os.OpenFile(file, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	buff := make([]byte, 1)
-	var counter byte = 0
-	l.lock.Lock()
-	for _, lease := range l.leases {
-		if lease == nil {
-			break
-		}
-		if lease.State == LeaseActive {
-			counter++
-			leaseBuff := make([]byte, 0)
-			leaseBuff = append(leaseBuff, byte(len(lease.ClientId)))
-			leaseBuff = append(leaseBuff, []byte(lease.ClientId)...)
-			leaseBuff = append(leaseBuff, byte(len(lease.Hostname)))
-			leaseBuff = append(leaseBuff, []byte(lease.Hostname)...)
-			leaseBuff = append(leaseBuff, lease.IP...)
-			leaseBuff = append(leaseBuff, byte(lease.State))
-			buff = append(buff, leaseBuff...)
-		}
-	}
-	l.lock.Unlock()
-
-	if counter > 0 {
-		buff[0] = counter
-		_, err := f.Write(buff)
-		return err
-	}
-
-	return nil
-}
-
-func (l *LeasePool) LoadLeases(file string, ttl time.Duration) error {
-	f, err := os.OpenFile(file, os.O_CREATE|os.O_RDONLY, 0600)
-	switch {
-	case err == nil:
-		defer f.Close()
-	case os.IsNotExist(err):
-		return nil
-	default:
-		return err
-	}
-
-	data, err := ioutil.ReadAll(f)
-	if err != nil {
-		return err
-	}
-
-	if len(data) == 0 {
-		return nil
-	}
-	leaseCount := int(data[0])
-	data = data[1:]
-	leases := make([]*Lease, 0)
-	for i := 0; i < leaseCount; i++ {
-		var lease = new(Lease)
-		cidLen := data[0]
-		lease.ClientId = string(data[1 : 1+cidLen])
-		data = data[1+cidLen:]
-		hostLen := data[0]
-		lease.Hostname = string(data[1 : 1+hostLen])
-		data = data[1+hostLen:]
-		lease.IP = data[:4]
-		data = data[4:]
-		lease.State = LeaseState(data[0])
-		lease.Expiry = time.Now().Add(ttl)
-		data = data[1:]
-		leases = append(leases, lease)
-	}
-
-	l.lock.Lock()
-	defer l.lock.Unlock()
-	for _, lease := range leases {
-		for j, createdLease := range l.leases {
-			if lease.IP.Equal(createdLease.IP) {
-				*l.leases[j] = *lease
-				log.Debug("restore lease ", l.leases[j])
-			}
-		}
-	}
-	log.Debugf("loaded %d leases", len(leases))
-	return nil
 }
 
 func (l *LeasePool) ActiveLeases() []Lease {
@@ -354,6 +287,7 @@ func (l *LeasePool) ReleaseLease(relLease *Lease) {
 		return
 	}
 	l.clearClient(relLease.ClientId)
+	l.notify()
 }
 
 // DeleteLease is the admin's delete: a reservation is removed, also from the config file.
@@ -362,6 +296,7 @@ func (l *LeasePool) DeleteLease(delLease *Lease) {
 	defer l.lock.Unlock()
 	if _, ok := l.reservedAddresses[delLease.ClientId]; ok {
 		delete(l.reservedAddresses, delLease.ClientId)
+		l.notify()
 		config.Lock()
 		delete(config.Config.DHCP.ReservedAddresses, delLease.ClientId)
 		config.UpdateConfig()
@@ -369,6 +304,7 @@ func (l *LeasePool) DeleteLease(delLease *Lease) {
 		return
 	}
 	l.clearClient(delLease.ClientId)
+	l.notify()
 }
 
 // clearClient clears the pool lease of clientID. The caller holds the lock.

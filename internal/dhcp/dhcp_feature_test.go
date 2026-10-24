@@ -186,7 +186,7 @@ func (ts *TestSuite) iShouldReceiveNoLease() error {
 
 func (ts *TestSuite) iPersistLeasesToFile(filename string) error {
 	ts.filename = filename
-	ts.error = ts.leasePool.PeristLeases(ts.leaseFile)
+	ts.error = ts.leasePool.SaveLeases(ts.leaseFile)
 	return nil
 }
 

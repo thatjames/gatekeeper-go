@@ -150,6 +150,22 @@ func TestDHCPServer_UpdateOptions(t *testing.T) {
 	}
 }
 
+func TestDHCPServer_LeaseFilePath(t *testing.T) {
+	server := NewDHCPServerWithOpts(&DHCPServerOpts{
+		StartFrom: net.ParseIP("10.0.0.10").To4(),
+		EndAt:     net.ParseIP("10.0.0.20").To4(),
+	})
+	if server.leaseFile != "/var/lib/gatekeeper/leases" {
+		t.Errorf("empty LeaseFile resolved to %q, want the default", server.leaseFile)
+	}
+	opts := *server.Options()
+	opts.LeaseFile = "/data/leases"
+	server.UpdateOptions(&opts)
+	if server.leaseFile != "/data/leases" {
+		t.Errorf("after UpdateOptions the lease file is %q, want /data/leases", server.leaseFile)
+	}
+}
+
 // testServer is a DHCP server on a synthetic range that is not started; requests go straight to handleRequest.
 func testServer(start, end string) *DHCPServer {
 	z := NewDHCPServerWithOpts(&DHCPServerOpts{

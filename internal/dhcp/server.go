@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"maps"
 	"net"
-	"os"
-	"path"
 	"strconv"
 	"sync"
 	"time"
@@ -19,7 +17,9 @@ import (
 )
 
 const (
-	dhcpServerPort = 67
+	dhcpServerPort     = 67
+	defaultLeaseFile   = "/var/lib/gatekeeper/leases"
+	leaseWriteDebounce = time.Second
 )
 
 var (
@@ -54,6 +54,8 @@ type DHCPServer struct {
 	requestChan   chan *DHCPPacket
 	responseChan  chan *DHCPPacket
 	stopChan      chan struct{}
+	writerDone    chan struct{}
+	leaseFile     string
 	lock          sync.Mutex
 }
 
@@ -77,7 +79,15 @@ var defaultOpts = &DHCPServerOpts{
 	LeaseTTL:   300,
 	SubnetMask: net.ParseIP("255.255.255.0").To4(),
 	Gateway:    net.ParseIP("10.0.0.1").To4(),
-	LeaseFile:  "/var/lib/gatekeeper/leases",
+	LeaseFile:  defaultLeaseFile,
+}
+
+// leaseFilePath is the lease file of opts: LeaseFile, or the default when it is empty.
+func leaseFilePath(opts *DHCPServerOpts) string {
+	if opts.LeaseFile == "" {
+		return defaultLeaseFile
+	}
+	return opts.LeaseFile
 }
 
 func NewDHCPServer() *DHCPServer {
@@ -109,6 +119,7 @@ func NewDHCPServerWithOpts(opts *DHCPServerOpts) *DHCPServer {
 	return &DHCPServer{
 		opts:         opts,
 		issuedLeases: NewLeasePool(opts.StartFrom, opts.EndAt),
+		leaseFile:    leaseFilePath(opts),
 		responseChan: make(chan *DHCPPacket, 100),
 		requestChan:  make(chan *DHCPPacket, 100),
 	}
@@ -150,22 +161,6 @@ func (z *DHCPServer) Start() error {
 		return fmt.Errorf("could not find IP network address for interface %s", z.opts.Interface)
 	}
 
-	log.Debug("load any existing leases")
-	leaseFile := z.opts.LeaseFile
-	if leaseFile == "" {
-		leaseFile = "/var/lib/gatekeeper/leases"
-	}
-	if err := z.issuedLeases.LoadLeases(leaseFile, time.Second*time.Duration(z.opts.LeaseTTL)); err != nil {
-		log.Warn("unable to load leases: ", err.Error())
-	} else {
-		counter := 0
-		for _, lease := range z.issuedLeases.leases {
-			if lease != nil && lease.State == LeaseActive {
-				counter++
-			}
-		}
-	}
-
 	// The map is the config's ReservedAddresses, which the web API changes: copy it under the config lock.
 	config.RLock()
 	reserved := maps.Clone(z.opts.ReservedLeases)
@@ -174,6 +169,12 @@ func (z *DHCPServer) Start() error {
 		z.issuedLeases.ReserveLease(clientID, net.ParseIP(lease).To4())
 		activeLeaseGauge.Inc()
 		log.Infof("reserving %s for %s", lease, clientID)
+	}
+
+	// Reservations first: loading drops saved leases that collide with them.
+	log.Debug("load any existing leases from ", z.leaseFile)
+	if err := z.issuedLeases.LoadLeases(z.leaseFile); err != nil {
+		log.Warn("unable to load leases, starting with an empty pool: ", err.Error())
 	}
 
 	packetConn, err := net.ListenPacket("udp4", fmt.Sprintf(":%d", dhcpServerPort))
@@ -187,23 +188,23 @@ func (z *DHCPServer) Start() error {
 		go z.receivePacketWorker()
 		go z.responsePacketWorker()
 	}
+	z.writerDone = make(chan struct{})
+	go func(file string, stop <-chan struct{}, done chan<- struct{}) {
+		defer close(done)
+		z.issuedLeases.PersistOnChange(file, leaseWriteDebounce, stop)
+	}(z.leaseFile, z.stopChan, z.writerDone)
 	return nil
 }
 
 func (z *DHCPServer) Stop() error {
-	leaseFile := z.opts.LeaseFile
-	if leaseFile == "" {
-		leaseFile = "/var/lib/gatekeeper/leases"
-	}
-
-	if err := os.MkdirAll(path.Dir(leaseFile), os.ModePerm); err != nil && !os.IsExist(err) {
-		return err
-	}
-
 	close(z.stopChan)
+	if z.writerDone != nil {
+		<-z.writerDone
+		z.writerDone = nil
+	}
 	z.lock.Lock()
 	defer z.lock.Unlock()
-	return z.issuedLeases.PeristLeases(z.opts.LeaseFile)
+	return z.issuedLeases.SaveLeases(z.leaseFile)
 }
 
 func (z *DHCPServer) LeaseDB() *LeasePool {
@@ -216,6 +217,7 @@ func (z *DHCPServer) Options() *DHCPServerOpts {
 
 func (z *DHCPServer) UpdateOptions(opts *DHCPServerOpts) error {
 	z.opts = opts
+	z.leaseFile = leaseFilePath(opts)
 	return nil
 }
 
@@ -330,7 +332,7 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 		var setIP net.IP
 		if lease := z.issuedLeases.GetLease(req.Message.CHAddr().String()); lease != nil {
 			if hostname, ok := opts[OptionHostname]; ok {
-				lease.Hostname = string(hostname)
+				z.issuedLeases.SetHostname(lease, string(hostname))
 			}
 			if lease.IP.Equal(requestedAddr) {
 				msgType = DHCPAck
@@ -345,7 +347,6 @@ func (z *DHCPServer) handleRequest(req *DHCPPacket) Message {
 					log.Infof("send ack for reserved address %s to %s", requestedAddr, id)
 				case LeaseActive:
 					z.issuedLeases.AcceptLease(lease, time.Second*time.Duration(z.opts.LeaseTTL))
-					lease.Expiry = time.Now().Add(time.Second * time.Duration(z.opts.LeaseTTL))
 					log.Infof("send ack for active address %s to %s", lease.IP.To4().String(), id)
 				default:
 					log.Infof("lease is invalid, resetting and nacking")

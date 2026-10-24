@@ -6,11 +6,13 @@ status: stable
 code:
   - internal/dhcp/lease.go
   - internal/dhcp/lease_test.go
+  - internal/dhcp/leasefile.go
+  - internal/dhcp/leasefile_test.go
   - internal/dhcp/features/lease_expiry.feature
   - internal/dhcp/features/lease_initialization.feature
   - internal/dhcp/features/reserved_leases.feature
 tags: [dhcp, leases]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-19T08:16:21Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-24T19:30:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -49,11 +51,33 @@ known devices, and remember leases across restarts.
   [config lock](/config/config-file.md), taken inside the pool lock.
 - `ActiveLeases()` returns unexpired active leases; `ReservedLeases()` all
   reservations.
-- Lease file: one count byte, then per active lease
-  `len,clientID,len,hostname,IPv4(4),state`. Written only by `Stop()`;
-  more than 255 leases overflow the count. On load each lease gets a fresh
-  full TTL and replaces the pool entry with the same IP; a truncated file
-  panics.
+- `SetHostname(lease, name)` stores a client's hostname under the pool lock.
+- Every change that matters to the lease file (`AcceptLease`,
+  `ReleaseLease`, `DeleteLease`, `ReserveLease`, `UpdateLease`, a new
+  hostname) signals the writer; offers do not. `PersistOnChange(file,
+  debounce, stop)` saves at once on the first signal, then waits `debounce`
+  (1 s in the server) and saves once more if anything changed meanwhile, so
+  a burst of changes costs at most two writes; it returns when `stop`
+  closes.
+- Lease file, big-endian: magic `GKLF`, version byte `2`, uint32 record
+  count; each record is uint16 length + client ID, uint16 length +
+  hostname, 4-byte IPv4, state byte (`3` active, `2` reserved), int64 Unix
+  expiry in seconds (`0` for none). Any number of leases fit. Unexpired
+  active leases and all reservations are written.
+- `SaveLeases(file)` creates the directory (0755), writes a temporary file
+  beside it, syncs it and renames it over the old one (mode 0600): a crash
+  leaves the old file or the new one, never half of one.
+- `LoadLeases(file)`: a missing or empty file loads nothing. Every length
+  is checked against the data; a wrong magic or version (the old
+  one-count-byte format too), a record past the end, an unknown state or
+  trailing bytes reject the file: it is renamed `<file>.bad-<UTC time,
+  20061102T150405Z>`, an error naming the new path is returned and the
+  pool is left as it was. Otherwise active leases keep their saved expiry
+  and replace the pool entry with their IP; expired ones, ones outside the
+  range, and ones on a reserved IP or for a reserved client are dropped. A
+  saved reservation only gives its hostname back to a reservation the pool
+  already has for that client on the same IP; the config stays the only
+  source of reservations.
 
 # Decisions
 - The lease file format is not a hard constraint (2026-10-17); the lease
@@ -62,5 +86,8 @@ known devices, and remember leases across restarts.
   shutdown must not cost it its reservation; only an admin removes one.
 - Reserved IPs never reach another client (2026-10-17, user): the pool skips
   them and a new reservation evicts a client already on that IP.
-- Fixes agreed 2026-10-17 (plans): persist on change, keep real expiry, no
-  255 limit, safe load.
+- Lease file format v2 (2026-10-18, user): versioned binary with magic
+  `GKLF`, a 32-bit count and real expiry times; an old-format file is moved
+  aside, not migrated. Reservations are saved but restore only hostnames,
+  so the config remains their one source. 1 s debounce; a rejected file is
+  kept as `<file>.bad-<time>` for inspection.
