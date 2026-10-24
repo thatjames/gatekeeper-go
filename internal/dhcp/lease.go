@@ -12,7 +12,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
+	"github.com/thatjames/gatekeeper-go/internal/config"
 )
 
 type LeaseState int

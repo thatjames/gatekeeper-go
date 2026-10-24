@@ -50,8 +50,12 @@ without hand edits.
 # Decisions
 - Secrets are not in the file: `ClientSecretVar` names an environment
   variable (`GATEKEEPER_OIDC_CLIENT_SECRET` in the sample).
-- The sample's `IssuerURL` points at `keycloak.thatjames.nl`, which is stale:
-  the identity provider is Authentik on atlas ([OIDC login](/web/auth.md)).
+- The sample's `IssuerURL` is Authentik on atlas
+  (`authentik.thatjames.nl/application/o/gatekeeper/`, 2026-10-24), the
+  identity provider ([OIDC login](/web/auth.md)); its `Roles` map the
+  groups `gatekeeper-admins` and `gatekeeper-viewers`.
+- Sample configs and docs use locally administered MACs
+  (`02:00:00:00:00:0x`), never a real device's (2026-10-24).
 - The config format is not a hard constraint; it may change.
 - One global lock rather than one per section (2026-10-18): `UpdateConfig`
   writes every section, so any save must exclude every

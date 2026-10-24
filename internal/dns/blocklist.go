@@ -8,7 +8,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/util"
+	"github.com/thatjames/gatekeeper-go/internal/util"
 )
 
 type BlocklistFetcher interface {

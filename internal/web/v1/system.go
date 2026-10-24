@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/system"
+	"github.com/thatjames/gatekeeper-go/internal/service"
+	"github.com/thatjames/gatekeeper-go/internal/system"
 )
 
 func healthHandler(c *gin.Context) {

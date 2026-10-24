@@ -8,8 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
-	v1 "gitlab.com/thatjames-go/gatekeeper-go/internal/web/v1"
+	"github.com/thatjames/gatekeeper-go/internal/config"
+	v1 "github.com/thatjames/gatekeeper-go/internal/web/v1"
 )
 
 func TestInitDefaultAddress(t *testing.T) {

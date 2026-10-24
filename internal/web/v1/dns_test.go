@@ -15,10 +15,10 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/dns"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
+	"github.com/thatjames/gatekeeper-go/internal/config"
+	"github.com/thatjames/gatekeeper-go/internal/dhcp"
+	"github.com/thatjames/gatekeeper-go/internal/dns"
+	"github.com/thatjames/gatekeeper-go/internal/service"
 )
 
 const testConfig = `DNS:

@@ -8,9 +8,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/dns"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
+	"github.com/thatjames/gatekeeper-go/internal/config"
+	"github.com/thatjames/gatekeeper-go/internal/dns"
+	"github.com/thatjames/gatekeeper-go/internal/service"
 )
 
 // dnsConfigResponse is the DNS section as the API answers it. The caller holds the config lock.

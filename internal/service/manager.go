@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	log "github.com/sirupsen/logrus"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
+	"github.com/thatjames/gatekeeper-go/internal/config"
 )
 
 type ServiceKey string

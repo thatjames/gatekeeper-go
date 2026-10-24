@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
+	"github.com/thatjames/gatekeeper-go/internal/config"
 )
 
 func TestMissingHTPasswdFileIsGenerated(t *testing.T) {

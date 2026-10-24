@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
+	"github.com/thatjames/gatekeeper-go/internal/config"
 )
 
 func TestRoleFromClaims(t *testing.T) {

@@ -22,8 +22,8 @@ DHCP:
   SubnetMask: 255.255.255.0
   Gateway: 10.0.0.1
   ReservedAddresses:
-    00:d8:61:39:b5:6a: 10.0.0.101
-    bc:5f:f4:ac:ea:c4: 10.0.0.100
+    02:00:00:00:00:01: 10.0.0.101
+    02:00:00:00:00:02: 10.0.0.100
   LeaseFile: /var/lib/gatekeeper/leases
 Web:
   Address: :8085

@@ -7,7 +7,7 @@ code:
   - Makefile
   - go.mod
 tags: [build, make, go]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T21:52:15Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-24T17:22:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -17,8 +17,8 @@ verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
   `bin/gatekeeper` with tag `live`. `build-pipeline`: CGO off, GOOS/GOARCH/
   BIN_NAME from the environment (CI).
 - `docker` / `docker-multiarch`: Linux binaries then the image(s)
-  `ghcr.io/thatjames/gatekeeper`; multi-arch pushes amd64, arm64, arm/v7
-  and 386 with buildx.
+  `ghcr.io/thatjames/gatekeeper-go` (the name CI pushes); multi-arch pushes
+  amd64, arm64, arm/v7 and 386 with buildx.
 - `test`: generate-mocks, then the godog feature tests of dhcp and dns and
   the packet test. `test-report`: JUnit reports and total coverage, with a
   dummy `dist` so the embed compiles.
@@ -33,7 +33,8 @@ verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 - `docs_server`: Hugo dev server for the docs.
 
 # Decisions
-- The module path is still `gitlab.com/thatjames-go/gatekeeper-go` from the
-  GitLab days; the repository is `github.com/thatjames/gatekeeper-go`. Both
-  agreed fixes (2026-10-17): drop the mock targets; move the module path.
+- The module path is `github.com/thatjames/gatekeeper-go`, the
+  repository's own (moved from the GitLab-era
+  `gitlab.com/thatjames-go/gatekeeper-go` on 2026-10-24). Agreed fix still
+  open (2026-10-17): drop the mock targets.
 - Linux only, multi-arch images must keep building (hard constraint).

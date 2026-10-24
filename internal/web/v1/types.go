@@ -7,7 +7,7 @@ import (
 	"regexp"
 
 	"github.com/golang-jwt/jwt/v5"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
+	"github.com/thatjames/gatekeeper-go/internal/dhcp"
 )
 
 type Role string

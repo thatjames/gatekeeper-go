@@ -16,8 +16,8 @@ import (
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 	"github.com/tg123/go-htpasswd"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
+	"github.com/thatjames/gatekeeper-go/internal/config"
+	"github.com/thatjames/gatekeeper-go/internal/service"
 	"golang.org/x/oauth2"
 )
 

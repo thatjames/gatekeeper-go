@@ -12,13 +12,13 @@ import (
 	"syscall"
 
 	log "github.com/sirupsen/logrus"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/dns"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/system"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/web"
-	v1 "gitlab.com/thatjames-go/gatekeeper-go/internal/web/v1"
+	"github.com/thatjames/gatekeeper-go/internal/config"
+	"github.com/thatjames/gatekeeper-go/internal/dhcp"
+	"github.com/thatjames/gatekeeper-go/internal/dns"
+	"github.com/thatjames/gatekeeper-go/internal/service"
+	"github.com/thatjames/gatekeeper-go/internal/system"
+	"github.com/thatjames/gatekeeper-go/internal/web"
+	v1 "github.com/thatjames/gatekeeper-go/internal/web/v1"
 )
 
 // Flags

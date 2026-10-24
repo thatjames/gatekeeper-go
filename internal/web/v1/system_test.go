@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
+	"github.com/thatjames/gatekeeper-go/internal/config"
 )
 
 func TestFeaturesWithoutAuth(t *testing.T) {

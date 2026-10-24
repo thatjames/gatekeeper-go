@@ -1,4 +1,4 @@
-module gitlab.com/thatjames-go/gatekeeper-go
+module github.com/thatjames/gatekeeper-go
 
 go 1.24.6
 

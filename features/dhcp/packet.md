@@ -6,9 +6,8 @@ status: stable
 code:
   - internal/dhcp/packet.go
   - internal/dhcp/packet_test.go
-  - internal/dhcp/.test-req
 tags: [dhcp, protocol]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T21:52:15Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-24T17:35:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -24,9 +23,10 @@ A hand-written RFC 2131/2132 codec, part of the point of the project.
 - `MarshalOptions` writes tag-length-value in map order and an end option.
 - `MakeReply` copies xid, flags, giaddr and chaddr from the request, sets
   yiaddr, lease time and message type, and appends the options.
-- `.test-req` is a captured DHCP request used by `packet_test.go`.
+- `packet_test.go` parses a synthetic DHCPREQUEST it builds itself (MAC
+  `02:00:00:00:00:01`, requested IP 10.0.0.40, seven requested parameters).
 
 # Decisions
-- `.test-req` carries MAC `00:d8:61:39:b5:6a`, which also appears in the
-  sample config; it is to be replaced by a synthetic packet (agreed
-  2026-10-17).
+- The captured `.test-req`, which carried a real device's MAC, was
+  replaced by the synthetic packet built in the test (2026-10-24): no real
+  device data in the repository.

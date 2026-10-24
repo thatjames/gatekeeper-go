@@ -9,8 +9,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/config"
-	v1 "gitlab.com/thatjames-go/gatekeeper-go/internal/web/v1"
+	"github.com/thatjames/gatekeeper-go/internal/config"
+	v1 "github.com/thatjames/gatekeeper-go/internal/web/v1"
 )
 
 func Init(ver string, cfg *config.Web) error {

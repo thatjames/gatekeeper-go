@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/dhcp"
-	"gitlab.com/thatjames-go/gatekeeper-go/internal/service"
+	"github.com/thatjames/gatekeeper-go/internal/dhcp"
+	"github.com/thatjames/gatekeeper-go/internal/service"
 )
 
 func TestUpdateLeaseOntoAnotherReservationRefused(t *testing.T) {
