@@ -73,7 +73,7 @@ func ExtraFeatures() []string {
 	lock.Lock()
 	defer lock.Unlock()
 	features := make([]string, 0)
-	if config.Config.Auth.Type() == "oidc" {
+	if config.Config.Auth != nil && config.Config.Auth.Type() == "oidc" {
 		features = append(features, "oidc")
 	}
 	return features

@@ -1,6 +1,6 @@
 <script>
-  import { auth } from "$lib/auth/auth.svelte";
-  import Router, { push } from "svelte-spa-router";
+  import { auth, restoreSession } from "$lib/auth/auth.svelte";
+  import Router, { location, push } from "svelte-spa-router";
   import wrap from "svelte-spa-router/wrap";
 
   const routes = {
@@ -15,8 +15,14 @@
     }),
   };
 
-  if (!auth.token || !document.cookie.includes("auth_token")) {
-    push("/auth/login");
+  // A password login keeps its token in sessionStorage; an OIDC login has
+  // only the HttpOnly cookie, so ask the server before sending anyone away.
+  if (!auth.token && $location !== "/auth/login") {
+    restoreSession().then((ok) => {
+      if (!ok) {
+        push("/auth/login");
+      }
+    });
   }
 </script>
 

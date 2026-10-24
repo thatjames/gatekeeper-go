@@ -43,9 +43,11 @@ The admin UI, embedded in the binary, for the one admin.
   production build. Requests send the Bearer token when there is one and
   cookies always. 401 → reload on `/#/auth/login`; a network error →
   the error screen ("Server Communications Failure").
-- On load the app goes to login unless it has a token AND a cookie named
-  `auth_token`. The server never sets `auth_token`, so every full page load
-  lands on login (bug).
+- On load, a token in `sessionStorage` counts as logged in (its user is
+  decoded from the token). Without one the app asks `GET /me` with cookies
+  (no reload on 401): an answer sets the user and the page stays where it
+  is; anything else goes to login. A token that has expired makes the
+  next API call answer 401, which reloads on login.
 - Login: username/password → `POST /login`, token kept in
   `sessionStorage`. When `/features` lists `oidc` a provider button goes
   to `/oidc-login` and the password form hides behind a link
@@ -57,7 +59,6 @@ The admin UI, embedded in the binary, for the one admin.
   viewer the DHCP and DNS pages show no Edit, Add, Reserve, Save or Delete
   buttons and opening a lease or local domain shows it read only
   ([OIDC roles](/web/auth-roles.md)).
-- `verify()` calls `/verify`, which the server lacks.
 - The side menu shows DHCP (Leases, Settings) and DNS (Local Domains,
   Statistics, Settings) only for running modules; the footer shows the
   version. Home shows the system info map.
@@ -66,5 +67,6 @@ The admin UI, embedded in the binary, for the one admin.
 - [API routes](/web/api-routes.md), [login and tokens](/web/auth.md).
 
 # Decisions
-- Fixes agreed 2026-10-17 (UI auth flow plan): the `auth_token` check,
-  `/verify`, the `/features` panic.
+- Fixed 2026-10-24 (UI auth flow plan): the `auth_token` check is
+  replaced by the session check above, and `verify()` (which called a
+  `/verify` route the server never had) is gone; `GET /me` does its job.

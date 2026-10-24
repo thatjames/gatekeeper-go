@@ -5,15 +5,16 @@ description: /api/v1/version and authenticated /api/v1/system routes for host in
 status: stable
 code:
   - internal/web/v1/system.go
+  - internal/web/v1/system_test.go
 tags: [web, api, system]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T21:52:15Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-24T17:12:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
 # Behavior
 - `GET /version` → `{version}`.
-- `GET /features` → `["oidc"]` or `[]`; 500 (recovered panic) when no
-  `Auth:` is configured.
+- `GET /features` → `["oidc"]` or `[]`; 200 `[]` when no `Auth:` is
+  configured.
 - `GET /system/info` → [system info](/system/system-info.md) map.
 - `GET /system/interfaces` → names of up, non-loopback, non-point-to-point
   interfaces with a MAC, minus docker, bridge, veth, virbr and Hamachi ones.
@@ -21,4 +22,5 @@ verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 - `/health` → `{status: "healthy", timestamp}`.
 
 # Decisions
-- The `/features` panic is fixed by the UI auth flow plan.
+- The `/features` panic with no `Auth:` was fixed 2026-10-24 (UI auth flow
+  plan).

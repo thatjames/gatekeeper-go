@@ -32,8 +32,7 @@ The contract between the embedded UI and the server.
   DHCP options (interface, IPv4 range, mask, gateway, DNS servers, TTL);
   DNS config (interface, at least one IPv4 upstream, port 0 or 1-65535);
   blocklist (non-empty `url`).
-- There is no `/verify` route although the UI calls it; `/me` is its
-  replacement (UI auth flow plan).
+- There is no `/verify` route; the UI asks `GET /me` who is logged in.
 
 # Decisions
 - The API shape is not a hard constraint (2026-10-17): only the embedded UI

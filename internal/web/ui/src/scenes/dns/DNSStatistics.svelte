@@ -8,7 +8,6 @@
   let error = $state(null);
   let dnsRequestTime = $state(null);
   let queryCounters = $state([]);
-  let cacheHitCounters = $state([]);
   let blockedDomainCounters = $state([]);
   let queryByClientCounter = $state([]);
   let refreshInterval = null;
@@ -25,9 +24,6 @@
       dnsRequestTime = await metricsService.getHistogram("dns_req_time");
 
       queryCounters = await metricsService.getCounterVec("dns_query_count");
-      cacheHitCounters = await metricsService.getCounterVec(
-        "dns_cache_hit_count",
-      );
       blockedDomainCounters = await metricsService.getCounterVec(
         "dns_blocked_domain_count",
       );

@@ -6,7 +6,7 @@ status: stable
 code:
   - internal/service/**
 tags: [runtime]
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-17T21:52:15Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-24T17:12:00Z }
 verified: { by: human:slimjim, at: 2026-10-17T21:59:57Z }
 ---
 
@@ -23,8 +23,7 @@ modules and extra features are on.
   key or wrong type panics.
 - `IsRegistered(key)`, `ActiveServices()` (the keys, unordered).
 - `ExtraFeatures()` returns `["oidc"]` when the auth type is `oidc`,
-  otherwise `[]`. When no `Auth:` is configured it panics (nil interface):
-  a known bug, see [UI auth flow](/ui/app-shell.md).
+  otherwise `[]`, also when no `Auth:` is configured.
 - `Register` takes no lock; registration only happens before the web
   server starts.
 
